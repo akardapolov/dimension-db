@@ -1,0 +1,26 @@
+package ru.dimension.db.model.output;
+
+import java.util.HashMap;
+import java.util.Map;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@Builder(toBuilder = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class StackedColumn {
+
+  @EqualsAndHashCode.Include
+  private long key;
+
+  private long tail;
+
+  private Map<String, Integer> keyCount = new HashMap<>();
+  private Map<String, Double> keySum = new HashMap<>();
+  private Map<String, Double> keyAvg = new HashMap<>();
+}
