@@ -5,5 +5,7 @@ public enum BType {
   CLICKHOUSE,
   ORACLE,
   POSTGRES,
-  MSSQL;
+  MSSQL,
+  MYSQL,
+  DUCKDB
 }

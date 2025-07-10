@@ -45,7 +45,11 @@ public class SqlDB {
         basicDataSource.setPassword(password);
       }
 
-      if (BType.CLICKHOUSE.equals(bType)) {
+      if (BType.POSTGRES.equals(bType)) {
+        basicDataSource.setValidationQuery("SELECT 1");
+      } else if (BType.MYSQL.equals(bType)) {
+        basicDataSource.setValidationQuery("SELECT 1");
+      } else if (BType.CLICKHOUSE.equals(bType)) {
         basicDataSource.setValidationQuery("SELECT 1");
         basicDataSource.addConnectionProperty("compress", "0");
       }
