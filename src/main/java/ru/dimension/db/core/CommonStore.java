@@ -489,7 +489,7 @@ public abstract class CommonStore implements DStore {
     if (optionalTsCProfile.isEmpty() & optionalTsEntry.isPresent()) {
       log.info("Update timestamp column in DBase metadata");
       for (CProfile cProfile : metaModel.getMetadata().get(tableName).getCProfiles()) {
-        if (cProfile != null && optionalTsEntry.get().getKey().equals(cProfile.getColName())) {
+        if (cProfile != null && optionalTsEntry.get().getKey().equalsIgnoreCase(cProfile.getColName())) {
           cProfile.getCsType().setTimeStamp(true);
           break;
         }

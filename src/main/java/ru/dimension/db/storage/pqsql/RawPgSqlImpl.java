@@ -308,6 +308,9 @@ public class RawPgSqlImpl extends QueryJdbcApi implements RawDAO {
                                   int limit,
                                   long begin,
                                   long end) {
+    checkDataType(cProfile, "BYTEA");
+    checkDataType(cProfile, "LOB");
+
     return getDistinctCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end, databaseDialect);
   }
 
@@ -322,6 +325,9 @@ public class RawPgSqlImpl extends QueryJdbcApi implements RawDAO {
                                   CProfile cProfileFilter,
                                   String[] filterData,
                                   CompareFunction compareFunction) {
+    checkDataType(cProfile, "BYTEA");
+    checkDataType(cProfile, "LOB");
+
     return getDistinctWithFilterCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end,
                                        cProfileFilter, filterData, compareFunction, databaseDialect);
   }

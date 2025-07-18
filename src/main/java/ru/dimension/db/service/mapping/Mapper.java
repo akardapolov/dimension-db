@@ -42,16 +42,20 @@ public class Mapper {
   }
 
   public static CType isCType(CProfile cProfile) {
-    if (cProfile.getColDbTypeName().contains("FIXEDSTRING")) return CType.STRING;
-    if (cProfile.getColDbTypeName().contains("ENUM")) return CType.STRING;
+    String typeName = cProfile.getColDbTypeName().toUpperCase();
+    
+    if (typeName.contains("FIXEDSTRING")) return CType.STRING;
+    if (typeName.contains("ENUM")) return CType.STRING;
+    if (typeName.contains("SET")) return CType.STRING;
 
-    if (cProfile.getColDbTypeName().contains("DECIMAL")) return CType.DOUBLE;
-    if (cProfile.getColDbTypeName().contains("DATETIME")) return CType.LONG;
-    if (cProfile.getColDbTypeName().contains("NULLABLE")) return CType.STRING;
-    if (cProfile.getColDbTypeName().contains("ARRAY")) return CType.STRING;
-    if (cProfile.getColDbTypeName().contains("MAP")) return CType.STRING;
+    if (typeName.contains("DECIMAL")) return CType.DOUBLE;
+    if (typeName.contains("DATETIME")) return CType.LONG;
+    if (typeName.contains("NULLABLE")) return CType.STRING;
+    if (typeName.contains("ARRAY")) return CType.STRING;
+    if (typeName.contains("MAP")) return CType.STRING;
 
-    return switch (DataType.valueOf(cProfile.getColDbTypeName().toUpperCase())) {
+    DataType dataType = isDBType(cProfile);
+    return switch (dataType) {
       case UINT8, UINT16, INT16, INT2, INT4, INT8, INT32,
           NUMBER, INTEGER, SMALLINT, INT, BIGINT, BIT, TIME, TIMETZ, TINYINT ->
           CType.INT;
@@ -61,27 +65,42 @@ public class Mapper {
           CType.LONG;
       case FLOAT4, FLOAT32, REAL -> CType.FLOAT;
       case FLOAT64, NUMERIC, FLOAT, FLOAT8, MONEY, SMALLMONEY, DECIMAL, DOUBLE -> CType.DOUBLE;
-      case BOOL, UUID, BYTEA, JSONB, POINT, INTERVAL, BINARY, RAW, VARBINARY, UNIQUEIDENTIFIER, STRING -> CType.STRING;
       default -> CType.STRING;
     };
   }
 
   public static DataType isDBType(CProfile cProfile) {
-    if (cProfile.getColDbTypeName().contains("DECIMAL")) return DataType.DECIMAL;
-    if (cProfile.getColDbTypeName().contains("FIXEDSTRING")) return DataType.FIXEDSTRING;
-    if (cProfile.getColDbTypeName().contains("ENUM8")) return DataType.ENUM8;
-    if (cProfile.getColDbTypeName().contains("ENUM16")) return DataType.ENUM16;
-    if (cProfile.getColDbTypeName().contains("ENUM")) return DataType.ENUM;
+    String typeName = cProfile.getColDbTypeName().toUpperCase();
 
-    if (cProfile.getColDbTypeName().equals("DATETIME")) return DataType.DATETIME;
-    if (cProfile.getColDbTypeName().equals("DATETIME2")) return DataType.DATETIME2;
-    if (cProfile.getColDbTypeName().contains("DATETIME")) return DataType.DATETIME;
+    if (typeName.contains("UNSIGNED")) {
+      if (typeName.contains("TINYINT")) return DataType.UINT8;
+      if (typeName.contains("SMALLINT")) return DataType.UINT16;
+      if (typeName.contains("INT") || typeName.contains("INTEGER")) return DataType.UINT32;
+      if (typeName.contains("BIGINT")) return DataType.UINT64;
+    }
 
-    if (cProfile.getColDbTypeName().contains("NULLABLE")) return DataType.NULLABLE;
-    if (cProfile.getColDbTypeName().contains("ARRAY")) return DataType.ARRAY;
-    if (cProfile.getColDbTypeName().contains("MAP")) return DataType.MAP;
+    if (typeName.contains("DECIMAL")) return DataType.DECIMAL;
+    if (typeName.contains("FIXEDSTRING")) return DataType.FIXEDSTRING;
+    if (typeName.contains("ENUM8")) return DataType.ENUM8;
+    if (typeName.contains("ENUM16")) return DataType.ENUM16;
+    if (typeName.contains("ENUM")) return DataType.ENUM;
 
-    return DataType.valueOf(cProfile.getColDbTypeName().toUpperCase());
+    if (typeName.equals("DATETIME")) return DataType.DATETIME;
+    if (typeName.equals("DATETIME2")) return DataType.DATETIME2;
+    if (typeName.contains("DATETIME")) return DataType.DATETIME;
+
+    if (typeName.contains("NULLABLE")) return DataType.NULLABLE;
+    if (typeName.contains("ARRAY")) return DataType.ARRAY;
+    if (typeName.contains("MAP")) return DataType.MAP;
+
+    if (typeName.contains("SET")) return DataType.SET;
+
+    try {
+      return DataType.valueOf(typeName);
+    } catch (IllegalArgumentException e) {
+      log.warn("Unknown data type: {}, fallback to STRING", typeName);
+      return DataType.STRING;
+    }
   }
 
   public static int convertRawToInt(Object obj,
@@ -223,6 +242,8 @@ public class Mapper {
       case SMALLMONEY:
         if (obj instanceof BigDecimal bd) {
           return bd.doubleValue();
+        } else if (obj instanceof Float fl) {
+          return fl.doubleValue();
         } else {
           return (Double) obj;
         }
@@ -250,6 +271,7 @@ public class Mapper {
       case VARCHAR2:
       case NVARCHAR:
       case NULLABLE:
+      case SET:
         return (String) obj;
       case ARRAY:
         if (obj.getClass().isArray()) {

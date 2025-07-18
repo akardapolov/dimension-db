@@ -1,6 +1,7 @@
 package ru.dimension.db.source;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -70,6 +71,12 @@ public interface JdbcSource {
                 isTheSameKey[0] = true;
               } else {
                 previousValue[0] = dt.toInstant().toEpochMilli();
+              }
+            } else if (object instanceof Date dt) {
+              if (previousValue[0] == dt.getTime()) {
+                isTheSameKey[0] = true;
+              } else {
+                previousValue[0] = dt.getTime();
               }
             }
           } catch (SQLException throwables) {

@@ -76,7 +76,7 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
     Map<String, CSType> csTypeMap = new HashMap<>();
 
     getSProfileForSelect(select, basicDataSource.getConnection()).getCsTypeMap().forEach((key, value) -> {
-      if (key.equals(tsName)) {
+      if (key.equalsIgnoreCase(tsName)) {
         csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(true).sType(SType.RAW).build());
       } else {
         csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(false).sType(SType.RAW).build());
@@ -151,6 +151,12 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
     }
   }
 
+  protected void dropTableMySQL(java.sql.Connection con, String tableName) throws SQLException {
+    try (java.sql.Statement st = con.createStatement()) {
+      st.executeUpdate("DROP TABLE IF EXISTS " + tableName);
+    }
+  }
+
   protected static void dropTableMSSQL(Connection connection, String tableName) throws SQLException {
     String sql = "DROP TABLE " + tableName;
 
@@ -189,7 +195,7 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
   protected CProfile getCProfileByName(TProfile tProfile,
                                      String colName) {
     return tProfile.getCProfiles().stream()
-        .filter(f -> f.getColName().equals(colName))
+        .filter(f -> f.getColName().equalsIgnoreCase(colName))
         .findAny().orElseThrow();
   }
 

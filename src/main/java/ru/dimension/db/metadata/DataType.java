@@ -86,6 +86,9 @@ public enum DataType {
   POINT(74, "POINT"),
   INTERVAL(75, "INTERVAL"),
 
+  /* MySQL */
+  SET(76, "SET"),
+
   INTEGER(122, "INTEGER"),
   OID(123, "OID"),
   NAME(124, "NAME"),

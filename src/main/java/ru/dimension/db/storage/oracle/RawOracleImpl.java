@@ -308,6 +308,8 @@ public class RawOracleImpl extends QueryJdbcApi implements RawDAO {
                                   int limit,
                                   long begin,
                                   long end) {
+    checkDataType(cProfile, "LOB");
+
     return getDistinctCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end, databaseDialect);
   }
 

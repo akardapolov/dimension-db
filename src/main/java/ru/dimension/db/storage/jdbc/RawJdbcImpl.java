@@ -47,9 +47,9 @@ public class RawJdbcImpl extends QueryJdbcApi implements RawDAO {
                           int[] rawColIds,
                           int[] enumColIds,
                           int[] histogramColIds) {
-    throw new UnsupportedOperationException("Not supported for JDBC");
+    MetadataKey metadataKey = new MetadataKey(tableId, blockId);
+    this.primaryIndex.put(tableId, new Metadata(metadataKey, rawCTypeKeys, rawColIds, enumColIds, histogramColIds));
   }
-
 
   @Override
   public void putByte(byte tableId,
@@ -306,6 +306,8 @@ public class RawJdbcImpl extends QueryJdbcApi implements RawDAO {
                                   int limit,
                                   long begin,
                                   long end) {
+    checkDataType(cProfile, "LOB");
+
     return getDistinctCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end, databaseDialect);
   }
 
@@ -320,7 +322,10 @@ public class RawJdbcImpl extends QueryJdbcApi implements RawDAO {
                                   CProfile cProfileFilter,
                                   String[] filterData,
                                   CompareFunction compareFunction) {
-    return null;
+    checkDataType(cProfile, "LOB");
+
+    return getDistinctWithFilterCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end,
+                                       cProfileFilter, filterData, compareFunction, databaseDialect);
   }
 
   @Override

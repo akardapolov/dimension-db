@@ -308,6 +308,8 @@ public class RawMsSqlImpl extends QueryJdbcApi implements RawDAO {
                                   int limit,
                                   long begin,
                                   long end) {
+    checkDataType(cProfile, "BINARY");
+
     return getDistinctCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end, databaseDialect);
   }
 
@@ -322,6 +324,8 @@ public class RawMsSqlImpl extends QueryJdbcApi implements RawDAO {
                                   CProfile cProfileFilter,
                                   String[] filterData,
                                   CompareFunction compareFunction) {
+    checkDataType(cProfile, "BINARY");
+
     return getDistinctWithFilterCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end,
                                        cProfileFilter, filterData, compareFunction, databaseDialect);
   }

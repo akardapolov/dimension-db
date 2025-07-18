@@ -4,7 +4,7 @@
 
   <groupId>ru.dimension</groupId>
   <artifactId>db</artifactId>
-  <version>25.7.2</version>
+  <version>25.7.3</version>
   <packaging>jar</packaging>
 
   <name>Dimension DB</name>
@@ -168,6 +168,11 @@
       <artifactId>mssql-jdbc</artifactId>
       <version>${mssql.version}</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <version>9.3.0</version>
     </dependency>
 
     <!--Test querydsl-->

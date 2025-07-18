@@ -38,20 +38,9 @@ public class GenericDialect implements DatabaseDialect {
     whereClause.append(tsCProfile.getColName()).append(" BETWEEN ? AND ?");
 
     if (cProfileFilter != null && filterData != null && filterData.length > 0) {
-      whereClause.append(" AND (");
-      String column = cProfileFilter.getColName();
-
-      for (int i = 0; i < filterData.length; i++) {
-        if (i > 0) whereClause.append(" OR ");
-
-        if (CompareFunction.CONTAIN.equals(compareFunction)) {
-          whereClause.append(column).append(" LIKE ?");
-        } else {
-          whereClause.append(column).append(" = ?");
-        }
-      }
-      whereClause.append(")");
+      whereClause.append(getFilterAndString(cProfileFilter, filterData, compareFunction));
     }
+
     return whereClause.toString();
   }
 
@@ -74,5 +63,36 @@ public class GenericDialect implements DatabaseDialect {
   public void setDateTime(CProfile tsCProfile, PreparedStatement ps,
                           int parameterIndex, long unixTimestamp) throws SQLException {
     ps.setTimestamp(parameterIndex, new Timestamp(unixTimestamp));
+  }
+
+
+  private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
+    if (cProfileFilter == null || filterData == null) {
+      return "";
+    }
+
+    String columnName = cProfileFilter.getColName();
+    StringBuilder filterClause = new StringBuilder();
+
+    for (String filterValue : filterData) {
+      String condition;
+      if (filterValue == null || filterValue.trim().isEmpty()) {
+        condition = columnName + " IS NULL OR " + columnName + " = ''";
+      } else {
+        String formattedValue = filterValue.trim();
+        if (CompareFunction.CONTAIN.equals(compareFunction)) {
+          formattedValue = "%" + formattedValue.toLowerCase() + "%";
+          condition = "LOWER(" + columnName + ") LIKE '" + formattedValue.replace("'", "''") + "'";
+        } else {
+          condition = columnName + " = '" + formattedValue.replace("'", "''") + "'";
+        }
+      }
+      if (filterClause.length() > 0) {
+        filterClause.append(" OR ");
+      }
+      filterClause.append(condition);
+    }
+
+    return filterClause.length() == 0 ? "" : " AND (" + filterClause + ")";
   }
 }

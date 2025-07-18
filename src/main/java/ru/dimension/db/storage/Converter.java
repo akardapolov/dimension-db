@@ -2,6 +2,7 @@ package ru.dimension.db.storage;
 
 import static ru.dimension.db.util.MapArrayUtil.arrayToString;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -9,12 +10,15 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
+import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.sql.Wrapper;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -150,6 +154,7 @@ public class Converter {
       case VARCHAR2:
       case NVARCHAR:
       case NULLABLE:
+      case SET:
         return dimensionDAO.getOrLoad((String) obj);
       case ARRAY:
         if (obj.getClass().isArray()) {
@@ -188,6 +193,7 @@ public class Converter {
     if (cProfile.getColDbTypeName().contains("FIXEDSTRING")) return dimensionDAO.getStringById(objIndex);
     if (cProfile.getColDbTypeName().contains("ARRAY")) return dimensionDAO.getStringById(objIndex);
     if (cProfile.getColDbTypeName().contains("MAP")) return dimensionDAO.getStringById(objIndex);
+    if (cProfile.getColDbTypeName().contains("SET")) return dimensionDAO.getStringById(objIndex);
 
     return switch (Mapper.isDBType(cProfile)) {
       case DATE, ENUM8, ENUM16, CHAR, NCHAR, NCLOB, CLOB, NAME, TEXT, NTEXT,
@@ -210,39 +216,58 @@ public class Converter {
     };
   }
 
-  public long getKeyValue(Object obj,
-                          CProfile cProfile) {
+  public long getKeyValue(Object obj, CProfile cProfile) {
     if (obj == null) {
       return 0L;
     }
 
     switch (cProfile.getCsType().getDType()) {
-      case LONG:
-      case INTEGER:
+      case LONG, INTEGER -> {
         if (obj instanceof Long l) {
           return l;
         } else {
           return ((Integer) obj).longValue();
         }
-      case DATE:
-      case TIMESTAMP:
-      case TIMESTAMPTZ:
-      case DATETIME:
-      case DATETIME2:
-      case SMALLDATETIME:
+      }
+      case DATE, TIMESTAMP, TIMESTAMPTZ, DATETIME, DATETIME2, SMALLDATETIME -> {
         if (obj instanceof Timestamp ts) {
           return ts.getTime();
+        } else if (obj instanceof Instant instant) {
+          return instant.toEpochMilli();
         } else if (obj instanceof LocalDateTime localDateTime) {
           ZonedDateTime zdt = localDateTime.atZone(ZoneId.systemDefault());
-          Instant instant = zdt.toInstant();
-          Timestamp timestamp = Timestamp.from(instant);
-          return timestamp.getTime();
+          return zdt.toInstant().toEpochMilli();
         } else if (obj instanceof LocalDate localDate) {
-          return localDate.atStartOfDay(ZoneOffset.UTC).toEpochSecond();
+          return localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
+        } else if (obj instanceof OffsetDateTime offsetDateTime) {
+          return offsetDateTime.toInstant().toEpochMilli();
+        } else if (obj instanceof ZonedDateTime zonedDateTime) {
+          return zonedDateTime.toInstant().toEpochMilli();
+        } else if (obj instanceof Date date) {
+          return date.getTime();
+        } else {
+          return handleOracleTimestamp(obj);
         }
-      default:
+      }
+      default -> {
         return 0L;
+      }
     }
+  }
+
+  private long handleOracleTimestamp(Object obj) {
+    if (obj instanceof Timestamp) {
+      return ((Timestamp) obj).getTime();
+    }
+    if (obj instanceof Wrapper) {
+      try {
+        Timestamp ts = ((Wrapper) obj).unwrap(Timestamp.class);
+        return ts.getTime();
+      } catch (SQLException ignored) {
+        log.warn("Unwrap failed, fall through");
+      }
+    }
+    return 0L;
   }
 
   private String getDateForLongShorted(int longDate) {
