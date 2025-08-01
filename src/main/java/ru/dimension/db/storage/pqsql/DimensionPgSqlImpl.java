@@ -15,21 +15,31 @@ public class DimensionPgSqlImpl implements DimensionDAO {
 
   @Override
   public int getOrLoad(double value) {
-    return 0;
+    throw new UnsupportedOperationException("Not supported implementation");
   }
 
   @Override
   public int getOrLoad(String value) {
-    return 0;
+    throw new UnsupportedOperationException("Not supported implementation");
+  }
+
+  @Override
+  public int getOrLoad(long value) {
+    throw new UnsupportedOperationException("Not supported implementation");
   }
 
   @Override
   public String getStringById(int key) {
-    return "";
+    throw new UnsupportedOperationException("Not supported implementation");
   }
 
   @Override
   public double getDoubleById(int key) {
-    return 0D;
+    throw new UnsupportedOperationException("Not supported implementation");
+  }
+
+  @Override
+  public long getLongById(int key) {
+    throw new UnsupportedOperationException("Not supported implementation");
   }
 }

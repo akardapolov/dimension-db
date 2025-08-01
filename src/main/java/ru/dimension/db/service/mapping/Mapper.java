@@ -13,6 +13,7 @@ import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -166,10 +167,12 @@ public class Mapper {
       case SMALLDATETIME:
         if (obj instanceof Timestamp ts) {
           return ts.getTime();
+        } else if (obj instanceof Instant instant) {
+          return instant.toEpochMilli();
         } else if (obj instanceof LocalDateTime localDateTime) {
           return localDateTime.atZone(ZoneOffset.UTC).toInstant().toEpochMilli();
         } else if (obj instanceof LocalDate localDate) {
-          return localDate.atStartOfDay(ZoneOffset.UTC).toEpochSecond() * 1000;
+          return localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
         } else if (obj instanceof Date date) {
           return date.getTime();
         } else if (obj instanceof byte[] ba) {
@@ -179,8 +182,7 @@ public class Mapper {
           java.util.Date date = new java.util.Date(timestamp.getTime());
           return date.getTime();
         } else if (obj instanceof OffsetDateTime offsetDateTime) {
-          int totalSeconds = offsetDateTime.getOffset().getTotalSeconds();
-          return (offsetDateTime.toLocalDateTime().toEpochSecond(offsetDateTime.getOffset()) + totalSeconds) * 1000;
+          return offsetDateTime.toInstant().toEpochMilli();
         }
       case OID:
       case BIGSERIAL:

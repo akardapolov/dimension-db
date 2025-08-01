@@ -297,7 +297,20 @@ public class RawMsSqlImpl extends QueryJdbcApi implements RawDAO {
                                           CProfile secondGrpBy,
                                           long begin,
                                           long end) {
-    throw new RuntimeException("Not supported");
+    return getGanttSum(tableName, tsCProfile, firstGrpBy, secondGrpBy, begin, end, databaseDialect);
+  }
+
+  @Override
+  public List<GanttColumnSum> getGanttSum(String tableName,
+                                          CProfile tsCProfile,
+                                          CProfile firstGrpBy,
+                                          CProfile secondGrpBy,
+                                          CProfile cProfileFilter,
+                                          String[] filterData,
+                                          CompareFunction compareFunction,
+                                          long begin,
+                                          long end) {
+    return getGanttSumWithFilter(tableName, tsCProfile, firstGrpBy, secondGrpBy, cProfileFilter, filterData, compareFunction, begin, end, databaseDialect);
   }
 
   @Override

@@ -13,10 +13,11 @@ public class StatisticsServiceImpl implements StatisticsService {
   // tableId -> colId -> stack of storage types (limited to HISTORY_SIZE)
   private final Map<Byte, Map<Integer, CircularBuffer<StorageType>>> stats = new HashMap<>();
   private final Map<Byte, Integer> lastAnalyzedColIdMap = new HashMap<>();
+  private final Map<Byte, Boolean> fullPassDoneMap = new HashMap<>();
 
   @Override
   public boolean isStatByTableExist(byte tableId) {
-    if (stats.get(tableId).isEmpty()) {
+    if (stats.get(tableId) == null || stats.get(tableId).isEmpty()) {
       stats.computeIfAbsent(tableId, k -> new HashMap<>());
       return false;
     } else {
@@ -28,10 +29,13 @@ public class StatisticsServiceImpl implements StatisticsService {
   public SType getLastSType(byte tableId, int colId, boolean isTimestamp) {
     if (isTimestamp) return SType.RAW;
 
-    CircularBuffer<StorageType> history = stats.getOrDefault(tableId, Collections.emptyMap()).get(colId);
+    Map<Integer, CircularBuffer<StorageType>> tableStats = stats.get(tableId);
+    if (tableStats == null) return SType.RAW;
+
+    CircularBuffer<StorageType> history = tableStats.get(colId);
 
     if (history == null || history.isEmpty()) {
-      stats.computeIfAbsent(tableId, k -> new HashMap<>())
+      stats.get(tableId)
           .computeIfAbsent(colId, k -> new CircularBuffer<>(HISTORY_SIZE))
           .add(new StorageType(SType.RAW));
       return SType.RAW;
@@ -39,7 +43,6 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     return history.getLastAdded().sType();
   }
-
   public Integer getLastAnalyzedColId(byte tableId) {
     return lastAnalyzedColIdMap.get(tableId);
   }
@@ -52,6 +55,14 @@ public class StatisticsServiceImpl implements StatisticsService {
     stats.computeIfAbsent(tableId, k -> new HashMap<>())
         .computeIfAbsent(colId, k -> new CircularBuffer<>(HISTORY_SIZE))
         .add(new StorageType(sType));
+  }
+
+  public boolean isFullPassDone(byte tableId) {
+    return fullPassDoneMap.getOrDefault(tableId, false);
+  }
+
+  public void setFullPassDone(byte tableId) {
+    fullPassDoneMap.put(tableId, true);
   }
 
   private record StorageType(SType sType) {}

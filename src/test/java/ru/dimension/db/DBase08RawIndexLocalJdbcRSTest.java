@@ -5,6 +5,7 @@ import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.common.AbstractH2Test;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.sql.BatchResultSet;
@@ -31,7 +32,7 @@ public class DBase08RawIndexLocalJdbcRSTest extends AbstractH2Test {
     Map<String, SType> csTypeMap = new LinkedHashMap<>();
     csTypeMap.put("ID", SType.RAW);
 
-    putDataJdbc(csTypeMap, TType.TIME_SERIES, IType.LOCAL, true);
+    putDataJdbc(csTypeMap, TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD, true);
   }
 
   @Test

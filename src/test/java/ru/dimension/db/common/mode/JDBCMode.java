@@ -10,6 +10,7 @@ import ru.dimension.db.exception.EnumByteExceedException;
 import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -20,6 +21,7 @@ public interface JDBCMode {
       String tableName,
       TType tableType,
       IType indexType,
+      AType analyzeType,
       BType backendType,
       boolean compression
   ) {
@@ -27,6 +29,7 @@ public interface JDBCMode {
         .tableName(tableName)
         .tableType(tableType)
         .indexType(indexType)
+        .analyzeType(analyzeType)
         .backendType(backendType)
         .compression(compression)
         .csTypeMap(new LinkedHashMap<>()).build();

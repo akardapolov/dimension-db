@@ -16,7 +16,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
@@ -33,6 +35,7 @@ import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.TProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.service.mapping.Mapper;
@@ -47,6 +50,10 @@ public class ClickHouseDatabase implements ClickHouse {
   @Getter
   private final List<CProfile> cProfileList = new ArrayList<>();
 
+  public enum Step {
+    DAY, HOUR
+  }
+
   public ClickHouseDatabase(String url) throws SQLException {
     connection = DriverManager.getConnection(url);
   }
@@ -55,6 +62,7 @@ public class ClickHouseDatabase implements ClickHouse {
                                                DStore dStore,
                                                TType tType,
                                                IType iType,
+                                               AType aType,
                                                Boolean compression,
                                                int batchSize,
                                                int resultSetFetchSize) throws SQLException {
@@ -76,7 +84,7 @@ public class ClickHouseDatabase implements ClickHouse {
 
     try {
       tProfile = dStore.loadJdbcTableMetadata(connection, select,
-                                              getSProfile(tableName, tType, iType, compression));
+                                              getSProfile(tableName, tType, iType, aType, compression));
     } catch (TableNameEmptyException e) {
       throw new RuntimeException(e);
     }
@@ -191,6 +199,7 @@ public class ClickHouseDatabase implements ClickHouse {
                                        DStore dStore,
                                        TType tType,
                                        IType iType,
+                                       AType aType,
                                        Boolean compression,
                                        int resultSetFetchSize,
                                        boolean saveMetadataAndExit) throws SQLException {
@@ -207,16 +216,16 @@ public class ClickHouseDatabase implements ClickHouse {
             .colDbTypeName(cProfile.getColDbTypeName())
             .colSizeDisplay(cProfile.getColSizeDisplay())
             .csType(CSType.builder()
-                .isTimeStamp(cProfile.getColName().equalsIgnoreCase("PICKUP_DATETIME"))
-                .sType(getSType(cProfile.getColName()))
-                .cType(Mapper.isCType(cProfile))
-                .dType(Mapper.isDBType(cProfile))
-                .build())
+                        .isTimeStamp(cProfile.getColName().equalsIgnoreCase("PICKUP_DATETIME"))
+                        .sType(getSType(cProfile.getColName()))
+                        .cType(Mapper.isCType(cProfile))
+                        .dType(Mapper.isDBType(cProfile))
+                        .build())
             .build()).toList();
 
     try {
       tProfile = dStore.loadJdbcTableMetadata(connection, select,
-                                              getSProfile(tableName, tType, iType, compression));
+                                              getSProfile(tableName, tType, iType, aType, compression));
     } catch (TableNameEmptyException e) {
       throw new RuntimeException(e);
     }
@@ -292,12 +301,22 @@ public class ClickHouseDatabase implements ClickHouse {
     return cProfiles;
   }
 
-  public List<CProfile> loadDataJdbc(String select, DStore dStore, TType tType, IType iType, Boolean compression,
-                                     int resultSetFetchSize) throws SQLException {
+  public List<CProfile> loadDataJdbc(String select,
+                                     DStore dStore,
+                                     TType tType,
+                                     IType iType,
+                                     AType aType,
+                                     Boolean compression,
+                                     int resultSetFetchSize,
+                                     LocalDate startDate,
+                                     LocalDate endDate,
+                                     Step step) throws SQLException {
 
     log.info("Start time: " + LocalDateTime.now());
 
-    List<CProfile> cProfileList = loadSqlColMetadataList(select);
+    String selectTest = select + " LIMIT 1";
+
+    List<CProfile> cProfileList = loadSqlColMetadataList(selectTest);
 
     List<CProfile> cProfiles = cProfileList.stream()
         .map(cProfile -> cProfile.toBuilder()
@@ -306,55 +325,72 @@ public class ClickHouseDatabase implements ClickHouse {
             .colDbTypeName(cProfile.getColDbTypeName())
             .colSizeDisplay(cProfile.getColSizeDisplay())
             .csType(CSType.builder()
-                .isTimeStamp(cProfile.getColName().equalsIgnoreCase("PICKUP_DATETIME"))
-                .sType(getSType(cProfile.getColName()))
-                .cType(Mapper.isCType(cProfile))
-                .dType(Mapper.isDBType(cProfile))
-                .build())
+                        .isTimeStamp(cProfile.getColName().equalsIgnoreCase("PICKUP_DATETIME"))
+                        .sType(getSType(cProfile.getColName()))
+                        .cType(Mapper.isCType(cProfile))
+                        .dType(Mapper.isDBType(cProfile))
+                        .build())
             .build()).toList();
 
     try {
-      tProfile = dStore.loadJdbcTableMetadata(connection, select, getSProfile(tableName, tType, iType, compression));
+      tProfile = dStore.loadJdbcTableMetadata(connection, selectTest, getSProfile(tableName, tType, iType, aType, compression));
     } catch (TableNameEmptyException e) {
       throw new RuntimeException(e);
     }
 
-    LocalDate start = LocalDate.of(2016, 1, 1);
-    LocalDate end = LocalDate.of(2017, 1, 1);
+    DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+    DateTimeFormatter hourFormatter = DateTimeFormatter.ofPattern("yyyyMMddHH");
 
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+    long stepCount;
+    switch (step) {
+      case DAY -> stepCount = ChronoUnit.DAYS.between(startDate, endDate);
+      case HOUR -> stepCount = ChronoUnit.HOURS.between(
+          startDate.atStartOfDay(),
+          endDate.atStartOfDay()
+      );
+      default -> throw new IllegalArgumentException("Unsupported step: " + step);
+    }
 
-    String select2016template = "SELECT * FROM datasets.trips_mergetree where toYYYYMMDD(pickup_date) = ";
-    start.datesUntil(end).forEach(day -> {
-      String sDay = day.format(formatter);
+    for (long i = 0; i < stepCount; i++) {
+      String condition;
+      if (step == Step.DAY) {
+        LocalDate currentDate = startDate.plusDays(i);
+        condition = "toYYYYMMDD(pickup_date) = " + currentDate.format(dayFormatter);
+      } else {
+        LocalDateTime currentDateTime = startDate.atStartOfDay().plusHours(i);
+        condition = "toYYYYMMDDhhmmss(pickup_datetime) BETWEEN " +
+            currentDateTime.format(hourFormatter) + "0000 AND " +
+            currentDateTime.format(hourFormatter) + "5959";
+      }
 
       try {
-        String query = select2016template + sDay + " ORDER BY pickup_datetime ASC";
+        String query = select + " WHERE " + condition + " ORDER BY pickup_datetime ASC";
 
         log.info("Start query: " + query);
-        PreparedStatement ps = connection.prepareStatement(query);
-        ps.setFetchSize(resultSetFetchSize);
-        ResultSet r = ps.executeQuery();
-
-        dStore.putDataJdbc(tProfile.getTableName(), r);
-
-        r.close();
-        ps.close();
-
+        try (PreparedStatement ps = connection.prepareStatement(query)) {
+          ps.setFetchSize(resultSetFetchSize);
+          try (ResultSet r = ps.executeQuery()) {
+            dStore.putDataJdbc(tProfile.getTableName(), r);
+          }
+        }
         log.info("End query: " + query);
       } catch (Exception e) {
         log.catching(e);
       }
-
-    });
+    }
 
     log.info("End time: " + LocalDateTime.now());
     return cProfiles;
   }
 
-  public List<CProfile> loadDataJdbcBatch(String select, DStore dStore,
-      TType tType, IType iType, Boolean compression,
-      int fBaseBatchSize, int resultSetFetchSize) throws SQLException, EnumByteExceedException, SqlColMetadataException {
+  public List<CProfile> loadDataJdbcBatch(String select,
+                                          DStore dStore,
+                                          TType tType,
+                                          IType iType,
+                                          AType aType,
+                                          Boolean compression,
+                                          int fBaseBatchSize,
+                                          int resultSetFetchSize) throws SQLException, EnumByteExceedException, SqlColMetadataException {
 
     log.info("Start time: " + LocalDateTime.now());
 
@@ -367,15 +403,15 @@ public class ClickHouseDatabase implements ClickHouse {
             .colDbTypeName(cProfile.getColDbTypeName())
             .colSizeDisplay(cProfile.getColSizeDisplay())
             .csType(CSType.builder()
-                .isTimeStamp(cProfile.getColName().equalsIgnoreCase("PICKUP_DATETIME"))
-                .sType(getSType(cProfile.getColName()))
-                .cType(Mapper.isCType(cProfile))
-                .dType(Mapper.isDBType(cProfile))
-                .build())
+                        .isTimeStamp(cProfile.getColName().equalsIgnoreCase("PICKUP_DATETIME"))
+                        .sType(getSType(cProfile.getColName()))
+                        .cType(Mapper.isCType(cProfile))
+                        .dType(Mapper.isDBType(cProfile))
+                        .build())
             .build()).toList();
 
     try {
-      tProfile = dStore.loadJdbcTableMetadata(connection, select, getSProfile(tableName, tType, iType, compression));
+      tProfile = dStore.loadJdbcTableMetadata(connection, select, getSProfile(tableName, tType, iType, aType, compression));
     } catch (TableNameEmptyException e) {
       throw new RuntimeException(e);
     }
@@ -392,7 +428,7 @@ public class ClickHouseDatabase implements ClickHouse {
     log.info("End time: " + LocalDateTime.now());
     return cProfiles;
   }
-  
+
   private void addToList(List<List<Object>> lists, CProfile v, ResultSet r ) throws SQLException {
     lists.get(v.getColId()).add(r.getObject(v.getColIdSql()));
   }
@@ -417,7 +453,7 @@ public class ClickHouseDatabase implements ClickHouse {
     } else {
       throw new RuntimeException("File not found: " + sourceMetamodel);
     }
-    
+
     storeObjectToFile(listsColStore, "listsColStore.obj");
   }
 
@@ -437,17 +473,17 @@ public class ClickHouseDatabase implements ClickHouse {
 
     for (int i = 1; i <= rsmd.getColumnCount(); i++) {
       cProfileList.add(i - 1,
-      CProfile.builder()
-          .colId(i-1)
-          .colIdSql(i)
-          .colName(rsmd.getColumnName(i).toUpperCase())
+                       CProfile.builder()
+                           .colId(i-1)
+                           .colIdSql(i)
+                           .colName(rsmd.getColumnName(i).toUpperCase())
 
-          .colDbTypeName(rsmd.getColumnTypeName(i).toUpperCase().contains("(") ?
-              rsmd.getColumnTypeName(i).toUpperCase().substring(0, rsmd.getColumnTypeName(i).toUpperCase().indexOf("("))
-               : rsmd.getColumnTypeName(i).toUpperCase())
+                           .colDbTypeName(rsmd.getColumnTypeName(i).toUpperCase().contains("(") ?
+                                              rsmd.getColumnTypeName(i).toUpperCase().substring(0, rsmd.getColumnTypeName(i).toUpperCase().indexOf("("))
+                                              : rsmd.getColumnTypeName(i).toUpperCase())
 
-          .colSizeDisplay(rsmd.getColumnDisplaySize(i))
-          .build());
+                           .colSizeDisplay(rsmd.getColumnDisplaySize(i))
+                           .build());
     }
 
     rs.close();
@@ -456,7 +492,26 @@ public class ClickHouseDatabase implements ClickHouse {
     return cProfileList;
   }
 
-  
+  public long[] getMinMaxTimestampMillis(LocalDate dateFrom, LocalDate dateTo) throws SQLException {
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+    String dateStrFrom = dateFrom.format(formatter);
+    String dateStrTo = dateTo.format(formatter);
+    String query = "SELECT " +
+        "toUnixTimestamp(min(pickup_datetime)) * 1000, " +
+        "toUnixTimestamp(max(pickup_datetime)) * 1000 " +
+        "FROM datasets.trips_mergetree " +
+        "WHERE toYYYYMMDD(pickup_datetime) BETWEEN " + dateStrFrom + " AND " + dateStrTo;
+
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery(query)) {
+      if (rs.next()) {
+        return new long[]{rs.getLong(1), rs.getLong(2)};
+      } else {
+        throw new SQLException("No results found for date: " + dateFrom + " - " + dateStrTo);
+      }
+    }
+  }
+
   public void close() throws SQLException {
     connection.close();
   }

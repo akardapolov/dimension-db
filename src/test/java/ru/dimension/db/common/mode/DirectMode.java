@@ -13,6 +13,7 @@ import ru.dimension.db.model.profile.TProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -23,6 +24,7 @@ public interface DirectMode {
       String tableName,
       TType tableType,
       IType indexType,
+      AType analyzeType,
       BType backendType,
       boolean compression
   ) {
@@ -30,6 +32,7 @@ public interface DirectMode {
         .tableName(tableName)
         .tableType(tableType)
         .indexType(indexType)
+        .analyzeType(analyzeType)
         .backendType(backendType)
         .compression(compression)
         .csTypeMap(new LinkedHashMap<>()).build();
@@ -50,15 +53,21 @@ public interface DirectMode {
       String tableName,
       TType tableType,
       IType indexType,
+      AType analyzeType,
       BType backendType,
       boolean compression
   ) throws TableNameEmptyException {
-    SProfile sProfile = getSProfileDirect(tableName, tableType, indexType, backendType, compression);
+    SProfile sProfile = getSProfileDirect(tableName, tableType, indexType, analyzeType, backendType, compression);
     config.getDStore().loadDirectTableMetadata(sProfile);
   }
 
   default TProfile setupDirectProfile(String tableName, DBaseTestConfig configDirect) throws TableNameEmptyException {
-    SProfile sProfile = getSProfileDirect(tableName, TType.REGULAR, IType.GLOBAL, BType.BERKLEYDB, true);
+    SProfile sProfile = getSProfileDirect(tableName,
+                                          TType.REGULAR,
+                                          IType.GLOBAL,
+                                          AType.ON_LOAD,
+                                          BType.BERKLEYDB,
+                                          true);
     return configDirect.getDStore().loadDirectTableMetadata(sProfile);
   }
 

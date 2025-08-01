@@ -18,6 +18,7 @@ import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -104,6 +105,7 @@ public class DBaseCsvBenchmarkTest {
     sProfile.setTableName(tableName);
     sProfile.setTableType(TType.TIME_SERIES);
     sProfile.setIndexType(IType.GLOBAL);
+    sProfile.setAnalyzeType(AType.ON_LOAD);
     sProfile.setBackendType(BType.BERKLEYDB);
     sProfile.setCompression(false);
     sProfile.setTableType(TType.REGULAR);

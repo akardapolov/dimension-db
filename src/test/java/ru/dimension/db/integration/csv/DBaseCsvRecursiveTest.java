@@ -24,6 +24,7 @@ import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -134,6 +135,7 @@ public class DBaseCsvRecursiveTest {
               .tableName(tableName)
               .tableType(TType.REGULAR)
               .indexType(IType.GLOBAL)
+              .analyzeType(AType.ON_LOAD)
               .compression(compression)
               .csTypeMap(new HashMap<>()).build());
     } catch (TableNameEmptyException e) {
@@ -148,6 +150,7 @@ public class DBaseCsvRecursiveTest {
     sProfile.setTableName(tableName);
     sProfile.setTableType(TType.TIME_SERIES);
     sProfile.setIndexType(IType.GLOBAL);
+    sProfile.setAnalyzeType(AType.ON_LOAD);
     sProfile.setBackendType(BType.BERKLEYDB);
     sProfile.setCompression(false);
     sProfile.setTableType(TType.REGULAR);

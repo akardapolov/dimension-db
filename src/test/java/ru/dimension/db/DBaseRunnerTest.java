@@ -33,6 +33,7 @@ import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -94,6 +95,7 @@ public class DBaseRunnerTest extends AbstractH2Test {
     @SuppressWarnings("unchecked")
     Map<String, SType> csTypeMap = (Map<String, SType>) configuration.get("csTypeMap");
     IType indexType = (IType) configuration.get("indexType");
+    AType analyzeType = (AType) configuration.get("analyzeType");
     Boolean compression = (Boolean) configuration.get("compression");
     LoadDataType loadDataType = (LoadDataType) configuration.get("loadDataType");
 
@@ -107,6 +109,7 @@ public class DBaseRunnerTest extends AbstractH2Test {
                                  csTypeMap,
                                  tableType,
                                  indexType,
+                                 analyzeType,
                                  backendType,
                                  compression);
 

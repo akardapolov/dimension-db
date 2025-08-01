@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import ru.dimension.db.model.MetaModel;
 import ru.dimension.db.model.profile.CProfile;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -38,6 +39,11 @@ public class MetaModelApiImpl implements MetaModelApi {
   @Override
   public IType getIndexType(String tableName) {
     return metaModel.getMetadata().get(tableName).getIndexType();
+  }
+
+  @Override
+  public AType getAnalyzeType(String tableName) {
+    return metaModel.getMetadata().get(tableName).getAnalyzeType();
   }
 
   @Override

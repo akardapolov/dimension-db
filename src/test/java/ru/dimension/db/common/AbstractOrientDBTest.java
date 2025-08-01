@@ -15,6 +15,7 @@ import ru.dimension.db.backend.BerkleyDB;
 import ru.dimension.db.config.DBaseConfig;
 import ru.dimension.db.core.DStore;
 import ru.dimension.db.model.profile.SProfile;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -73,6 +74,7 @@ public abstract class AbstractOrientDBTest implements JdbcSource {
     return new SProfile().setTableName(tableNameRandom)
         .setTableType(TType.TIME_SERIES)
         .setIndexType(IType.GLOBAL)
+        .setAnalyzeType(AType.ON_LOAD)
         .setBackendType(BType.BERKLEYDB)
         .setCompression(false)
         .setCsTypeMap(csTypeMap);
@@ -94,6 +96,7 @@ public abstract class AbstractOrientDBTest implements JdbcSource {
     return new SProfile().setTableName(tableNameAsh)
         .setTableType(TType.TIME_SERIES)
         .setIndexType(IType.GLOBAL)
+        .setAnalyzeType(AType.ON_LOAD)
         .setBackendType(BType.BERKLEYDB)
         .setCompression(false)
         .setCsTypeMap(csTypeMap);

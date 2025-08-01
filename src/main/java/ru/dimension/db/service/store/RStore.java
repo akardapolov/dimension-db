@@ -87,7 +87,7 @@ public class RStore extends CommonServiceApi {
     if (CType.INT == cType) {
       this.rawDataInt.get(mappingInt.get(colId)).add(iR, key);
     } else if (CType.LONG == cType) {
-      this.rawDataLong.get(mappingLong.get(colId)).add(iR, (long) key);
+      this.rawDataLong.get(mappingLong.get(colId)).add(iR, converter.convertIntToLong(key, cProfile));
     } else if (CType.FLOAT == cType) {
       this.rawDataFloat.get(mappingFloat.get(colId)).add(iR, (float) converter.convertIntToDouble(key, cProfile));
     } else if (CType.DOUBLE == cType) {

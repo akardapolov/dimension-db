@@ -33,6 +33,7 @@ Hybrid time-series and block-column storage database engine written in Java
       - [Parameters](#parameters)
         - [Table type - enum TType](#table-type---enum-ttype)
         - [Table indexing type - enum IType](#table-indexing-type---enum-itype)
+        - [Data analysis method type by table - enum AType](#data-analysis-method-type-by-table---enum-atype)
         - [Table backend type - enum BType](#table-backend-type---enum-btype)
         - [Data grouping function type - enum GroupFunction](#data-grouping-function-type---enum-groupfunction)
         - [Table column storage parameters - CSType class](#table-column-storage-parameters---cstype-class)
@@ -48,6 +49,7 @@ Hybrid time-series and block-column storage database engine written in Java
         - [Object to get data aggregates from stacked API - StackedColumn class](#object-to-get-data-aggregates-from-stacked-api---stackedcolumn-class)
           [Object to get data aggregates from the gantt API - GanttColumnCount and GanttColumnSum classes](#object-to-get-data-aggregates-from-the-gantt-api---ganttcolumncount-and-ganttcolumnsum-classes)
     - [Code use cases](#code-use-cases)
+    - [Performance](#performance)
 - [Download](#download)
 - [Development](#development)
 - [Documentation](#documentation)
@@ -158,15 +160,15 @@ Table 4. Parameters and statistics for **Dimension DBRunnerTest** tests
 
 | Test name              | PermutationState | Number of configurations | Total tests | Execution time |
 |------------------------|------------------|--------------------------|-------------|----------------|
-| testPermutationNone    | NONE             | 36                       | 1 620       | ~ 3 seconds    |
-| testPermutationPartial | PARTIAL          | 648                      | 29 160      | ~ 30 seconds   |
-| testPermutationAll     | ALL              | 8748                     | 393 660     | ~ 6-7 minutes  |
+| testPermutationNone    | NONE             | 108                      | 4 860       | ~ 9 seconds    |
+| testPermutationPartial | PARTIAL          | 1 944                    | 87 480      | ~ 2 minutes    |
+| testPermutationAll     | ALL              | 26 244                   | 1 180 980   | ~ 25 minutes   |
 
 - To reduce the time of building and installing the project, you can disable the launch of all tests from this class using the **-Dtest=!Dimension DBRunnerTest** switch or use the **@Disabled** annotation for a class or method
 ```shell
-mvn clean test -Dtest=!Dimension DBRunnerTest
-mvn clean package -Dtest=!Dimension DBRunnerTest
-mvn clean install -Dtest=!Dimension DBRunnerTest
+mvn clean test -Dtest=!DBaseRunnerTest
+mvn clean package -Dtest=!DBaseRunnerTest
+mvn clean install -Dtest=!DBaseRunnerTest
 ```
 
 [Return to Contents](#contents)
@@ -389,16 +391,16 @@ Metadata of the storage format, indexing type and compression are stored in the 
 
 #### Algorithms
 The main methods of the Dimension DB Java API are located in the **DStore** interface.
-Access to **DStore** must be obtained after initialization of the Dimension DB DB by calling the constructor of the **Dimension DB** class, examples are presented in the [DB initialization algorithm](#DB-initialization-algorithm) section.
+Access to **DStore** must be obtained after initialization of the Dimension DB by calling the constructor of the **Dimension DB** class, examples are presented in the [DB initialization algorithm](#DB-initialization-algorithm) section.
 
 A complete list of methods of the main classes and interfaces with input and output parameters is posted in the [Used methods](#used-methods) section.
 
 ##### DB initialization algorithm
-1. Define a local directory for storing Dimension DB DB settings;
+1. Define a local directory for storing Dimension DB settings;
 2. Create the Dimension DB DB configuration **Dimension DBConfig**;
 3. Initialize the backend DB;
-4. Initialize the Dimension DB DB by calling the constructor from the **Dimension DB** class;
-5. Get a reference to the **DStore** interface from the **Dimension DB** class to access the Dimension DB DB Java API.
+4. Initialize the Dimension DB by calling the constructor from the **Dimension DB** class;
+5. Get a reference to the **DStore** interface from the **Dimension DB** class to access the Dimension DB Java API.
 
 Example of DB initialization for Berkley DB backend
 ```
@@ -461,14 +463,15 @@ The APIs for writing data only work with the local Berkley DB key-value data sto
 
 Table 5. Supported databases for working with API in Dimension DB
 
-| Item No. | Dimension DB API support | Database             | Database type |
-|----------|--------------------------|----------------------|---------------|
-| 1        | Read/Write               | Berkley DB           | key-value     |
-| 2        | Read                     | ClickHouse           | analytical    |
-| 3        | Read                     | Oracle               | relational    |
-| 4        | Read                     | PostgreSQL           | relational    |
-| 5        | Read                     | Microsoft SQL Server | relational    |
-| 6        | Read                     | CSV files            | file          |
+| № | Dimension DB API support | Database             | Database type |
+|---|--------------------------|----------------------|---------------|
+| 1 | Read/Write               | Berkley DB           | key-value     |
+| 2 | Read                     | ClickHouse           | analytical    |
+| 3 | Read                     | Oracle               | relational    |
+| 4 | Read                     | PostgreSQL           | relational    |
+| 5 | Read                     | Microsoft SQL Server | relational    |
+| 6 | Read                     | MySQL                | relational    |
+| 7 | Read                     | CSV files            | file          |
 
 Before you start writing data, you need to set storage parameters and metadata for tables and columns in the **SProfile** object.
 
@@ -532,10 +535,6 @@ sequenceDiagram
 ###### DStore interface
 
 Table 6. List of APIs for working with the Dimension DB database of the DStore interface
-
-###### Interface DStore
-
-Table 6. List of APIs for working with Dimension DB database (DStore interface)
 
 | #  | Method Name             | API Type | Description                                  | Input Parameters                                                                                                                                                      | Output Parameters         |
 |----|-------------------------|----------|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
@@ -606,9 +605,21 @@ Table 9. Enum IType for storing table indexing type
 
 [Return to Contents](#contents)
 
+###### Data analysis method type by table - enum AType
+
+Table 10. Enum AType for storing the data analysis method for local indexing
+
+| Имя свойства   | Тип   | Описание                                                                                                                                                                                      |
+|----------------|-------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ON_LOAD        | AType | Data is analyzed upon initial retrieval, and the indexing type for each column in the table is determined based on this analysis                                                              |
+| FULL_PASS_ONCE | AType | Data is analyzed upon initial retrieval, then on subsequent runs, each column of the table is sequentially analyzed once, <br/>and the indexing type is determined based on this information. |
+| FULL_PASS_EACH | AType | Same as FULL_PASS_ONCE, except each column of the table is analyzed every time the data write API is called. <br/>Each API call analyzes one column, cycling through them in order.           |
+
+[Return to Contents](#contents)
+
 ###### Table backend type - enum BType
 
-Table 10. Enum BType for storing supported DB types used as a backend for the API for reading and writing data
+Table 11. Enum BType for storing supported DB types used as a backend for the API for reading and writing data
 
 | Property name | Type  | Description          |
 |---------------|-------|----------------------|
@@ -622,7 +633,7 @@ Table 10. Enum BType for storing supported DB types used as a backend for the AP
 
 ###### Data grouping function type - enum GroupFunction
 
-Table 11. Enum GroupFunction for passing the grouping function when calling Stacked API
+Table 12. Enum GroupFunction for passing the grouping function when calling Stacked API
 
 | Property name | Type          | Description                                                                                   |
 |---------------|---------------|-----------------------------------------------------------------------------------------------|
@@ -634,7 +645,7 @@ Table 11. Enum GroupFunction for passing the grouping function when calling Stac
 
 ###### Table column storage parameters - CSType class
 
-Table 12. CSType class for storing storage parameters and data types of table columns
+Table 13. CSType class for storing storage parameters and data types of table columns
 
 | Property name | Type     | Default value | Description                                                                                                 |
 |---------------|----------|---------------|-------------------------------------------------------------------------------------------------------------|
@@ -647,7 +658,7 @@ Table 12. CSType class for storing storage parameters and data types of table co
 
 ###### Data storage type - enum SType
 
-Table 13. SType class for storing the table data storage type used in a column or block
+Table 14. SType class for storing the table data storage type used in a column or block
 
 | Property name | Type  | Default value | Description                                  |
 |---------------|-------|---------------|----------------------------------------------|
@@ -659,7 +670,7 @@ Table 13. SType class for storing the table data storage type used in a column o
 
 ###### Java data storage type - enum CType
 
-Table 14. CType class for storing the Java data type used to store data in the Berkley DB table column
+Table 15. CType class for storing the Java data type used to store data in the Berkley DB table column
 
 | Property name | Type | Default Value | Description                         |
 |---------------|------|---------------|-------------------------------------|
@@ -674,7 +685,7 @@ Table 14. CType class for storing the Java data type used to store data in the B
 
 ###### JDBC/CSV Data Storage Type - enum DataType
 
-Table 15. DataType class for storing JDBC/CSV data types, which is used to convert data to Java storage format in Berkley DB database of Dimension DB database table column
+Table 16. DataType class for storing JDBC/CSV data types, which is used to convert data to Java storage format in Berkley DB database of Dimension DB database table column
 
 | Property name | Type | Default value | Description                 |
 |---------------|------|---------------|-----------------------------|
@@ -694,7 +705,7 @@ Table 15. DataType class for storing JDBC/CSV data types, which is used to conve
 
 ###### DB settings - DBConfig class
 
-Table 16. Dimension DBaseConfig class for storing settings
+Table 17. Dimension DBaseConfig class for storing settings
 
 | Property name   | Type   | Default value   | Description                                                                                  |
 |-----------------|--------|-----------------|----------------------------------------------------------------------------------------------|
@@ -705,7 +716,7 @@ Table 16. Dimension DBaseConfig class for storing settings
 
 ###### SProfile table settings
 
-Table 17. SProfile class for storing table/column settings in the Dimension DB database (used in input parameters)
+Table 18. SProfile class for storing table/column settings in the Dimension DB database (used in input parameters)
 
 | Property name | Type                | Default value | Description                                         |
 |---------------|---------------------|---------------|-----------------------------------------------------|
@@ -722,7 +733,7 @@ Table 17. SProfile class for storing table/column settings in the Dimension DB d
 
 ###### Table Settings - TProfile Class
 
-Table 18. TProfile Class for Getting Table/Column Settings from Metadata (Used in Output Parameters)
+Table 19. TProfile Class for Getting Table/Column Settings from Metadata (Used in Output Parameters)
 
 | Property Name | Type           | Default Value      | Description                         |
 |---------------|----------------|--------------------|-------------------------------------|
@@ -737,7 +748,7 @@ Table 18. TProfile Class for Getting Table/Column Settings from Metadata (Used i
 
 ###### Table Column Settings - CProfile Class
 
-Table 19. CProfile Class for Storing Table Column Settings
+Table 20. CProfile Class for Storing Table Column Settings
 
 | Property Name  | Type   | Default Value | Description                                                              |
 |----------------|--------|---------------|--------------------------------------------------------------------------|
@@ -755,7 +766,7 @@ Table 19. CProfile Class for Storing Table Column Settings
 
 Timestamps store the date in milliseconds that have passed since January 1, 1970 - [Unix-time](https://en.wikipedia.org/wiki/Unix_time)
 
-Table 20. StackedColumn class for get data aggregates from stacked API
+Table 21. StackedColumn class for get data aggregates from stacked API
 
 | Property name | Type                 | Default value | Description                                                                                                                                                                      |
 |---------------|----------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -769,15 +780,14 @@ Table 20. StackedColumn class for get data aggregates from stacked API
 
 ###### Object to get data aggregates from the gantt API - GanttColumnCount and GanttColumnSum classes
 
-Table 21a.  GanttColumnCount Class for Two-Level COUNT Aggregation Results
+Table 22a.  GanttColumnCount Class for Two-Level COUNT Aggregation Results
 
 | Property name | Type                 | Default value | Description                                                                                                                                                                 |
 |---------------|----------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | key           | String               | N/A           | Key, stores a unique metric in the firstGrpBy table column data when calling the Gantt API                                                                                  |
 | gantt         | Map<String, Integer> | Empty map     | Key-value structure, for storing the number of occurrences of each unique value from secondGrpBy with the key filter by the data from firstGrpBy when calling the Gantt API |
 
-
-Table 21b. GanttColumnSum Class for Two-Level SUM Aggregation Results
+Table 22b. GanttColumnSum Class for Two-Level SUM Aggregation Results
 
 | Property name | Type   | Default value | Description                                                             |
 |---------------|--------|---------------|-------------------------------------------------------------------------|
@@ -792,7 +802,7 @@ Table 21b. GanttColumnSum Class for Two-Level SUM Aggregation Results
 - Before each call to a method of the **DStore** interface, it is initialized according to the instructions in the [DB Initialization Algorithm](#db-initialization-algorithm) section;
 - A test case has been developed for each use case in [Dimension DBUseCasesCodeTest](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java).
 
-Table 22. Use cases
+Table 23. Use cases
 
 | #  | Method Name             | API Type | Description                                  | Use cases                                                                                    |
 |----|-------------------------|----------|----------------------------------------------|----------------------------------------------------------------------------------------------|
@@ -828,6 +838,82 @@ Table 22. Use cases
 
 [Return to Contents](#contents)
 
+### Performance
+
+Table 24. Test environment
+
+| Category      | Details                                                                                                                          |
+|---------------|----------------------------------------------------------------------------------------------------------------------------------|
+| **Processor** | AMD Ryzen 5 5600H with Radeon Graphics, 3301 Mhz, 6 Core(s), 12 Logical Processor(s)                                             |
+| **RAM**       | 16.0 GB                                                                                                                          |
+| **Disk**      | Generic Flash Disk USB Device<br>- SAMSUNG MZVL2512HCJQ-00B00 (476.94 GB)                                                        |
+| **OS**        | Microsoft Windows 11                                                                                                             |
+| **Test data** | [New York taxi orders](https://clickhouse.com/docs/en/getting-started/example-datasets/nyc-taxi#download-of-prepared-partitions) |
+
+<details>
+  <summary>SQL query to get statistics for partition 2016</summary>
+
+```sql
+WITH 
+2016_parts AS (
+    SELECT sum(bytes) AS bytes
+    FROM system.parts
+    WHERE table = 'trips_mergetree'
+      AND database = 'datasets'
+      AND active
+      AND partition LIKE '2016%'
+)
+SELECT
+    (SELECT count() FROM datasets.trips_mergetree WHERE toYear(pickup_datetime) = 2016) AS exact_row_count,
+    formatReadableSize((SELECT bytes FROM 2016_parts)) AS total_size,
+    formatReadableSize((SELECT bytes FROM 2016_parts) / exact_row_count) AS avg_row_size;
+```
+
+</details> 
+
+Table 25. Data for 2016
+
+| exact_row_count | total_size | avg_row_size |
+|-----------------|------------|--------------|
+| 78325655        | 6.88 GiB   | 94.37 B      |
+
+Table 26. Load profiles
+
+| # | TType       | IType  | AType          | Compression | Load (min) | Size (GB) |
+|--:|-------------|--------|----------------|-------------|------------|-----------|
+| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 99,52      | 9,132     |
+| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 26,12      | 12,070    |
+| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 26,24      | 11,407    |
+| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 26,20      | 11,881    |
+
+Table 27. Performance tests for gantt API
+
+| № | Test name        | № 1 ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | № 2 ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | № 3 PASS_ONCE <br/>Execution time <br/>(single/2-thread) (sec) | № 4 PASS_EACH <br/>Execution time <br/>(single/2-thread) (sec) |
+|---|------------------|--------------------------------------------------------------|--------------------------------------------------------------|----------------------------------------------------------------|----------------------------------------------------------------|
+| 1 | getGanttRawRaw   | 14,0 / 10,5                                                  | 15,8 / 10,6                                                  | 17,2 / 10,8                                                    | 16,3 / 10,5                                                    |
+| 2 | getGanttEnumEnum | 4,4 / 2,6                                                    | 11,2 / 8,0                                                   | 11,3 / 8,2                                                     | 10,9 / 7,8                                                     |
+| 3 | getGanttHistHist | 2,3 / 1,2                                                    | 13,6 / 9,8                                                   | 13,9 / 10,2                                                    | 14,3 / 9,7                                                     |
+| 4 | getGanttHistRaw  | 9,9 / 7,5                                                    | 12,4 / 9,2                                                   | 12,3 / 9,2                                                     | 12,0 / 8,9                                                     |
+| 5 | getGanttHistEnum | 3,4 / 2,1                                                    | 13,8 / 10,0                                                  | 13,9 / 10,3                                                    | 13,6 / 9,9                                                     |
+| 6 | getGanttEnumRaw  | 9,5 / 7,0                                                    | 15,5 / 11,3                                                  | 16,1 / 11,7                                                    | 15,6 / 12,2                                                    |
+| 7 | getGanttEnumHist | 4,2 / 2,7                                                    | 16,5 / 12,7                                                  | 16,5 / 12,6                                                    | 16,5 / 12,1                                                    |
+| 8 | getGanttRawHist  | 10,7 / 7,8                                                   | 15,4 / 11,0                                                  | 15,7 / 11,6                                                    | 16,0 / 11,4                                                    |
+| 9 | getGanttRawEnum  | 9,6 / 7,0                                                    | 15,4 / 11,3                                                  | 15,6 / 11,2                                                    | 15,4 / 11,1                                                    |
+
+Table 28. Queries Table
+
+| № | Test name        | SQL query                                                                                                                                                                       |
+|---|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | getGanttRawRaw   | `SELECT pickup_cdeligibil, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, vendor_id;`                   |
+| 2 | getGanttHistRaw  | `SELECT trip_type, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, vendor_id;`                                   |
+| 3 | getGanttRawEnum  | `SELECT pickup_cdeligibil, cab_type, COUNT(cab_type) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, cab_type;`                      |
+| 4 | getGanttRawHist  | `SELECT pickup_cdeligibil, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, pickup_boroname;` |
+| 5 | getGanttEnumEnum | `SELECT dropoff_puma, dropoff_borocode, COUNT(dropoff_borocode) FROM datasets.trips_mergetree where toYear(pickup_date) = 2016 group by dropoff_puma, dropoff_borocode;`        |
+| 6 | getGanttEnumHist | `SELECT dropoff_boroname, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, pickup_boroname;`   |
+| 7 | getGanttEnumRaw  | `SELECT dropoff_boroname, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, vendor_id;`                     |
+| 8 | getGanttHistEnum | `SELECT trip_type, dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, dropoff_boroname;`              |
+| 9 | getGanttHistHist | `SELECT trip_type, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, pickup_boroname;`                 |
+
 ## Download
 - Building and installing Dimension DB from source codes to a local Maven repository is described in the [Building the project](#building-the-project) section.
 
@@ -836,7 +922,7 @@ Table 22. Use cases
 ## Development
 - If you find an error in the code or have suggestions for improvement, create a ticket;
 - Before starting work, you must check the project build and successful completion of unit tests according to the instructions in the [Building the project](#building-the-project) section;
-- Integration tests are used to check the correctness and performance of the Dimension DB API. For more details, see [Preparing the Environment to Run Integration Tests](#preparing-the-environment-to-run-integration-tests) and [Code Use Cases](#code-use-cases).
+- Integration tests are used to check the correctness and performance of the Dimension DB API. For more details, see [Preparing the Environment to Run Integration Tests](#prepare-the-environment-to-run-integration-tests) and [Code Use Cases](#code-use-cases).
 
 [Return to Contents](#contents)
 

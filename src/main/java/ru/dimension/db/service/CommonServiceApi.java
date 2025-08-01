@@ -505,7 +505,7 @@ public abstract class CommonServiceApi {
     IntStream.range(0, timestamps.length).forEach(iR -> {
       byte valueByte = eColumn.getDataByte()[iR];
       int intValue = EnumHelper.getIndexValue(eColumn.getValues(), valueByte);
-      array[iR] = converter.convertIntToDouble(intValue, cProfile);
+      array[iR] = converter.convertIntFromDoubleLong(intValue, cProfile);
     });
 
     return array;
@@ -523,7 +523,7 @@ public abstract class CommonServiceApi {
     int[] histogramsUnPack = getHistogramUnPack(timestamps, histograms);
 
     IntStream.range(0, timestamps.length).forEach(iR -> {
-      array[iR] = converter.convertIntToDouble(histogramsUnPack[iR], cProfile);
+      array[iR] = converter.convertIntFromDoubleLong(histogramsUnPack[iR], cProfile);
     });
 
     return array;

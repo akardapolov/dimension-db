@@ -15,21 +15,31 @@ public class DimensionJdbcImpl implements DimensionDAO {
 
   @Override
   public int getOrLoad(double value) {
-    throw new UnsupportedOperationException("Not supported for JDBC");
+    throw new UnsupportedOperationException("Not supported implementation");
   }
 
   @Override
   public int getOrLoad(String value) {
-    throw new UnsupportedOperationException("Not supported for JDBC");
+    throw new UnsupportedOperationException("Not supported implementation");
+  }
+
+  @Override
+  public int getOrLoad(long value) {
+    throw new UnsupportedOperationException("Not supported implementation");
   }
 
   @Override
   public String getStringById(int key) {
-    throw new UnsupportedOperationException("Not supported for JDBC");
+    throw new UnsupportedOperationException("Not supported implementation");
   }
 
   @Override
   public double getDoubleById(int key) {
-    throw new UnsupportedOperationException("Not supported for JDBC");
+    throw new UnsupportedOperationException("Not supported implementation");
+  }
+
+  @Override
+  public long getLongById(int key) {
+    throw new UnsupportedOperationException("Not supported implementation");
   }
 }

@@ -17,6 +17,7 @@ import ru.dimension.db.handler.MetadataHandler;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -30,6 +31,7 @@ public interface CSVMode {
       String csvSplitBy,
       TType tableType,
       IType indexType,
+      AType analyzeType,
       BType backendType,
       boolean compression
   ) {
@@ -37,6 +39,7 @@ public interface CSVMode {
         .tableName(tableName)
         .tableType(tableType)
         .indexType(indexType)
+        .analyzeType(analyzeType)
         .backendType(backendType)
         .compression(compression)
         .csTypeMap(new LinkedHashMap<>()).build();

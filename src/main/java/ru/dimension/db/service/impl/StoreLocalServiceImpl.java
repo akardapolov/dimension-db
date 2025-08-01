@@ -16,6 +16,7 @@ import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.service.CommonServiceApi;
 import ru.dimension.db.service.StatisticsService;
@@ -110,17 +111,13 @@ public class StoreLocalServiceImpl extends CommonServiceApi implements StoreLoca
             uStore.add(cProfile, iR, currObject);
           }
         }
-
-        /** Update SType statistic **/
-        if (!isStatByTableExist && iR == 100) {
-          uStore.analyzeAndConvertColumns(iR, colIdToProfile);
-          isStatByTableExist = true;
-        }
       }
 
       /** Update SType statistic **/
       if (!isStatByTableExist) {
         uStore.analyzeAndConvertColumns(iRow.get(), colIdToProfile);
+        colIdSTypeMap.clear();
+        colIdSTypeMap.putAll(uStore.getStorageTypeMap());
       }
 
       if (tStore.size() == 0) return -1;
@@ -130,8 +127,7 @@ public class StoreLocalServiceImpl extends CommonServiceApi implements StoreLoca
       storeDataLocal(tableId, blockId, compression, cProfiles, tStore, uStore, colIdSTypeMap);
 
       // Full mode analysis after storing data
-      // TODO: Make this configurable in settings (disabled by default for better performance)
-      // fullModeColumnAnalyze(tableId, cProfiles, uStore, iRow);
+      fullModeColumnAnalyze(tableId, cProfiles, uStore, iRow);
 
       return tStore.getTail();
     } catch (SQLException e) {
@@ -141,25 +137,59 @@ public class StoreLocalServiceImpl extends CommonServiceApi implements StoreLoca
   }
 
   private void fullModeColumnAnalyze(byte tableId,
-                         List<CProfile> cProfiles,
-                         UStore uStore,
-                         AtomicInteger iRow) {
+                                     List<CProfile> cProfiles,
+                                     UStore uStore,
+                                     AtomicInteger iRow) {
+    String tableName = metaModelApi.getTableName(tableId);
+    AType aType = metaModelApi.getAnalyzeType(tableName);
+
+    if (aType == AType.ON_LOAD) {
+      return;
+    }
+
     List<CProfile> nonTimestampColumns = cProfiles.stream()
         .filter(isNotTimestamp)
         .collect(Collectors.toList());
 
-    if (!nonTimestampColumns.isEmpty() && statisticsService instanceof StatisticsServiceImpl) {
-      StatisticsServiceImpl statisticsServiceImpl = (StatisticsServiceImpl) statisticsService;
-      int colIdToAnalyze = getNextColumnToAnalyze(tableId, nonTimestampColumns, statisticsServiceImpl);
+    if (nonTimestampColumns.isEmpty()) {
+      return;
+    }
 
-      CProfile cProfile = nonTimestampColumns.stream()
-          .filter(c -> c.getColId() == colIdToAnalyze)
-          .findFirst()
-          .orElse(null);
+    if (!(statisticsService instanceof StatisticsServiceImpl)) {
+      log.warn("Full mode analysis requires StatisticsServiceImpl");
+      return;
+    }
 
-      if (cProfile != null) {
-        SType newSType = uStore.analyzeColumn(colIdToAnalyze, iRow.get(), cProfile);
-        statisticsServiceImpl.updateSType(tableId, colIdToAnalyze, newSType);
+    StatisticsServiceImpl statisticsServiceImpl = (StatisticsServiceImpl) statisticsService;
+    int rowCount = iRow.get();
+
+    switch (aType) {
+      case FULL_PASS_ONCE -> {
+        if (statisticsServiceImpl.isFullPassDone(tableId)) {
+          log.debug("Full pass already done for table {}", tableName);
+          return;
+        }
+        log.info("Performing full pass analysis for table {}", tableName);
+        for (CProfile cProfile : nonTimestampColumns) {
+          int colId = cProfile.getColId();
+          SType newSType = uStore.analyzeColumn(colId, rowCount, cProfile);
+          statisticsServiceImpl.updateSType(tableId, colId, newSType);
+        }
+        statisticsServiceImpl.setFullPassDone(tableId);
+      }
+      case FULL_PASS_EACH -> {
+        int colIdToAnalyze = getNextColumnToAnalyze(tableId, nonTimestampColumns, statisticsServiceImpl);
+        CProfile cProfile = nonTimestampColumns.stream()
+            .filter(c -> c.getColId() == colIdToAnalyze)
+            .findFirst()
+            .orElse(null);
+        if (cProfile != null) {
+          log.info("Analyzing column {} in table {}", cProfile.getColName(), tableName);
+          SType newSType = uStore.analyzeColumn(colIdToAnalyze, rowCount, cProfile);
+          statisticsServiceImpl.updateSType(tableId, colIdToAnalyze, newSType);
+        }
+      }
+      default -> {
       }
     }
   }

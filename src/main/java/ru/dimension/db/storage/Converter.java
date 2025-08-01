@@ -1,9 +1,10 @@
 package ru.dimension.db.storage;
 
+import static ru.dimension.db.metadata.DataType.INT64;
 import static ru.dimension.db.util.MapArrayUtil.arrayToString;
 
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -26,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.model.profile.CProfile;
+import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.service.mapping.Mapper;
 import ru.dimension.db.storage.helper.ClickHouseHelper;
 
@@ -47,22 +49,19 @@ public class Converter {
     switch (cProfile.getCsType().getDType()) {
       case DATE:
         if (obj instanceof java.util.Date dt) {
-          return dimensionDAO.getOrLoad(dt.toString());
+          return dimensionDAO.getOrLoad(dt.getTime());
         } else if (obj instanceof LocalDateTime localDateTime) {
-          return dimensionDAO.getOrLoad(localDateTime.toString());
+          return dimensionDAO.getOrLoad(localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
         } else if (obj instanceof LocalDate localDate) {
-          return dimensionDAO.getOrLoad(localDate.toString());
+          return dimensionDAO.getOrLoad(localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli());
         }
+        return dimensionDAO.getOrLoad(getKeyValue(obj, cProfile));
       case TIMESTAMP:
       case TIMESTAMPTZ:
       case DATETIME:
       case DATETIME2:
       case SMALLDATETIME:
-        if (obj instanceof Timestamp ts) {
-          return Math.toIntExact(ts.getTime() / 1000);
-        } else if (obj instanceof LocalDateTime localDateTime) {
-          return Math.toIntExact(localDateTime.atZone(ZoneOffset.UTC).toInstant().toEpochMilli() / 1000);
-        }
+        return dimensionDAO.getOrLoad(getKeyValue(obj, cProfile));
       case OID:
       case UINT32:
       case UINT64:
@@ -71,10 +70,10 @@ public class Converter {
       case BIGSERIAL:
       case LONG:
         if (ClickHouseHelper.checkUnsigned(obj.getClass().getName())) {
-          return ClickHouseHelper.invokeMethod(obj, "intValue", Integer.class);
+          long longValue = ClickHouseHelper.invokeMethod(obj, "longValue", Long.class);
+          return dimensionDAO.getOrLoad(longValue);
         } else {
-          Long l = (Long) obj;
-          return l.intValue();
+          return dimensionDAO.getOrLoad(((Number) obj).longValue());
         }
       case UINT8:
       case UINT16:
@@ -94,18 +93,23 @@ public class Converter {
       case TIME:
       case TIMETZ:
       case TINYINT:
+        if (cProfile.getCsType().getDType() == INT64) {
+          return dimensionDAO.getOrLoad(((Number) obj).longValue());
+        }
         if (obj instanceof BigDecimal bd) {
-          return bd.intValue();
-        } else if (obj instanceof Double db) {
-          return db.intValue();
-        } else if (obj instanceof Long lng) {
-          return lng.intValue();
-        } else if (obj instanceof Short sh) {
-          return sh.intValue();
+          return dimensionDAO.getOrLoad(bd.doubleValue());
+        } else if (obj instanceof BigInteger bi) {
+          return dimensionDAO.getOrLoad(bi.doubleValue());
+        } else if (obj instanceof Double d) {
+          return dimensionDAO.getOrLoad(d);
+        } else if (obj instanceof Long l) {
+          return dimensionDAO.getOrLoad(l);
+        } else if (obj instanceof Short s) {
+          return s.intValue();
         } else if (obj instanceof Time t) {
-          return Math.toIntExact(t.getTime());
+          return dimensionDAO.getOrLoad(t.getTime());
         } else if (obj instanceof Float f) {
-          return f.intValue();
+          return dimensionDAO.getOrLoad(f);
         } else if (obj instanceof Byte b) {
           return b.intValue();
         } else if (ClickHouseHelper.checkUnsigned(obj.getClass().getName())) {
@@ -196,14 +200,49 @@ public class Converter {
     if (cProfile.getColDbTypeName().contains("SET")) return dimensionDAO.getStringById(objIndex);
 
     return switch (Mapper.isDBType(cProfile)) {
-      case DATE, ENUM8, ENUM16, CHAR, NCHAR, NCLOB, CLOB, NAME, TEXT, NTEXT,
+      case ENUM8, ENUM16, CHAR, NCHAR, NCLOB, CLOB, NAME, TEXT, NTEXT,
           VARCHAR, NVARCHAR2, VARCHAR2, NVARCHAR, RAW, VARBINARY, BYTEA, JSONB, POINT, INTERVAL, BINARY, SYSNAME, NULLABLE, STRING ->
           dimensionDAO.getStringById(objIndex);
       case IPV4, IPV6 -> getCanonicalHost(dimensionDAO.getStringById(objIndex));
-      case TIMESTAMP, TIMESTAMPTZ, DATETIME, DATETIME2, SMALLDATETIME -> getDateForLongShorted(objIndex);
+      case UINT8, UINT16, INTEGER -> String.valueOf(objIndex);
+      case DATE, TIMESTAMP, TIMESTAMPTZ, DATETIME, DATETIME2, SMALLDATETIME -> getDateForLong(objIndex);
+      case LONG, OID, UINT32, UINT64, SERIAL, SMALLSERIAL, BIGSERIAL, BIGINT, INT64, INT128, INT256 ->
+          String.valueOf(dimensionDAO.getLongById(objIndex));
       case FLOAT64, DECIMAL, FLOAT4, REAL, FLOAT8, FLOAT32, FLOAT, NUMERIC, MONEY, SMALLMONEY, DOUBLE ->
           String.valueOf(dimensionDAO.getDoubleById(objIndex));
-      default -> String.valueOf(objIndex);
+      default -> {
+        try {
+          yield String.valueOf(dimensionDAO.getLongById(objIndex));
+        } catch (Exception ed) {
+          log.info(ed.getMessage());
+          log.warn(cProfile);
+          try {
+            yield String.valueOf(dimensionDAO.getDoubleById(objIndex));
+          } catch (Exception el) {
+            log.info(el.getMessage());
+            log.warn(cProfile);
+            yield String.valueOf(objIndex);
+          }
+        }
+      }
+    };
+  }
+
+  public long convertIntToLong(int objIndex,
+                               CProfile cProfile) {
+    return switch (cProfile.getCsType().getDType()) {
+      case LONG, OID, UINT32, UINT64, SERIAL, SMALLSERIAL, BIGSERIAL, BIGINT, INT64, INT128, INT256 ->
+          dimensionDAO.getLongById(objIndex);
+
+      default -> {
+        try {
+          yield dimensionDAO.getLongById(objIndex);
+        } catch (Exception el) {
+          log.info(el.getMessage());
+          log.warn(cProfile);
+          yield objIndex;
+        }
+      }
     };
   }
 
@@ -212,7 +251,42 @@ public class Converter {
     return switch (cProfile.getCsType().getDType()) {
       case FLOAT64, DECIMAL, FLOAT4, REAL, FLOAT8, FLOAT32, FLOAT, NUMERIC, MONEY, SMALLMONEY, DOUBLE ->
           dimensionDAO.getDoubleById(objIndex);
-      default -> objIndex;
+
+      default -> {
+        try {
+          yield dimensionDAO.getDoubleById(objIndex);
+        } catch (Exception ed) {
+          log.info(ed.getMessage());
+          log.warn(cProfile);
+          yield objIndex;
+        }
+      }
+    };
+  }
+
+  public double convertIntFromDoubleLong(int objIndex,
+                                         CProfile cProfile) {
+    return switch (cProfile.getCsType().getDType()) {
+      case FLOAT64, DECIMAL, FLOAT4, REAL, FLOAT8, FLOAT32, FLOAT, NUMERIC, MONEY, SMALLMONEY, DOUBLE ->
+          dimensionDAO.getDoubleById(objIndex);
+      case LONG, OID, UINT32, UINT64, SERIAL, SMALLSERIAL, BIGSERIAL, BIGINT, INT64, INT128, INT256 ->
+          dimensionDAO.getLongById(objIndex);
+
+      default -> {
+        try {
+          yield dimensionDAO.getDoubleById(objIndex);
+        } catch (Exception ed) {
+          log.info(ed.getMessage());
+          log.warn(cProfile);
+          try {
+            yield dimensionDAO.getLongById(objIndex);
+          } catch (Exception el) {
+            log.info(el.getMessage());
+            log.warn(cProfile);
+            yield objIndex;
+          }
+        }
+      }
     };
   }
 
@@ -235,15 +309,20 @@ public class Converter {
         } else if (obj instanceof Instant instant) {
           return instant.toEpochMilli();
         } else if (obj instanceof LocalDateTime localDateTime) {
-          ZonedDateTime zdt = localDateTime.atZone(ZoneId.systemDefault());
-          return zdt.toInstant().toEpochMilli();
+          return localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
         } else if (obj instanceof LocalDate localDate) {
-          return localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
+          return localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
         } else if (obj instanceof OffsetDateTime offsetDateTime) {
           return offsetDateTime.toInstant().toEpochMilli();
         } else if (obj instanceof ZonedDateTime zonedDateTime) {
           return zonedDateTime.toInstant().toEpochMilli();
         } else if (obj instanceof Date date) {
+          return date.getTime();
+        } else if (obj instanceof byte[] ba) {
+          java.sql.Timestamp timestamp = new java.sql.Timestamp(
+              java.nio.ByteBuffer.wrap(ba).getLong()
+          );
+          java.util.Date date = new java.util.Date(timestamp.getTime());
           return date.getTime();
         } else {
           return handleOracleTimestamp(obj);
@@ -270,9 +349,9 @@ public class Converter {
     return 0L;
   }
 
-  private String getDateForLongShorted(int longDate) {
+  private String getDateForLong(int key) {
     SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
-    Date dtDate = new Date(((long) longDate) * 1000L);
+    Date dtDate = new Date(dimensionDAO.getLongById(key));
     return simpleDateFormat.format(dtDate);
   }
 

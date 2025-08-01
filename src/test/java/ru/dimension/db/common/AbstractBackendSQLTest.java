@@ -30,6 +30,7 @@ import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -86,6 +87,7 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
     return new SProfile().setTableName(tableName)
         .setTableType(TType.TIME_SERIES)
         .setIndexType(IType.GLOBAL)
+        .setAnalyzeType(AType.ON_LOAD)
         .setBackendType(bType)
         .setCompression(false)
         .setCsTypeMap(csTypeMap);

@@ -7,17 +7,23 @@ import com.sleepycat.persist.SecondaryIndex;
 import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.storage.DimensionDAO;
 import ru.dimension.db.storage.bdb.entity.dictionary.DIntDouble;
+import ru.dimension.db.storage.bdb.entity.dictionary.DIntLong;
 import ru.dimension.db.storage.bdb.entity.dictionary.DIntString;
 
 @Log4j2
 public class DimensionBdbImpl implements DimensionDAO {
 
+  private final SecondaryIndex<Long, Integer, DIntLong> secondaryIndexLong;
   private final SecondaryIndex<Double, Integer, DIntDouble> secondaryIndexDouble;
   private final SecondaryIndex<String, Integer, DIntString> secondaryIndexString;
+  private final PrimaryIndex<Integer, DIntLong> primaryIndexLong;
   private final PrimaryIndex<Integer, DIntDouble> primaryIndexDouble;
   private final PrimaryIndex<Integer, DIntString> primaryIndexString;
 
   public DimensionBdbImpl(EntityStore store) {
+    this.primaryIndexLong = store.getPrimaryIndex(Integer.class, DIntLong.class);
+    this.secondaryIndexLong = store.getSecondaryIndex(primaryIndexLong, Long.class, "value");
+
     this.primaryIndexDouble = store.getPrimaryIndex(Integer.class, DIntDouble.class);
     this.secondaryIndexDouble = store.getSecondaryIndex(primaryIndexDouble, Double.class, "value");
 
@@ -52,6 +58,19 @@ public class DimensionBdbImpl implements DimensionDAO {
   }
 
   @Override
+  public int getOrLoad(long value) {
+    if (!secondaryIndexLong.contains(value)) {
+      try {
+        this.primaryIndexLong.putNoReturn(new DIntLong(0, value));
+      } catch (UniqueConstraintException e) {
+        log.info("Value: {} already exists", value);
+        return this.secondaryIndexLong.get(value).getParam();
+      }
+    }
+    return this.secondaryIndexLong.get(value).getParam();
+  }
+
+  @Override
   public String getStringById(int key) {
     return this.primaryIndexString.get(key).getValue();
   }
@@ -59,5 +78,10 @@ public class DimensionBdbImpl implements DimensionDAO {
   @Override
   public double getDoubleById(int key) {
     return this.primaryIndexDouble.get(key).getValue();
+  }
+
+  @Override
+  public long getLongById(int key) {
+    return this.primaryIndexLong.get(key).getValue();
   }
 }

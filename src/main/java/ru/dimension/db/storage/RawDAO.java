@@ -181,6 +181,16 @@ public interface RawDAO {
                                    long begin,
                                    long end);
 
+  List<GanttColumnSum> getGanttSum(String tableName,
+                                   CProfile tsCProfile,
+                                   CProfile firstGrpBy,
+                                   CProfile secondGrpBy,
+                                   CProfile cProfileFilter,
+                                   String[] filterData,
+                                   CompareFunction compareFunction,
+                                   long begin,
+                                   long end);
+
   List<String> getDistinct(String tableName,
                            CProfile tsCProfile,
                            CProfile cProfile,

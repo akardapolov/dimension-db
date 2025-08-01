@@ -10,6 +10,7 @@ import ru.dimension.db.exception.BeginEndWrongOrderException;
 import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import org.junit.jupiter.api.BeforeAll;
@@ -22,7 +23,7 @@ public class DBase01StackedIndexLocalTest extends AbstractH2Test {
     Map<String, SType> csTypeMap = new LinkedHashMap<>();
     csTypeMap.put("ID", SType.RAW);
 
-    putDataJdbc(csTypeMap, TType.TIME_SERIES, IType.LOCAL, true);
+    putDataJdbc(csTypeMap, TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD, true);
   }
 
   @Test

@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import ru.dimension.db.common.AbstractH2Test;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import org.junit.jupiter.api.BeforeAll;
@@ -28,7 +29,7 @@ public class DBase04RawIndexLocalJdbcTest extends AbstractH2Test {
     Map<String, SType> csTypeMap = new LinkedHashMap<>();
     csTypeMap.put("ID", SType.RAW);
 
-    putDataJdbc(csTypeMap, TType.TIME_SERIES, IType.LOCAL, false);
+    putDataJdbc(csTypeMap, TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD,false);
   }
 
   @Test

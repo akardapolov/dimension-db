@@ -16,6 +16,7 @@ import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -30,6 +31,7 @@ public class DBase14StackedSumAvgDirectTest extends AbstractDirectTest {
     sProfile.setTableName(tableName);
     sProfile.setTableType(TType.TIME_SERIES);
     sProfile.setIndexType(IType.GLOBAL);
+    sProfile.setAnalyzeType(AType.ON_LOAD);
     sProfile.setBackendType(BType.BERKLEYDB);
     sProfile.setCompression(true);
 

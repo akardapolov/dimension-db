@@ -51,6 +51,7 @@ import ru.dimension.db.model.profile.TProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -218,6 +219,7 @@ public abstract class AbstractH2Test implements JdbcSource {
       sProfile.setTableName(tableName);
       sProfile.setTableType(TType.TIME_SERIES);
       sProfile.setIndexType(IType.GLOBAL);
+      sProfile.setAnalyzeType(AType.ON_LOAD);
       sProfile.setBackendType(BType.BERKLEYDB);
       sProfile.setCompression(isCompressed);
       sProfile.setCsTypeMap(new LinkedHashMap<>());
@@ -259,7 +261,11 @@ public abstract class AbstractH2Test implements JdbcSource {
     }
   }
 
-  protected void putDataJdbc(Map<String, SType> csTypeMap, TType tableType, IType indexType, Boolean compression) {
+  protected void putDataJdbc(Map<String, SType> csTypeMap,
+                             TType tableType,
+                             IType indexType,
+                             AType analyzeType,
+                             Boolean compression) {
     dStore = dBase.getDStore();
 
     cProfilesH2Db = h2Db.getCProfileList().stream()
@@ -281,6 +287,7 @@ public abstract class AbstractH2Test implements JdbcSource {
       sProfile.setTableName(tableName);
       sProfile.setTableType(tableType);
       sProfile.setIndexType(indexType);
+      sProfile.setAnalyzeType(analyzeType);
       sProfile.setBackendType(BType.BERKLEYDB);
       sProfile.setCompression(compression);
       sProfile.setCsTypeMap(new LinkedHashMap<>());
@@ -335,6 +342,7 @@ public abstract class AbstractH2Test implements JdbcSource {
                               Map<String, SType> csTypeMap,
                               TType tableType,
                               IType indexType,
+                              AType analyzeType,
                               BType backendType,
                               Boolean compression) {
     SProfile sProfile;
@@ -344,6 +352,7 @@ public abstract class AbstractH2Test implements JdbcSource {
       sProfile.setTableName(tableName);
       sProfile.setTableType(tableType);
       sProfile.setIndexType(indexType);
+      sProfile.setAnalyzeType(analyzeType);
       sProfile.setBackendType(backendType);
       sProfile.setCompression(compression);
       sProfile.setCsTypeMap(packToCSType(h2Db.getCProfileList(), csTypeMap));
@@ -653,6 +662,7 @@ public abstract class AbstractH2Test implements JdbcSource {
       sProfile.setTableName(tableName);
       sProfile.setTableType(TType.TIME_SERIES);
       sProfile.setIndexType(IType.GLOBAL);
+      sProfile.setAnalyzeType(AType.ON_LOAD);
       sProfile.setBackendType(BType.BERKLEYDB);
       sProfile.setCompression(true);
       sProfile.setCsTypeMap(new HashMap<>());
@@ -897,14 +907,17 @@ public abstract class AbstractH2Test implements JdbcSource {
 
         for (Boolean compression : boolArray) {
           for (IType indexType : IType.values()) {
-            for (LoadDataType loadDataType : LoadDataType.values()) {
-              Map<String, Object> config = new LinkedHashMap<>();
+            for (AType analyzeType : AType.values()) {
+              for (LoadDataType loadDataType : LoadDataType.values()) {
+                Map<String, Object> config = new LinkedHashMap<>();
 
-              config.put("csTypeMap", csTypeMap);
-              config.put("indexType", indexType);
-              config.put("compression", compression);
-              config.put("loadDataType", loadDataType);
-              configurations.add(config);
+                config.put("csTypeMap", csTypeMap);
+                config.put("indexType", indexType);
+                config.put("analyzeType", analyzeType);
+                config.put("compression", compression);
+                config.put("loadDataType", loadDataType);
+                configurations.add(config);
+              }
             }
           }
         }

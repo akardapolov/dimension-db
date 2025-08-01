@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -20,6 +21,7 @@ public class TProfile {
   private String tableName;
   private TType tableType;
   private IType indexType;
+  private AType analyzeType;
   private BType backendType;
   private Boolean compression;
   private List<CProfile> cProfiles;

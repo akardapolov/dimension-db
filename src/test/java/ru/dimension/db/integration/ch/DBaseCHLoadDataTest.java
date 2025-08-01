@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.DBase;
@@ -11,6 +12,7 @@ import ru.dimension.db.backend.BerkleyDB;
 import ru.dimension.db.config.DBaseConfig;
 import ru.dimension.db.core.DStore;
 import ru.dimension.db.model.profile.CProfile;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.source.ClickHouse;
@@ -52,7 +54,8 @@ public class DBaseCHLoadDataTest implements ClickHouse {
   public void loadDataDirectParallel() {
     try {
       cProfiles = clickHouseDB.loadDataDirectParallel(ClickHouse.select2016, dStore,
-                                                      TType.TIME_SERIES, IType.GLOBAL, true, 2, 20000);
+                                                      TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD,
+                                                      true, 2, 20000);
     } catch (Exception e) {
       log.catching(e);
     }
@@ -63,12 +66,8 @@ public class DBaseCHLoadDataTest implements ClickHouse {
   public void loadDataDirect() {
     try {
       cProfiles = clickHouseDB.loadDataDirect(ClickHouse.select2016,
-                                              dStore,
-                                              TType.TIME_SERIES,
-                                              IType.GLOBAL,
-                                              true,
-                                              20000,
-                                              false);
+                                              dStore, TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD,
+                                              true,20000,false);
     } catch (Exception e) {
       log.catching(e);
     }
@@ -78,8 +77,11 @@ public class DBaseCHLoadDataTest implements ClickHouse {
   @Test
   public void loadDataJdbcTimeSeriesGlobalCompression() {
     try {
-      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore,
-                                            TType.TIME_SERIES, IType.GLOBAL, true, 20000);
+      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore, TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD,
+                                            true, 20000,
+                                            LocalDate.of(2016, 1, 1),
+                                            LocalDate.of(2017, 1, 1),
+                                            ClickHouseDatabase.Step.DAY);
     } catch (Exception e) {
       log.catching(e);
     }
@@ -89,8 +91,11 @@ public class DBaseCHLoadDataTest implements ClickHouse {
   @Test
   public void loadDataJdbcTimeSeriesGlobalNoCompression() {
     try {
-      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore,
-                                            TType.TIME_SERIES, IType.GLOBAL, false, 20000);
+      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore, TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD,
+                                            false, 20000,
+                                            LocalDate.of(2016, 1, 1),
+                                            LocalDate.of(2017, 1, 1),
+                                            ClickHouseDatabase.Step.DAY);
     } catch (Exception e) {
       log.catching(e);
     }
@@ -98,10 +103,42 @@ public class DBaseCHLoadDataTest implements ClickHouse {
   }
 
   @Test
-  public void loadDataJdbcTimeSeriesLocalCompression() {
+  public void loadDataJdbcTimeSeriesLocalOnLoadCompression() {
     try {
-      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore,
-                                            TType.TIME_SERIES, IType.LOCAL, true, 20000);
+      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore, TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD,
+                                            true, 20000,
+                                            LocalDate.of(2016, 1, 1),
+                                            LocalDate.of(2017, 1, 1),
+                                            ClickHouseDatabase.Step.DAY);
+    } catch (Exception e) {
+      log.catching(e);
+    }
+    assertEquals(1, 1);
+  }
+
+  @Test
+  public void loadDataJdbcTimeSeriesLocalPassOneCompression() {
+    try {
+      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore, TType.TIME_SERIES, IType.LOCAL, AType.FULL_PASS_ONCE,
+                                            true, 20000,
+                                            LocalDate.of(2016, 1, 1),
+                                            LocalDate.of(2017, 1, 1),
+                                            ClickHouseDatabase.Step.DAY);
+    } catch (Exception e) {
+      log.catching(e);
+    }
+    assertEquals(1, 1);
+  }
+
+
+  @Test
+  public void loadDataJdbcTimeSeriesLocalPassEachCompression() {
+    try {
+      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore, TType.TIME_SERIES, IType.LOCAL, AType.FULL_PASS_EACH,
+                                            true, 20000,
+                                            LocalDate.of(2016, 1, 1),
+                                            LocalDate.of(2017, 1, 1),
+                                            ClickHouseDatabase.Step.DAY);
     } catch (Exception e) {
       log.catching(e);
     }
@@ -111,8 +148,11 @@ public class DBaseCHLoadDataTest implements ClickHouse {
   @Test
   public void loadDataJdbcTimeSeriesLocalNoCompression() {
     try {
-      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore,
-                                            TType.TIME_SERIES, IType.LOCAL, false, 20000);
+      cProfiles = clickHouseDB.loadDataJdbc(ClickHouse.select2016, dStore, TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD,
+                                            false, 20000,
+                                            LocalDate.of(2016, 1, 1),
+                                            LocalDate.of(2017, 1, 1),
+                                            ClickHouseDatabase.Step.DAY);
     } catch (Exception e) {
       log.catching(e);
     }
@@ -122,8 +162,9 @@ public class DBaseCHLoadDataTest implements ClickHouse {
   @Test
   public void loadDataBatchTest() {
     try {
-     cProfiles = clickHouseDB.loadDataJdbcBatch(ClickHouse.select2016, dStore,
-                                                TType.TIME_SERIES, IType.GLOBAL, true, 20000, 20000);
+      cProfiles = clickHouseDB.loadDataJdbcBatch(ClickHouse.select2016, dStore,
+                                                 TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD,
+                                                 true, 20000, 20000);
     } catch (Exception e) {
       log.catching(e);
     }

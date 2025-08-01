@@ -12,13 +12,14 @@ import java.util.Map;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 
 public interface ClickHouse {
   String tableName = "ch_table_test";
-  String select2016 = "SELECT * FROM datasets.trips_mergetree where toYear(pickup_date) = 2016";
+  String select2016 = "SELECT * FROM datasets.trips_mergetree";
 
   String rootFolder = "C:\\Users\\.temp";
   String folderName = "clickhouse_test";
@@ -35,7 +36,7 @@ public interface ClickHouse {
     return out;
   }
 
-  
+
   default SType getSType(String colName) {
     if (colName.equalsIgnoreCase("PICKUP_DATE") |
         colName.equalsIgnoreCase("DROPOFF_DATE") |
@@ -70,12 +71,17 @@ public interface ClickHouse {
       return SType.RAW;
     }
   }
-  
-  default SProfile getSProfile(String tableName, TType tType, IType iType, Boolean compression) {
+
+  default SProfile getSProfile(String tableName,
+                               TType tType,
+                               IType iType,
+                               AType aType,
+                               Boolean compression) {
     SProfile sProfile = new SProfile();
     sProfile.setTableName(tableName);
     sProfile.setTableType(tType);
     sProfile.setIndexType(iType);
+    sProfile.setAnalyzeType(aType);
     sProfile.setBackendType(BType.BERKLEYDB);
     sProfile.setCompression(compression);
     Map<String, CSType> csTypeMap = new HashMap<>();
@@ -110,9 +116,9 @@ public interface ClickHouse {
     csTypeMap.put("DROPOFF_BOROCODE", new CSType().toBuilder().sType(SType.ENUM).build());
     csTypeMap.put("DROPOFF_BORONAME", new CSType().toBuilder().sType(SType.ENUM).build());
     csTypeMap.put("DROPOFF_CDELIGIBIL", new CSType().toBuilder().sType(SType.ENUM).build());
-    
+
     sProfile.setCsTypeMap(csTypeMap);
-    
+
     return sProfile;
   }
   default String getTestDbFolder() {

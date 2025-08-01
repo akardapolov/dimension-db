@@ -1,6 +1,10 @@
 package ru.dimension.db.storage.pqsql;
 
 import com.sleepycat.persist.EntityCursor;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -297,7 +301,20 @@ public class RawPgSqlImpl extends QueryJdbcApi implements RawDAO {
                                           CProfile secondGrpBy,
                                           long begin,
                                           long end) {
-    throw new RuntimeException("Not supported");
+    return getGanttSum(tableName, tsCProfile, firstGrpBy, secondGrpBy, begin, end, databaseDialect);
+  }
+
+  @Override
+  public List<GanttColumnSum> getGanttSum(String tableName,
+                                          CProfile tsCProfile,
+                                          CProfile firstGrpBy,
+                                          CProfile secondGrpBy,
+                                          CProfile cProfileFilter,
+                                          String[] filterData,
+                                          CompareFunction compareFunction,
+                                          long begin,
+                                          long end) {
+    return getGanttSumWithFilter(tableName, tsCProfile, firstGrpBy, secondGrpBy, cProfileFilter, filterData, compareFunction, begin, end, databaseDialect);
   }
 
   @Override

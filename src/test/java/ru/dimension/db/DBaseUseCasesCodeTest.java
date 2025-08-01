@@ -44,6 +44,7 @@ import ru.dimension.db.model.profile.TProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -123,7 +124,12 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   public void getTProfile() throws TableNameEmptyException {
     log.info("Use case: get table metadata");
 
-    loadMetadataDirect(configDirect, GET_TABLE_PROFILE_USE_CASE_TABLE_NAME, TType.REGULAR, IType.GLOBAL, BType.BERKLEYDB, true);
+    loadMetadataDirect(configDirect, GET_TABLE_PROFILE_USE_CASE_TABLE_NAME,
+                       TType.REGULAR,
+                       IType.GLOBAL,
+                       AType.ON_LOAD,
+                       BType.BERKLEYDB,
+                       true);
 
     TProfile tProfile = configDirect.getDStore().getTProfile(GET_TABLE_PROFILE_USE_CASE_TABLE_NAME);
 
@@ -137,7 +143,12 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   public void loadDirectTableMetadata() throws TableNameEmptyException {
     log.info("Use case: load table metadata in direct mode from SProfile configuration");
 
-    SProfile sProfile = getSProfileDirect(LOAD_DIRECT_METADATA_USE_CASE_TABLE_NAME, TType.TIME_SERIES, IType.GLOBAL, BType.BERKLEYDB, true);
+    SProfile sProfile = getSProfileDirect(LOAD_DIRECT_METADATA_USE_CASE_TABLE_NAME,
+                                          TType.TIME_SERIES,
+                                          IType.GLOBAL,
+                                          AType.ON_LOAD,
+                                          BType.BERKLEYDB,
+                                          true);
 
     TProfile tProfile = configDirect.getDStore().loadDirectTableMetadata(sProfile);
 
@@ -151,7 +162,7 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   public void loadJdbcTableMetadata() throws TableNameEmptyException, SQLException {
     log.info("Use case: load table metadata from JDBC Connection");
 
-    SProfile sProfile = getSProfileJdbc(LOAD_JDBC_METADATA_USE_CASE_TABLE_NAME, TType.REGULAR, IType.GLOBAL, BType.BERKLEYDB, true);
+    SProfile sProfile = getSProfileJdbc(LOAD_JDBC_METADATA_USE_CASE_TABLE_NAME, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
 
     TProfile tProfile = configDirect.getDStore()
         .loadJdbcTableMetadata(configDirect.getH2DbConnection(), select, sProfile);
@@ -171,7 +182,7 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
 
     String csvSplitBy = ",";
 
-    SProfile sProfile = getSProfileCsv(LOAD_CSV_METADATA_USE_CASE_TABLE_NAME, fileName, csvSplitBy, TType.REGULAR, IType.GLOBAL, BType.BERKLEYDB, true);
+    SProfile sProfile = getSProfileCsv(LOAD_CSV_METADATA_USE_CASE_TABLE_NAME, fileName, csvSplitBy, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
 
     TProfile tProfile = configCsv.getDStore().loadCsvTableMetadata(fileName, csvSplitBy, sProfile);
 
@@ -185,7 +196,13 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   public void setTimestampColumn() throws TableNameEmptyException {
     log.info("Use case: update table profile with new timestamp column");
 
-    loadMetadataDirect(configDirect, SET_TIMESTAMP_COLUMN_USE_CASE_TABLE_NAME, TType.REGULAR, IType.GLOBAL, BType.BERKLEYDB, true);
+    loadMetadataDirect(configDirect,
+                       SET_TIMESTAMP_COLUMN_USE_CASE_TABLE_NAME,
+                       TType.REGULAR,
+                       IType.GLOBAL,
+                       AType.ON_LOAD,
+                       BType.BERKLEYDB,
+                       true);
 
     TProfile tProfile = configDirect.getDStore().getTProfile(SET_TIMESTAMP_COLUMN_USE_CASE_TABLE_NAME);
 
@@ -765,7 +782,7 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
 
     String csvSplitBy = ",";
 
-    SProfile sProfile = getSProfileCsv(GET_RESULT_SET_REGULAR_USE_CASE_TABLE_NAME, fileName, csvSplitBy, TType.REGULAR, IType.GLOBAL, BType.BERKLEYDB, false);
+    SProfile sProfile = getSProfileCsv(GET_RESULT_SET_REGULAR_USE_CASE_TABLE_NAME, fileName, csvSplitBy, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, false);
 
     TProfile tProfile = configCsv.getDStore().loadCsvTableMetadata(fileName, csvSplitBy, sProfile);
 
@@ -920,7 +937,7 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   }
 
   private TProfile setupJdbcProfile(String tableName) throws SQLException, TableNameEmptyException {
-    SProfile sProfile = getSProfileJdbc(tableName, TType.TIME_SERIES, IType.LOCAL, BType.BERKLEYDB, true);
+    SProfile sProfile = getSProfileJdbc(tableName, TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD, BType.BERKLEYDB, true);
     sProfile.getCsTypeMap()
         .put("ID", CSType.builder().isTimeStamp(true).sType(SType.RAW).cType(CType.LONG).dType(DataType.LONG).build());
     return configJdbc.getDStore().loadJdbcTableMetadata(configJdbc.getH2DbConnection(), select, sProfile);

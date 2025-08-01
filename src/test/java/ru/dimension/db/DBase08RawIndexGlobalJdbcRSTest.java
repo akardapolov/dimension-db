@@ -5,6 +5,7 @@ import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.common.AbstractH2Test;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.sql.BatchResultSet;
@@ -36,7 +37,7 @@ public class DBase08RawIndexGlobalJdbcRSTest extends AbstractH2Test {
     csTypeMap.put("CITY", SType.ENUM);
     csTypeMap.put("BIRTHDAY", SType.RAW);
 
-    putDataJdbc(csTypeMap, TType.TIME_SERIES, IType.GLOBAL, true);
+    putDataJdbc(csTypeMap, TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD, true);
   }
 
   @Test

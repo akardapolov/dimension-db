@@ -23,6 +23,7 @@ import ru.dimension.db.handler.MetadataHandler;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -286,6 +287,7 @@ public class DBase06CsvTest {
           .tableName(tableName)
           .tableType(TType.REGULAR)
           .indexType(IType.GLOBAL)
+          .analyzeType(AType.ON_LOAD)
           .backendType(BType.BERKLEYDB)
           .compression(compression)
           .csTypeMap(new LinkedHashMap<>()).build();

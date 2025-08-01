@@ -17,6 +17,7 @@ import ru.dimension.db.core.DStore;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -73,6 +74,7 @@ public abstract class AbstractMicrosoftSQLTest implements JdbcSource {
     return new SProfile().setTableName(tableNameRandom)
         .setTableType(TType.TIME_SERIES)
         .setIndexType(IType.GLOBAL)
+        .setAnalyzeType(AType.ON_LOAD)
         .setBackendType(BType.BERKLEYDB)
         .setCompression(false)
         .setCsTypeMap(csTypeMap);
@@ -94,6 +96,7 @@ public abstract class AbstractMicrosoftSQLTest implements JdbcSource {
     return new SProfile().setTableName(tableNameAsh)
         .setTableType(TType.TIME_SERIES)
         .setIndexType(IType.GLOBAL)
+        .setAnalyzeType(AType.ON_LOAD)
         .setBackendType(BType.BERKLEYDB)
         .setCompression(false)
         .setCsTypeMap(csTypeMap);

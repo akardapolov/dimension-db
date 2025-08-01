@@ -18,6 +18,7 @@ import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
 import ru.dimension.db.model.output.GanttColumnCount;
+import ru.dimension.db.model.output.GanttColumnSum;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.sql.BatchResultSet;
@@ -175,6 +176,90 @@ public abstract class QueryJdbcApi {
     }
 
     return ganttColumnCounts;
+  }
+
+  public List<GanttColumnSum> getGanttSum(String tableName,
+                                          CProfile tsCProfile,
+                                          CProfile firstGrpBy,
+                                          CProfile secondGrpBy,
+                                          long begin,
+                                          long end,
+                                          DatabaseDialect databaseDialect) {
+    List<GanttColumnSum> results = new ArrayList<>();
+    String firstColName = firstGrpBy.getColName().toLowerCase();
+    String secondColName = secondGrpBy.getColName().toLowerCase();
+
+    String query = "SELECT " + firstColName + ", SUM(" + secondColName + ") " +
+        "FROM " + tableName + " " +
+        databaseDialect.getWhereClass(tsCProfile, null, null, null) +
+        " GROUP BY " + firstColName;
+    log.info("Query: " + query);
+
+    try (Connection conn = basicDataSource.getConnection();
+        PreparedStatement ps = conn.prepareStatement(query)) {
+
+      databaseDialect.setDateTime(tsCProfile, ps, 1, begin);
+      databaseDialect.setDateTime(tsCProfile, ps, 2, end);
+
+      ResultSet rs = ps.executeQuery();
+
+      while (rs.next()) {
+        String key = rs.getString(1);
+        double sum = rs.getDouble(2);
+        if (key == null) {
+          key = "";
+        }
+        results.add(new GanttColumnSum(key, sum));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Error executing gantt sum query: " + e.getMessage(), e);
+    }
+
+    return results;
+  }
+
+  public List<GanttColumnSum> getGanttSumWithFilter(String tableName,
+                                                    CProfile tsCProfile,
+                                                    CProfile firstGrpBy,
+                                                    CProfile secondGrpBy,
+                                                    CProfile cProfileFilter,
+                                                    String[] filterData,
+                                                    CompareFunction compareFunction,
+                                                    long begin,
+                                                    long end,
+                                                    DatabaseDialect databaseDialect) {
+    List<GanttColumnSum> results = new ArrayList<>();
+    String firstColName = firstGrpBy.getColName().toLowerCase();
+    String secondColName = secondGrpBy.getColName().toLowerCase();
+
+    // Build query with filter support
+    String query =
+        "SELECT " + firstColName + ", SUM(" + secondColName + ") " +
+            "FROM " + tableName + " " +
+            databaseDialect.getWhereClass(tsCProfile, cProfileFilter, filterData, compareFunction) +
+            " GROUP BY " + firstColName;
+    log.info("Query: " + query);
+
+    try (Connection conn = basicDataSource.getConnection();
+        PreparedStatement ps = conn.prepareStatement(query)) {
+
+      // Set timestamp parameters
+      databaseDialect.setDateTime(tsCProfile, ps, 1, begin);
+      databaseDialect.setDateTime(tsCProfile, ps, 2, end);
+
+      ResultSet rs = ps.executeQuery();
+
+      while (rs.next()) {
+        String key = rs.getString(1);
+        double sum = rs.getDouble(2);
+        if (key == null) key = "";
+        results.add(new GanttColumnSum(key, sum));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Error executing gantt sum with filter query: " + e.getMessage(), e);
+    }
+
+    return results;
   }
 
   public List<String> getDistinctCommon(String tableName,

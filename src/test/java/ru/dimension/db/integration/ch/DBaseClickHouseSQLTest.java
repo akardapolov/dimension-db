@@ -54,6 +54,7 @@ import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -188,10 +189,15 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
     byte ch_dt_int8 = -128;
     float ch_dt_real = 3.14f;
     String ch_dt_text = "Hello, world!";
-    LocalDateTime ch_dt_time = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);;//LocalDateTime.of(2023, 10, 13, 16, 5, 20);
+    LocalDateTime ch_dt_time = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
     ZonedDateTime ldtZoned = ch_dt_time.atZone(ZoneId.systemDefault());
     ZonedDateTime utcZoned = ldtZoned.withZoneSameInstant(ZoneOffset.UTC);
-    ZonedDateTime mskZoned = ldtZoned.withZoneSameInstant(ZoneId.of("Europe/Moscow"));
+
+    LocalDateTime utcDateTime = ch_dt_time
+        .atZone(ZoneId.of("Europe/Moscow"))
+        .withZoneSameInstant(ZoneOffset.UTC)
+        .toLocalDateTime();
+
     UUID ch_dt_uuid = UUID.fromString("123e4567-e89b-12d3-a456-426655440000");
     String ch_dt_enum8_2 = "enumA";
     short ch_dt_uint8 = 255;
@@ -509,7 +515,7 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
     CProfile chDtTime = getCProfile(cProfiles, "ch_dt_time");
     Date dateTime = formatter.parse(getStackedColumnKey(tableName, chDtTime));
     LocalDateTime localDateTimeTime = new java.sql.Timestamp(dateTime.getTime()).toLocalDateTime();
-    assertEquals(ch_dt_time, localDateTimeTime); // TODO Done
+    assertEquals(utcDateTime, localDateTimeTime); // TODO Done
 
     CProfile chDtUuid = getCProfile(cProfiles, "ch_dt_uuid");
     assertEquals(ch_dt_uuid.toString(), getStackedColumnKey(tableName, chDtUuid));
@@ -664,7 +670,7 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
     List<GanttColumnCount> chDtTimeUuid = getGanttColumn(tableName, chDtTime, chDtUuid);
     Date dateTimeGC = formatter.parse(chDtTimeUuid.get(0).getKey());
     LocalDateTime localDateTimeTimeGC = new java.sql.Timestamp(dateTimeGC.getTime()).toLocalDateTime();
-    assertEquals(ch_dt_time, localDateTimeTimeGC); // TODO Done
+    assertEquals(utcDateTime, localDateTimeTimeGC); // TODO Done
     assertEquals(ch_dt_uuid, UUID.fromString(getGanttKey(chDtTimeUuid, ch_dt_uuid.toString())));
 
     List<GanttColumnCount> chDtUint8Enum8_2 = getGanttColumn(tableName, chDtUint8, chDtEnum8_2);
@@ -781,7 +787,7 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
         } else if (cProfile.equals(chDtTime)) {
           Date dateTimeRaw = formatter.parse(getStackedColumnKey(tableName, chDtTime));
           LocalDateTime localDateTimeTimeRaw = new java.sql.Timestamp(dateTimeRaw.getTime()).toLocalDateTime();
-          assertEquals(ch_dt_time, localDateTimeTimeRaw);
+          assertEquals(utcDateTime, localDateTimeTimeRaw);
         } else if (cProfile.equals(chDtUuid)) {
           assertEquals(ch_dt_uuid.toString(), getStackedColumnKey(tableName, chDtUuid));
         } else if (cProfile.equals(chDtUint8)) {
@@ -857,6 +863,7 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
     return new SProfile().setTableName(tableNameDataType)
         .setTableType(TType.TIME_SERIES)
         .setIndexType(IType.GLOBAL)
+        .setAnalyzeType(AType.ON_LOAD)
         .setBackendType(BType.BERKLEYDB)
         .setCompression(false)
         .setCsTypeMap(csTypeMap);

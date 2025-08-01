@@ -78,15 +78,14 @@ public class UStore extends CommonServiceApi {
       Object value = convertRawValue(currObject, cProfile, cType);
       insertRawValue(colId, iR, value);
     } else if (sType == SType.ENUM) {
-      int intValue = converter.convertRawToInt(currObject, cProfile);
-      insertEnumValue(colId, iR, intValue, cProfile);
+      int currValue = converter.convertRawToInt(currObject, cProfile);
+      insertEnumValue(colId, iR, currValue, cProfile);
     } else if (sType == SType.HISTOGRAM) {
-      int intValue = converter.convertRawToInt(currObject, cProfile);
-      insertHistogramValue(colId, iR, intValue);
+      int currValue = converter.convertRawToInt(currObject, cProfile);
+      insertHistogramValue(colId, iR, currValue);
     }
   }
 
-  // Helper methods
   private void insertRawValue(int colId, int iR, Object value) {
     List<Object> columnData = rawDataMap.get(colId);
     if (columnData == null) {
@@ -119,24 +118,15 @@ public class UStore extends CommonServiceApi {
         if (intValue == null) {
           throw new IllegalStateException("Enum value not found for byte: " + b);
         }
-        rawData.add(convertIntToRawValue(intValue, cProfile));
+        rawData.add(convertIntToObject(value, cProfile));
       }
-      rawData.add(iR, convertIntToRawValue(value, cProfile));
+      rawData.add(iR, convertIntToObject(value, cProfile));
 
       // Update storage structures
       enumDataMap.remove(colId);
       enumDictionaries.remove(colId);
       storageTypeMap.put(colId, SType.RAW);
       rawDataMap.put(colId, rawData);
-    }
-  }
-
-  private Object convertIntToRawValue(int value, CProfile cProfile) {
-    CType cType = Mapper.isCType(cProfile);
-    if (cType == CType.STRING) {
-      return converter.convertIntToRaw(value, cProfile);
-    } else {
-      return convertIntToObject(value, cType);
     }
   }
 
@@ -170,15 +160,19 @@ public class UStore extends CommonServiceApi {
   }
 
   public void analyzeAndConvertColumns(int totalRowCount, Map<Integer, CProfile> cProfileMap) {
+    List<ColumnConversion> columnsToConvert = new ArrayList<>();
+
     for (Map.Entry<Integer, SType> entry : storageTypeMap.entrySet()) {
       int colId = entry.getKey();
       SType currentType = entry.getValue();
       CProfile cProfile = cProfileMap.get(colId);
       if (cProfile == null) continue;
 
-      // Skip non-numeric columns
-      CType cType = Mapper.isCType(cProfile);
+      if (cProfile.getCsType().getCType() != CType.INT) {
+        continue;
+      }
 
+      CType cType = Mapper.isCType(cProfile);
       List<Integer> intValues = getIntegerListForColumn(colId, currentType, totalRowCount, cProfile);
       if (intValues == null || intValues.size() != totalRowCount) continue;
 
@@ -205,22 +199,26 @@ public class UStore extends CommonServiceApi {
       if (ndv > 0.5 * totalRowCount) {
         newType = SType.RAW;
       } else {
-        if (clusteringIndex >= 0.8) {
-          newType = SType.HISTOGRAM;
-        } else {
-          newType = SType.ENUM;
-        }
+        newType = clusteringIndex >= 0.8 ? SType.HISTOGRAM : SType.ENUM;
       }
 
-      if (newType == currentType) continue;
+      if (newType != currentType) {
+        columnsToConvert.add(new ColumnConversion(colId, cProfile, newType, intValues, cType));
+      }
+    }
 
-      // Remove column and convert to new storage type
-      removeColumn(cProfile);
-      convertToNewStorage(colId, cProfile, newType, intValues, cType);
+    // Process collected conversions
+    for (ColumnConversion conv : columnsToConvert) {
+      removeColumn(conv.cProfile);
+      convertToNewStorage(conv.colId, conv.cProfile, conv.newType, conv.intValues, conv.cType);
     }
   }
 
   List<Integer> getIntegerListForColumn(int colId, SType currentType, int totalRowCount, CProfile cProfile) {
+    if (cProfile.getCsType().getCType() != CType.INT) {
+      return null;
+    }
+
     if (currentType == SType.RAW) {
       List<Object> rawData = rawDataMap.get(colId);
       if (rawData == null) return null;
@@ -263,35 +261,47 @@ public class UStore extends CommonServiceApi {
   }
 
   private void convertToNewStorage(int colId, CProfile cProfile, SType newType, List<Integer> intValues, CType cType) {
+    removeColumn(cProfile);
     addColumn(cProfile, newType);
+
     if (newType == SType.RAW) {
       List<Object> rawData = new ArrayList<>();
       for (int value : intValues) {
         if (cType == CType.STRING) {
           rawData.add(converter.convertIntToRaw(value, cProfile));
         } else {
-          rawData.add(convertIntToObject(value, cType));
+          rawData.add(convertIntToObject(value, cProfile));
         }
       }
       rawDataMap.put(colId, rawData);
     } else if (newType == SType.ENUM) {
       List<Byte> enumData = enumDataMap.get(colId);
       CachedLastLinkedHashMap<Integer, Byte> dictionary = enumDictionaries.get(colId);
+
       dictionary.clear();
-      for (int value : intValues) {
-        try {
-          enumData.add(EnumHelper.getByteValue(dictionary, value));
-        } catch (EnumByteExceedException e) {
-          // Fallback to RAW if enum conversion fails
-          removeColumn(cProfile);
-          addColumn(cProfile, SType.RAW);
-          List<Object> rawData = new ArrayList<>();
-          for (int v : intValues) {
-            rawData.add(convertIntToObject(v, cType));
+      byte nextByte = 0;
+
+      try {
+        for (int value : intValues) {
+          if (!dictionary.containsKey(value)) {
+            if (nextByte == Byte.MAX_VALUE) {
+              throw new EnumByteExceedException("Byte limit exceeded");
+            }
+            dictionary.put(value, nextByte++);
           }
-          rawDataMap.put(colId, rawData);
-          return;
+
+          byte byteValue = dictionary.get(value);
+          enumData.add(byteValue);
         }
+      } catch (EnumByteExceedException e) {
+        // Fallback to RAW storage
+        removeColumn(cProfile);
+        addColumn(cProfile, SType.RAW);
+        List<Object> rawData = new ArrayList<>();
+        for (int v : intValues) {
+          rawData.add(convertIntToObject(v, cProfile));
+        }
+        rawDataMap.put(colId, rawData);
       }
     } else if (newType == SType.HISTOGRAM) {
       HEntry entry = histogramDataMap.get(colId);
@@ -310,54 +320,113 @@ public class UStore extends CommonServiceApi {
   }
 
   public SType analyzeColumn(int colId, int totalRowCount, CProfile cProfile) {
-    SType currentType = storageTypeMap.get(colId);
-    List<Integer> intValues = getIntegerListForColumn(colId, currentType, totalRowCount, cProfile);
+    if (cProfile.getCsType().getCType() != CType.INT) {
+      return storageTypeMap.get(colId);
+    }
 
-    if (intValues == null || intValues.size() != totalRowCount) {
+    SType currentType = storageTypeMap.get(colId);
+
+    if (totalRowCount <= 100) {
+      // Full analysis for small datasets
+      List<Integer> intValues = getIntegerListForColumn(colId, currentType, totalRowCount, cProfile);
+      if (intValues == null || intValues.size() != totalRowCount) {
+        return currentType;
+      }
+      return computeStorageType(intValues, totalRowCount);
+    }
+
+    // Determine sample size based on data size
+    int sampleSize;
+    if (totalRowCount <= 1000) {
+      sampleSize = (int) Math.ceil(totalRowCount * 0.2);
+    } else if (totalRowCount <= 10000) {
+      sampleSize = (int) Math.ceil(totalRowCount * 0.1);
+    } else {
+      sampleSize = (int) Math.ceil(totalRowCount * 0.01);
+    }
+
+    // Calculate sampling step
+    int step = Math.max(1, totalRowCount / sampleSize);
+    List<Integer> sampledValues = new ArrayList<>();
+
+    try {
+      // Collect sampled values
+      if (currentType == SType.RAW) {
+        List<Object> rawData = rawDataMap.get(colId);
+        for (int i = 0; i < totalRowCount; i += step) {
+          Object obj = rawData.get(i);
+          int value = converter.convertRawToInt(obj, cProfile);
+          sampledValues.add(value);
+        }
+      } else if (currentType == SType.ENUM) {
+        List<Byte> enumData = enumDataMap.get(colId);
+        CachedLastLinkedHashMap<Integer, Byte> dictionary = enumDictionaries.get(colId);
+        Map<Byte, Integer> reverseMap = new HashMap<>();
+        for (Map.Entry<Integer, Byte> e : dictionary.entrySet()) {
+          reverseMap.put(e.getValue(), e.getKey());
+        }
+        for (int i = 0; i < totalRowCount; i += step) {
+          byte b = enumData.get(i);
+          Integer value = reverseMap.get(b);
+          sampledValues.add(value != null ? value : 0);
+        }
+      } else if (currentType == SType.HISTOGRAM) {
+        HEntry entry = histogramDataMap.get(colId);
+        for (int i = 0; i < totalRowCount; i += step) {
+          sampledValues.add(entry.getValueAtRow(i));
+        }
+      } else {
+        return currentType;
+      }
+    } catch (Exception e) {
       return currentType;
     }
 
-    // Calculate distinct values and runs
-    Set<Integer> distinct = new HashSet<>(intValues);
+    return computeStorageType(sampledValues, sampledValues.size());
+  }
+
+  private SType computeStorageType(List<Integer> values, int sampleSize) {
+    if (values.isEmpty()) {
+      return SType.RAW;
+    }
+
+    // Compute distinct values
+    Set<Integer> distinct = new HashSet<>(values);
     int ndv = distinct.size();
+
+    // Compute runs
     int runs = 1;
-    for (int i = 1; i < intValues.size(); i++) {
-      if (!intValues.get(i).equals(intValues.get(i - 1))) {
+    for (int i = 1; i < values.size(); i++) {
+      if (!values.get(i).equals(values.get(i - 1))) {
         runs++;
       }
     }
 
     // Calculate clustering index
     double clusteringIndex;
-    if (totalRowCount == ndv) {
+    if (sampleSize == ndv) {
       clusteringIndex = 0.0;
     } else {
-      clusteringIndex = (totalRowCount - runs) / (double) (totalRowCount - ndv);
+      clusteringIndex = (sampleSize - runs) / (double) (sampleSize - ndv);
     }
 
-    // Determine new storage type
-    SType newType;
-    if (ndv > 0.5 * totalRowCount) {
-      newType = SType.RAW;
+    // Determine storage type
+    if (ndv > 0.5 * sampleSize) {
+      return SType.RAW;
     } else {
-      if (clusteringIndex >= 0.8) {
-        newType = SType.HISTOGRAM;
-      } else {
-        newType = SType.ENUM;
-      }
+      return clusteringIndex >= 0.8 ? SType.HISTOGRAM : SType.ENUM;
     }
-
-    return newType;
   }
 
-  private Object convertIntToObject(int value, CType cType) {
+  private Object convertIntToObject(int value, CProfile cProfile) {
+    CType cType = Mapper.isCType(cProfile);
+
     return switch (cType) {
-      case INT -> value;
-      case LONG -> (long) value;
-      case FLOAT -> (float) value;
-      case DOUBLE -> (double) value;
+      case LONG -> converter.convertIntToLong(value, cProfile);
+      case FLOAT -> (float) converter.convertIntToDouble(value, cProfile);
+      case DOUBLE -> converter.convertIntToDouble(value, cProfile);
+      case STRING -> converter.convertRawToInt(value, cProfile);
       default -> value;
     };
   }
-
 }

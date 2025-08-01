@@ -18,6 +18,7 @@ import ru.dimension.db.core.DStore;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.SType;
+import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
@@ -83,6 +84,7 @@ public abstract class AbstractClickhouseSQLTest implements JdbcSource {
     return new SProfile().setTableName(tableNameDataType)
             .setTableType(TType.TIME_SERIES)
             .setIndexType(IType.GLOBAL)
+            .setAnalyzeType(AType.ON_LOAD)
             .setBackendType(BType.BERKLEYDB)
             .setCompression(false)
             .setCsTypeMap(csTypeMap);

@@ -696,6 +696,19 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
   }
 
   @Override
+  public List<GanttColumnSum> getGanttSum(String tableName,
+                                          CProfile tsCProfile,
+                                          CProfile firstGrpBy,
+                                          CProfile secondGrpBy,
+                                          CProfile cProfileFilter,
+                                          String[] filterData,
+                                          CompareFunction compareFunction,
+                                          long begin,
+                                          long end) {
+    throw new RuntimeException("Not supported");
+  }
+
+  @Override
   public List<String> getDistinct(String tableName,
                                   CProfile tsCProfile,
                                   CProfile cProfile,

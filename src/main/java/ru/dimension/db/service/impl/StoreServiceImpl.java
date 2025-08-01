@@ -143,15 +143,15 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
 
       // Fill histogram data
       if (csType.getSType() == SType.HISTOGRAM) {
-        int prevInt = getPrevValue(histograms, colId);
-        int currInt = this.converter.convertRawToInt(currObject, cProfile);
+        int prevValue = getPrevValue(histograms, colId);
+        int currValue = this.converter.convertRawToInt(currObject, cProfile);
 
-        if (prevInt != currInt) {
+        if (prevValue != currValue) {
           histograms.get(colId).getIndex().add(iR);
-          histograms.get(colId).getValue().add(currInt);
+          histograms.get(colId).getValue().add(currValue);
         } else if (iR == 0) {
           histograms.get(colId).getIndex().add(iR);
-          histograms.get(colId).getValue().add(currInt);
+          histograms.get(colId).getValue().add(currValue);
         }
       }
 
@@ -166,12 +166,6 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
   @Override
   public long putDataJdbc(String tableName,
                           ResultSet resultSet) {
-    IType indexType = metaModelApi.getIndexType(tableName);
-    if (IType.LOCAL.equals(indexType)) {
-      log.info(IType.LOCAL);
-      return storeLocalService.putDataJdbc(tableName, resultSet);
-    }
-
     return storeLocalService.putDataJdbc(tableName, resultSet);
   }
 
@@ -218,15 +212,15 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
             if (!csType.isTimeStamp()) {
               // Fill histogram data
               int colId = cProfile.getColId();
-              int prevInt = getPrevValue(histograms, colId);
-              int currInt = this.converter.convertRawToInt(currObject, cProfile);
+              int prevValue = getPrevValue(histograms, colId);
+              int currValue = this.converter.convertRawToInt(currObject, cProfile);
 
-              if (prevInt != currInt) {
+              if (prevValue != currValue) {
                 histograms.get(colId).getIndex().add(iR);
-                histograms.get(colId).getValue().add(currInt);
+                histograms.get(colId).getValue().add(currValue);
               } else if (iR == 0) {
                 histograms.get(colId).getIndex().add(iR);
-                histograms.get(colId).getValue().add(currInt);
+                histograms.get(colId).getValue().add(currValue);
               }
             }
 
@@ -543,15 +537,15 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
 
             // Fill histogram data
             if (csType.getSType() == SType.HISTOGRAM) {
-              int prevInt = getPrevValue(histograms, colId);
-              int currInt = this.converter.convertRawToInt(currObject, cProfile);
+              int prevValue = getPrevValue(histograms, colId);
+              int currValue = this.converter.convertRawToInt(currObject, cProfile);
 
-              if (prevInt != currInt) {
+              if (prevValue != currValue) {
                 histograms.get(colId).getIndex().add(iR);
-                histograms.get(colId).getValue().add(currInt);
+                histograms.get(colId).getValue().add(currValue);
               } else if (iR == 0) {
                 histograms.get(colId).getIndex().add(iR);
-                histograms.get(colId).getValue().add(currInt);
+                histograms.get(colId).getValue().add(currValue);
               }
             }
 

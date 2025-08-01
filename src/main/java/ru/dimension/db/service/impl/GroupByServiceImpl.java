@@ -241,7 +241,7 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
 
     BType bType = metaModelApi.getBackendType(tableName);
     if (!BType.BERKLEYDB.equals(bType)) {
-      throw new UnsupportedOperationException("Filtered gantt sum is only supported for BerkleyDB backend");
+      return rawDAO.getGanttSum(tableName, tsProfile, firstGrpBy, secondGrpBy, cProfileFilter, filterData, compareFunction, begin, end);
     }
 
     byte tableId = metaModelApi.getTableId(tableName);
