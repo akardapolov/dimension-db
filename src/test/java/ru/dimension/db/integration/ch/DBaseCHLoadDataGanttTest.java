@@ -112,14 +112,16 @@ public class DBaseCHLoadDataGanttTest implements ClickHouse {
     try {
       Instant start = Instant.now();
       runLoadTest(resources, tType, iType, aType, compression);
-      long loadTimeMillis = Duration.between(start, Instant.now()).toMillis();
-      double loadTimeMin = loadTimeMillis / 60000.0;
+      Duration loadDuration = Duration.between(start, Instant.now());
+      long loadMinutes = loadDuration.toMinutes();
+      long loadSeconds = loadDuration.minusMinutes(loadMinutes).getSeconds();
+      String loadTimeFormatted = String.format("%d min %d sec", loadMinutes, loadSeconds);
 
       long sizeBytes = calculateFolderSize(resources.databaseDir);
       double sizeGB = sizeBytes / (1024.0 * 1024.0 * 1024.0);
 
       appendMarkdownRow(tType, iType, aType, compression,
-                        String.format("%.2f", loadTimeMin),
+                        loadTimeFormatted,
                         String.format("%.3f", sizeGB));
 
       // Run all gantt tests by profileKey

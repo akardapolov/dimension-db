@@ -114,14 +114,16 @@ public class DBaseCHLoadDataGanttSmallTest implements ClickHouse {
       Instant start = Instant.now();
       runLoadTest(resources, tType, iType, aType, compression);
       long loadTimeMillis = Duration.between(start, Instant.now()).toMillis();
-      double loadTimeMin = loadTimeMillis / 60000.0;
+      long minutes = loadTimeMillis / 60000;
+      long seconds = (loadTimeMillis % 60000) / 1000;
+      String loadTimeFormatted = String.format("%d min %d sec", minutes, seconds);
 
       long sizeBytes = calculateFolderSize(resources.databaseDir);
-      double sizeGB = sizeBytes / (1024.0 * 1024.0 * 1024.0);
+      double sizeMB = sizeBytes / (1024.0 * 1024.0);
 
       appendMarkdownRow(tType, iType, aType, compression,
-                        String.format("%.2f", loadTimeMin),
-                        String.format("%.3f", sizeGB));
+                        loadTimeFormatted,
+                        String.format("%.3f", sizeMB));
 
       // Run all gantt tests by profileKey
       String profileKey = String.format("%s_%s_%s_%s", tType, iType, aType, compression);
@@ -147,9 +149,9 @@ public class DBaseCHLoadDataGanttSmallTest implements ClickHouse {
           aType,
           compression,
           20000,
-          LocalDate.of(2016, 1, 10),
-          LocalDate.of(2016, 1, 11),
-          Step.HOUR
+          LocalDate.of(2016, 4, 1),
+          LocalDate.of(2016, 4, 10),
+          Step.DAY
       );
       assertTrue(cProfiles.size() > 0, "Should load some column profiles");
     } catch (Exception e) {
@@ -160,11 +162,11 @@ public class DBaseCHLoadDataGanttSmallTest implements ClickHouse {
 
   static Stream<Arguments> loadParameters() {
     return Stream.of(
-        //Arguments.of(TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD, true),
-        //Arguments.of(TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD, false),
-        Arguments.of(TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD, true)
-        //Arguments.of(TType.TIME_SERIES, IType.LOCAL, AType.FULL_PASS_ONCE, true),
-        //Arguments.of(TType.TIME_SERIES, IType.LOCAL, AType.FULL_PASS_EACH, true)
+        Arguments.of(TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD, true),
+        Arguments.of(TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD, false),
+        Arguments.of(TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD, true),
+        Arguments.of(TType.TIME_SERIES, IType.LOCAL, AType.FULL_PASS_ONCE, true),
+        Arguments.of(TType.TIME_SERIES, IType.LOCAL, AType.FULL_PASS_EACH, true)
     );
   }
 
@@ -337,10 +339,10 @@ public class DBaseCHLoadDataGanttSmallTest implements ClickHouse {
                                                      AType aType,
                                                      boolean compression,
                                                      String loadTimeMin,
-                                                     String sizeGB) {
+                                                     String sizeMB) {
 
     if (markdownTableByProfile.length() == 0) {
-      markdownTableByProfile.append("| # | TType | IType | AType | Compression | Load (min) | Size (GB) |")
+      markdownTableByProfile.append("| # | TType | IType | AType | Compression | Load (min) | Size (MB) |")
           .append(NL)
           .append("|--:|-------|-------|-------|-------------|------------|-----------|")
           .append(NL);
@@ -353,7 +355,7 @@ public class DBaseCHLoadDataGanttSmallTest implements ClickHouse {
         .append(aType).append(" | ")
         .append(compression).append(" | ")
         .append(loadTimeMin).append(" | ")
-        .append(sizeGB).append(" |")
+        .append(sizeMB).append(" |")
         .append(NL);
   }
 

@@ -8,6 +8,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
@@ -24,6 +25,7 @@ import ru.dimension.db.service.StoreLocalService;
 import ru.dimension.db.service.mapping.Mapper;
 import ru.dimension.db.service.store.TStore;
 import ru.dimension.db.service.store.UStore;
+import ru.dimension.db.service.store.UStore.LFUCache;
 import ru.dimension.db.storage.Converter;
 import ru.dimension.db.storage.EnumDAO;
 import ru.dimension.db.storage.HistogramDAO;
@@ -42,6 +44,8 @@ public class StoreLocalServiceImpl extends CommonServiceApi implements StoreLoca
 
   private final HistogramDAO histogramDAO;
   private final StatisticsService statisticsService;
+
+  private final ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, LFUCache>> globalConversionCache = new ConcurrentHashMap<>();
 
   public StoreLocalServiceImpl(MetaModelApi metaModelApi,
                           StatisticsService statisticsService,
@@ -80,9 +84,13 @@ public class StoreLocalServiceImpl extends CommonServiceApi implements StoreLoca
                                                                               cProfile.getColId(),
                                                                               cProfile.getCsType().isTimeStamp())));
 
-    // Initialize stores
+    // Get table cache from global cache
+    ConcurrentHashMap<Integer, UStore.LFUCache> tableCache =
+        globalConversionCache.computeIfAbsent(tableId, k -> new ConcurrentHashMap<>());
+
+    // Initialize stores with cache
     TStore tStore = new TStore(1, cProfiles);
-    UStore uStore = new UStore(converter);
+    UStore uStore = new UStore(converter, tableCache);
 
     // Initialize columns in UStore
     cProfiles.stream()
@@ -233,9 +241,13 @@ public class StoreLocalServiceImpl extends CommonServiceApi implements StoreLoca
         .filter(isNotTimestamp)
         .forEach(cProfile -> colIdSTypeMap.put(cProfile.getColId(), cProfile.getCsType().getSType()));
 
-    // Initialize stores
+    // Get table cache from global cache
+    ConcurrentHashMap<Integer, UStore.LFUCache> tableCache =
+        globalConversionCache.computeIfAbsent(tableId, k -> new ConcurrentHashMap<>());
+
+    // Initialize stores with cache
     TStore tStore = new TStore(1, cProfiles);
-    UStore uStore = new UStore(converter);
+    UStore uStore = new UStore(converter, tableCache);
 
     // Initialize columns in UStore
     cProfiles.stream()

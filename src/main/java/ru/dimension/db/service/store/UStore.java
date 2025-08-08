@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import ru.dimension.db.exception.EnumByteExceedException;
@@ -29,13 +30,20 @@ public class UStore extends CommonServiceApi {
   private final Map<Integer, SType> storageTypeMap;           // Tracks storage type per column
   private final Map<Integer, CachedLastLinkedHashMap<Integer, Byte>> enumDictionaries; // Enum value mappings
 
+  private final Map<Integer, LFUCache> conversionCacheMap;
+
   public UStore(Converter converter) {
+    this(converter, null);
+  }
+
+  public UStore(Converter converter, Map<Integer, LFUCache> conversionCacheMap) {
     this.converter = converter;
     this.rawDataMap = new HashMap<>();
     this.enumDataMap = new HashMap<>();
     this.histogramDataMap = new HashMap<>();
     this.storageTypeMap = new HashMap<>();
     this.enumDictionaries = new CachedLastLinkedHashMap<>();
+    this.conversionCacheMap = conversionCacheMap;
   }
 
   public void addColumn(CProfile cProfile, SType sType) {
@@ -69,6 +77,7 @@ public class UStore extends CommonServiceApi {
     }
   }
 
+
   public void add(CProfile cProfile, int iR, Object currObject) {
     int colId = cProfile.getColId();
     SType sType = storageTypeMap.get(colId);
@@ -78,12 +87,32 @@ public class UStore extends CommonServiceApi {
       Object value = convertRawValue(currObject, cProfile, cType);
       insertRawValue(colId, iR, value);
     } else if (sType == SType.ENUM) {
-      int currValue = converter.convertRawToInt(currObject, cProfile);
+      int currValue = getCachedOrConvert(colId, currObject, cProfile);
       insertEnumValue(colId, iR, currValue, cProfile);
     } else if (sType == SType.HISTOGRAM) {
-      int currValue = converter.convertRawToInt(currObject, cProfile);
+      int currValue = getCachedOrConvert(colId, currObject, cProfile);
       insertHistogramValue(colId, iR, currValue);
     }
+  }
+
+  private int getCachedOrConvert(int colId, Object currObject, CProfile cProfile) {
+    if (currObject == null) {
+      return Mapper.INT_NULL;
+    }
+
+    if (conversionCacheMap == null) {
+      return converter.convertRawToInt(currObject, cProfile);
+    }
+
+    LFUCache cache = conversionCacheMap.computeIfAbsent(
+        colId,
+        k -> new LFUCache(100)
+    );
+
+    return cache.computeIfAbsent(
+        currObject,
+        k -> converter.convertRawToInt(k, cProfile)
+    );
   }
 
   private void insertRawValue(int colId, int iR, Object value) {
@@ -428,5 +457,149 @@ public class UStore extends CommonServiceApi {
       case STRING -> converter.convertRawToInt(value, cProfile);
       default -> value;
     };
+  }
+
+  public static class LFUCache {
+    private final int capacity;
+    private final Map<Object, Node> cache;
+    private final Map<Integer, DoublyLinkedList> freqMap;
+
+    public LFUCache(int capacity) {
+      this.capacity = capacity;
+      this.cache = new HashMap<>();
+      this.freqMap = new HashMap<>();
+    }
+
+    public synchronized Integer get(Object key) {
+      Node node = cache.get(key);
+      if (node == null) {
+        return null;
+      }
+      updateNode(node);
+      return node.value;
+    }
+
+    public synchronized Integer computeIfAbsent(Object key, Function<Object, Integer> mappingFunction) {
+      Integer value = get(key);
+      if (value == null) {
+        value = mappingFunction.apply(key);
+        put(key, value);
+      }
+      return value;
+    }
+
+    public synchronized Integer put(Object key, Integer value) {
+      if (capacity <= 0) {
+        return null;
+      }
+      if (cache.containsKey(key)) {
+        Node node = cache.get(key);
+        node.value = value;
+        updateNode(node);
+        return value;
+      }
+      if (cache.size() >= capacity) {
+        evict();
+      }
+      Node node = new Node(key, value, 1);
+      cache.put(key, node);
+      DoublyLinkedList list = freqMap.computeIfAbsent(1, k -> new DoublyLinkedList());
+      list.add(node);
+      return value;
+    }
+
+    private void updateNode(Node node) {
+      int oldFreq = node.freq;
+      DoublyLinkedList oldList = freqMap.get(oldFreq);
+      if (oldList != null) {
+        oldList.remove(node);
+        if (oldList.size == 0) {
+          freqMap.remove(oldFreq);
+        }
+      }
+      node.freq = oldFreq + 1;
+      DoublyLinkedList newList = freqMap.computeIfAbsent(node.freq, k -> new DoublyLinkedList());
+      newList.add(node);
+    }
+
+    private void evict() {
+      if (cache.size() < capacity) {
+        return;
+      }
+      int minFreq = Integer.MAX_VALUE;
+      for (int freq : freqMap.keySet()) {
+        DoublyLinkedList list = freqMap.get(freq);
+        if (list != null && list.size > 0) {
+          if (freq < minFreq) {
+            minFreq = freq;
+          }
+        }
+      }
+      if (minFreq == Integer.MAX_VALUE) {
+        return;
+      }
+      DoublyLinkedList list = freqMap.get(minFreq);
+      Node toRemove = list.removeLast();
+      if (toRemove != null) {
+        cache.remove(toRemove.key);
+        if (list.size == 0) {
+          freqMap.remove(minFreq);
+        }
+      }
+    }
+
+    private static class Node {
+      Object key;
+      Integer value;
+      int freq;
+      Node prev;
+      Node next;
+
+      Node() {
+      }
+
+      Node(Object key, Integer value, int freq) {
+        this.key = key;
+        this.value = value;
+        this.freq = freq;
+      }
+    }
+
+    private static class DoublyLinkedList {
+      Node head;
+      Node tail;
+      int size;
+
+      DoublyLinkedList() {
+        head = new Node();
+        tail = new Node();
+        head.next = tail;
+        tail.prev = head;
+        size = 0;
+      }
+
+      void add(Node node) {
+        node.next = head.next;
+        node.prev = head;
+        head.next.prev = node;
+        head.next = node;
+        size++;
+      }
+
+      void remove(Node node) {
+        node.prev.next = node.next;
+        node.next.prev = node.prev;
+        size--;
+      }
+
+      Node removeLast() {
+        if (size == 0) {
+          return null;
+        }
+        Node last = tail.prev;
+        remove(last);
+        return last;
+      }
+    }
   }
 }
