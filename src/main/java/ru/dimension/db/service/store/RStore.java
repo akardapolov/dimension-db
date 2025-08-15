@@ -47,35 +47,35 @@ public class RStore extends CommonServiceApi {
     rawDataInt = new ArrayList<>(initialCapacityInt);
     mappingInt = new CachedLastLinkedHashMap<>();
     fillArrayList(rawDataInt, initialCapacityInt);
-    fillMappingRaw(cProfiles, mappingInt, colIdSTypeMap, isNotTimestamp, isRaw, isInt);
+    fillMappingRaw(cProfiles, mappingInt, colIdSTypeMap, isNotTimestamp, isInt);
 
     /* Long */
     initialCapacityLong = Mapper.getColumnCount(cProfiles, colIdSTypeMap, isNotTimestamp, isLong);
     rawDataLong = new ArrayList<>(initialCapacityLong);
     mappingLong = new CachedLastLinkedHashMap<>();
     fillArrayList(rawDataLong, initialCapacityLong);
-    fillMappingRaw(cProfiles, mappingLong, colIdSTypeMap, isNotTimestamp, isRaw, isLong);
+    fillMappingRaw(cProfiles, mappingLong, colIdSTypeMap, isNotTimestamp, isLong);
 
     /* Float */
     initialCapacityFloat = Mapper.getColumnCount(cProfiles, colIdSTypeMap, isNotTimestamp, isFloat);
     rawDataFloat = new ArrayList<>(initialCapacityFloat);
     mappingFloat = new CachedLastLinkedHashMap<>();
     fillArrayList(rawDataFloat, initialCapacityFloat);
-    fillMappingRaw(cProfiles, mappingFloat, colIdSTypeMap, isNotTimestamp, isRaw, isFloat);
+    fillMappingRaw(cProfiles, mappingFloat, colIdSTypeMap, isNotTimestamp, isFloat);
 
     /* Double */
     initialCapacityDouble = Mapper.getColumnCount(cProfiles, colIdSTypeMap, isNotTimestamp, isDouble);
     rawDataDouble = new ArrayList<>(initialCapacityDouble);
     mappingDouble = new CachedLastLinkedHashMap<>();
     fillArrayList(rawDataDouble, initialCapacityDouble);
-    fillMappingRaw(cProfiles, mappingDouble, colIdSTypeMap, isNotTimestamp, isRaw, isDouble);
+    fillMappingRaw(cProfiles, mappingDouble, colIdSTypeMap, isNotTimestamp, isDouble);
 
     /* String */
     initialCapacityString = Mapper.getColumnCount(cProfiles, colIdSTypeMap, isNotTimestamp, isString);
     rawDataString = new ArrayList<>(initialCapacityString);
     mappingString = new CachedLastLinkedHashMap<>();
     fillArrayList(rawDataString, initialCapacityString);
-    fillMappingRaw(cProfiles, mappingString, colIdSTypeMap, isNotTimestamp, isRaw, isString);
+    fillMappingRaw(cProfiles, mappingString, colIdSTypeMap, isNotTimestamp, isString);
   }
 
   public void add(CType cType,

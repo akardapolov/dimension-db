@@ -2,7 +2,6 @@ package ru.dimension.db.service.impl;
 
 import com.sleepycat.persist.EntityCursor;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -190,7 +189,7 @@ public class RawServiceImpl extends CommonServiceApi implements RawService {
             int startPoint = isStarted ? 0 : isPointerFirst ? pointer.getValue() : 0;
 
             for (int i = startPoint; i < timestamps.length; i++) {
-              columnData.add(this.converter.convertIntToRaw(getHistogramValue(i, h, timestamps), cProfile));
+              columnData.add(this.converter.convertIntToRaw(getHistogramValue(i, h), cProfile));
               fetchCounter.decrementAndGet();
               if (fetchCounter.get() == 0) {
                 if (i == timestamps.length - 1) {

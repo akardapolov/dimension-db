@@ -202,8 +202,6 @@ public class GroupByOneServiceImpl extends CommonServiceApi implements GroupByOn
                                       List<Object> columnData) {
     long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsProfile.getColId());
 
-    MetadataKey metadataKey = MetadataKey.builder().tableId(tableId).blockId(blockId).build();
-
     String[] columnValues = getStringArrayValues(rawDAO, enumDAO, histogramDAO, converter, tableId, cProfile, blockId, timestamps);
     String[] filterValues = null;
     if (cProfileFilter != null) {

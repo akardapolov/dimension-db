@@ -5,9 +5,6 @@
     </Console>
   </Appenders>
   <Loggers>
-    <Logger name="com.querydsl.sql.dml.AbstractSQLInsertClause" level="OFF">
-      <AppenderRef ref="Console"/>
-    </Logger>
     <Root level="ALL">
       <AppenderRef ref="Console"/>
     </Root>

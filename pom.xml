@@ -4,7 +4,7 @@
 
   <groupId>ru.dimension</groupId>
   <artifactId>db</artifactId>
-  <version>25.8.2</version>
+  <version>25.8.3</version>
   <packaging>jar</packaging>
 
   <name>Dimension DB</name>
@@ -36,13 +36,14 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <bdb-version>5.0.73</bdb-version>
-    <lombok-version>1.18.30</lombok-version>
-    <slf4j.version>2.0.6</slf4j.version>
-    <log4j2.version>2.19.0</log4j2.version>
-    <snappy-java.version>1.1.10.5</snappy-java.version>
-    <commons-dbcp2-version>2.12.0</commons-dbcp2-version>
+    <lombok-version>1.18.38</lombok-version>
+    <slf4j.version>2.0.17</slf4j.version>
+    <log4j2.version>2.25.1</log4j2.version>
+    <snappy-java.version>1.1.10.8</snappy-java.version>
+    <commons-dbcp2-version>2.13.0</commons-dbcp2-version>
 
-    <junit-version>5.7.0</junit-version>
+    <junit.version>5.13.4</junit.version>
+    <junit.platform.version>1.13.4</junit.platform.version>
     <querydsl.version>5.1.0</querydsl.version>
     <clickhouse.version>0.3.2</clickhouse.version>
     <h2.version>1.4.200</h2.version>
@@ -108,30 +109,55 @@
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
+      <artifactId>slf4j-reload4j</artifactId>
       <version>${slf4j.version}</version>
     </dependency>
 
-    <!--Test-->
+    <!-- JUnit Jupiter -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
-      <version>${junit-version}</version>
+      <version>${junit.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-engine</artifactId>
-      <version>${junit-version}</version>
+      <version>${junit.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-params</artifactId>
-      <version>${junit-version}</version>
+      <version>${junit.version}</version>
       <scope>test</scope>
     </dependency>
 
+    <!-- JUnit Platform -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-commons</artifactId>
+      <version>${junit.platform.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+      <version>${junit.platform.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <version>${junit.platform.version}</version>
+      <scope>test</scope>
+    </dependency>
 
     <dependency>
       <groupId>com.h2database</groupId>
