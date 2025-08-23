@@ -871,12 +871,12 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
 
   private List<GanttColumnCount> getGanttColumn(String tableName, CProfile cProfileFirst, CProfile cProfileSecond)
       throws BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
-    return dStore.getGantt(tableName, cProfileFirst, cProfileSecond, 0, Long.MAX_VALUE);
+    return dStore.getGanttCount(tableName, cProfileFirst, cProfileSecond, null, 0, Long.MAX_VALUE);
   }
 
   private String getStackedColumnKey(String tableName, CProfile cProfile)
       throws BeginEndWrongOrderException, SqlColMetadataException {
-    return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, 0, Long.MAX_VALUE)
+    return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, Long.MAX_VALUE)
         .stream()
         .findAny()
         .orElseThrow()
@@ -890,7 +890,7 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
 
   private Optional<StackedColumn> getStackedColumn(String tableName, CProfile cProfile)
       throws BeginEndWrongOrderException, SqlColMetadataException {
-    return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, 0, Long.MAX_VALUE)
+    return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, Long.MAX_VALUE)
         .stream()
         .findAny();
   }

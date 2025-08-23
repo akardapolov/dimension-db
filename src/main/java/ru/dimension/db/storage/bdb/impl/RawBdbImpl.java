@@ -11,10 +11,11 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import lombok.extern.log4j.Log4j2;
+import org.xerial.snappy.Snappy;
 import ru.dimension.db.metadata.CompressType;
-import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
 import ru.dimension.db.model.output.StackedColumn;
@@ -28,7 +29,6 @@ import ru.dimension.db.storage.bdb.entity.Metadata;
 import ru.dimension.db.storage.bdb.entity.MetadataKey;
 import ru.dimension.db.storage.bdb.entity.column.RColumn;
 import ru.dimension.db.util.CachedLastLinkedHashMap;
-import org.xerial.snappy.Snappy;
 
 @Log4j2
 public class RawBdbImpl extends QueryBdbApi implements RawDAO {
@@ -654,34 +654,20 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
                                         CProfile tsCProfile,
                                         CProfile cProfile,
                                         GroupFunction groupFunction,
-                                        CProfile cProfileFilter,
-                                        String[] filterData,
-                                        CompareFunction compareFunction,
+                                        CompositeFilter compositeFilter,
                                         long begin,
                                         long end) {
     throw new RuntimeException("Not supported");
   }
 
   @Override
-  public List<GanttColumnCount> getGantt(String tableName,
-                                         CProfile tsCProfile,
-                                         CProfile firstGrpBy,
-                                         CProfile secondGrpBy,
-                                         long begin,
-                                         long end) {
-    throw new RuntimeException("Not supported");
-  }
-
-  @Override
-  public List<GanttColumnCount> getGantt(String tableName,
-                                         CProfile tsCProfile,
-                                         CProfile firstGrpBy,
-                                         CProfile secondGrpBy,
-                                         CProfile cProfileFilter,
-                                         String[] filterData,
-                                         CompareFunction compareFunction,
-                                         long begin,
-                                         long end) {
+  public List<GanttColumnCount> getGanttCount(String tableName,
+                                              CProfile tsCProfile,
+                                              CProfile firstGrpBy,
+                                              CProfile secondGrpBy,
+                                              CompositeFilter compositeFilter,
+                                              long begin,
+                                              long end) {
     throw new RuntimeException("Not supported");
   }
 
@@ -690,19 +676,7 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
                                           CProfile tsCProfile,
                                           CProfile firstGrpBy,
                                           CProfile secondGrpBy,
-                                          long begin,
-                                          long end) {
-    throw new RuntimeException("Not supported");
-  }
-
-  @Override
-  public List<GanttColumnSum> getGanttSum(String tableName,
-                                          CProfile tsCProfile,
-                                          CProfile firstGrpBy,
-                                          CProfile secondGrpBy,
-                                          CProfile cProfileFilter,
-                                          String[] filterData,
-                                          CompareFunction compareFunction,
+                                          CompositeFilter compositeFilter,
                                           long begin,
                                           long end) {
     throw new RuntimeException("Not supported");
@@ -713,23 +687,10 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
                                   CProfile tsCProfile,
                                   CProfile cProfile,
                                   OrderBy orderBy,
+                                  CompositeFilter compositeFilter,
                                   int limit,
                                   long begin,
                                   long end) {
-    throw new RuntimeException("Not supported");
-  }
-
-  @Override
-  public List<String> getDistinct(String tableName,
-                                  CProfile tsCProfile,
-                                  CProfile cProfile,
-                                  OrderBy orderBy,
-                                  int limit,
-                                  long begin,
-                                  long end,
-                                  CProfile cProfileFilter,
-                                  String[] filterData,
-                                  CompareFunction compareFunction) {
     throw new RuntimeException("Not supported");
   }
 

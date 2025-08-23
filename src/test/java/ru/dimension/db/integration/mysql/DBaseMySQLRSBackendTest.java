@@ -23,6 +23,9 @@ import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
@@ -115,8 +118,8 @@ public class DBaseMySQLRSBackendTest extends AbstractBackendSQLTest {
     CProfile cProfile = getCProfileByName(tProfile, "mysql_dt_char");
     CProfile cProfileEmpty = getCProfileByName(tProfile, "mysql_dt_char_empty");
 
-    List<String> listActual = dStore.getDistinct(tableName, cProfile, OrderBy.DESC, 100, 0L, 1697357130000L);
-    List<String> listEmptyActual = dStore.getDistinct(tableName, cProfileEmpty, OrderBy.DESC, 100, 0L, 1697357130000L);
+    List<String> listActual = dStore.getDistinct(tableName, cProfile, OrderBy.DESC, null, 100, 0L, 1697357130000L);
+    List<String> listEmptyActual = dStore.getDistinct(tableName, cProfileEmpty, OrderBy.DESC, null, 100, 0L, 1697357130000L);
 
     assertEquals(List.of("Sample VARCHAR2"), listActual);
     assertEquals(Arrays.asList("Test", ""), listEmptyActual);
@@ -153,14 +156,21 @@ public class DBaseMySQLRSBackendTest extends AbstractBackendSQLTest {
   }
 
   private void assertDistinctResults(CProfile target,
-                                     CProfile filterCol,
+                                     CProfile filterProfile,
                                      String[] filterValues,
                                      CompareFunction compareFunction,
                                      List<String> expected) throws BeginEndWrongOrderException {
+    CompositeFilter compositeFilter = new CompositeFilter(
+        List.of(new FilterCondition(filterProfile, filterValues, compareFunction)),
+        LogicalOperator.AND);
+
+    if (filterProfile == null || filterValues == null) {
+      compositeFilter = null;
+    }
+
     List<String> actual = dStore.getDistinct(
-        tableName, target, OrderBy.ASC, 100,
-        0L, 1697357130000L,
-        filterCol, filterValues, compareFunction);
+        tableName, target, OrderBy.ASC, compositeFilter,
+        100, 0L, 1697357130000L);
     assertEquals(expected, actual);
   }
 
@@ -218,9 +228,7 @@ public class DBaseMySQLRSBackendTest extends AbstractBackendSQLTest {
         .orElseThrow();
 
     List<StackedColumn> stacked =
-        dStore.getStacked(tableName, cProfile, GroupFunction.COUNT,
-                          null, null, null,
-                          0, 4394908640000L);
+        dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, 4394908640000L);
 
     assertEquals(3, stacked.get(0).getKeyCount().get(""));
     assertEquals(1, stacked.get(0).getKeyCount().get("Test"));

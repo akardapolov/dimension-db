@@ -6,6 +6,8 @@ import java.sql.Timestamp;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
 import ru.dimension.db.model.profile.CProfile;
 
 public class GenericDialect implements DatabaseDialect {
@@ -65,6 +67,24 @@ public class GenericDialect implements DatabaseDialect {
     ps.setTimestamp(parameterIndex, new Timestamp(unixTimestamp));
   }
 
+  @Override
+  public String getWhereClassWithCompositeFilter(CProfile tsCProfile, CompositeFilter compositeFilter) {
+    StringBuilder whereClause = new StringBuilder("WHERE ");
+    whereClause.append(tsCProfile.getColName()).append(" BETWEEN ? AND ?");
+
+    if (compositeFilter != null && !compositeFilter.getConditions().isEmpty()) {
+      for (FilterCondition condition : compositeFilter.getConditions()) {
+        String filterStr = getFilterAndString(
+            condition.getCProfile(),
+            condition.getFilterData(),
+            condition.getCompareFunction()
+        );
+        whereClause.append(filterStr);
+      }
+    }
+
+    return whereClause.toString();
+  }
 
   private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
     if (cProfileFilter == null || filterData == null) {

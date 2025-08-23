@@ -1,19 +1,15 @@
 package ru.dimension.db.storage.pqsql;
 
 import com.sleepycat.persist.EntityCursor;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.dbcp2.BasicDataSource;
 import ru.dimension.db.core.metamodel.MetaModelApi;
-import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
 import ru.dimension.db.model.output.StackedColumn;
@@ -263,35 +259,21 @@ public class RawPgSqlImpl extends QueryJdbcApi implements RawDAO {
                                         CProfile tsCProfile,
                                         CProfile cProfile,
                                         GroupFunction groupFunction,
-                                        CProfile cProfileFilter,
-                                        String[] filterData,
-                                        CompareFunction compareFunction,
+                                        CompositeFilter compositeFilter,
                                         long begin,
                                         long end) {
-    return getStackedCommon(tableName, tsCProfile, cProfile, groupFunction, cProfileFilter, filterData, compareFunction, begin, end, databaseDialect);
+    return getStackedCommon(tableName, tsCProfile, cProfile, groupFunction, compositeFilter, begin, end, databaseDialect);
   }
 
   @Override
-  public List<GanttColumnCount> getGantt(String tableName,
-                                         CProfile tsCProfile,
-                                         CProfile firstGrpBy,
-                                         CProfile secondGrpBy,
-                                         long begin,
-                                         long end) {
-    return getGantt(tableName, tsCProfile, firstGrpBy, secondGrpBy, null, null, null, begin, end, databaseDialect);
-  }
-
-  @Override
-  public List<GanttColumnCount> getGantt(String tableName,
-                                         CProfile tsCProfile,
-                                         CProfile firstGrpBy,
-                                         CProfile secondGrpBy,
-                                         CProfile cProfileFilter,
-                                         String[] filterData,
-                                         CompareFunction compareFunction,
-                                         long begin,
-                                         long end) {
-    return getGantt(tableName, tsCProfile, firstGrpBy, secondGrpBy, cProfileFilter, filterData, compareFunction, begin, end, databaseDialect);
+  public List<GanttColumnCount> getGanttCount(String tableName,
+                                              CProfile tsCProfile,
+                                              CProfile firstGrpBy,
+                                              CProfile secondGrpBy,
+                                              CompositeFilter compositeFilter,
+                                              long begin,
+                                              long end) {
+    return getGanttCountCommon(tableName, tsCProfile, firstGrpBy, secondGrpBy, compositeFilter, begin, end, databaseDialect);
   }
 
   @Override
@@ -299,22 +281,11 @@ public class RawPgSqlImpl extends QueryJdbcApi implements RawDAO {
                                           CProfile tsCProfile,
                                           CProfile firstGrpBy,
                                           CProfile secondGrpBy,
+                                          CompositeFilter compositeFilter,
                                           long begin,
                                           long end) {
-    return getGanttSum(tableName, tsCProfile, firstGrpBy, secondGrpBy, begin, end, databaseDialect);
-  }
-
-  @Override
-  public List<GanttColumnSum> getGanttSum(String tableName,
-                                          CProfile tsCProfile,
-                                          CProfile firstGrpBy,
-                                          CProfile secondGrpBy,
-                                          CProfile cProfileFilter,
-                                          String[] filterData,
-                                          CompareFunction compareFunction,
-                                          long begin,
-                                          long end) {
-    return getGanttSumWithFilter(tableName, tsCProfile, firstGrpBy, secondGrpBy, cProfileFilter, filterData, compareFunction, begin, end, databaseDialect);
+    return getGanttSumCommon(tableName, tsCProfile, firstGrpBy, secondGrpBy,
+                             compositeFilter, begin, end, databaseDialect);
   }
 
   @Override
@@ -322,31 +293,19 @@ public class RawPgSqlImpl extends QueryJdbcApi implements RawDAO {
                                   CProfile tsCProfile,
                                   CProfile cProfile,
                                   OrderBy orderBy,
+                                  CompositeFilter compositeFilter,
                                   int limit,
                                   long begin,
                                   long end) {
     checkDataType(cProfile, "BYTEA");
     checkDataType(cProfile, "LOB");
 
-    return getDistinctCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end, databaseDialect);
-  }
-
-  @Override
-  public List<String> getDistinct(String tableName,
-                                  CProfile tsCProfile,
-                                  CProfile cProfile,
-                                  OrderBy orderBy,
-                                  int limit,
-                                  long begin,
-                                  long end,
-                                  CProfile cProfileFilter,
-                                  String[] filterData,
-                                  CompareFunction compareFunction) {
-    checkDataType(cProfile, "BYTEA");
-    checkDataType(cProfile, "LOB");
-
-    return getDistinctWithFilterCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end,
-                                       cProfileFilter, filterData, compareFunction, databaseDialect);
+    if (compositeFilter != null && !compositeFilter.getConditions().isEmpty()) {
+      return getDistinctCommon(tableName, tsCProfile, cProfile, orderBy,
+                               compositeFilter, limit, begin, end, databaseDialect);
+    } else {
+      return getDistinctCommon(tableName, tsCProfile, cProfile, orderBy, limit, begin, end, databaseDialect);
+    }
   }
 
   @Override

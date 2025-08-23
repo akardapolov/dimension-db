@@ -4,12 +4,12 @@ import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.PrimaryIndex;
 import java.io.IOException;
 import lombok.extern.log4j.Log4j2;
+import org.xerial.snappy.Snappy;
 import ru.dimension.db.metadata.CompressType;
 import ru.dimension.db.storage.EnumDAO;
 import ru.dimension.db.storage.bdb.QueryBdbApi;
 import ru.dimension.db.storage.bdb.entity.ColumnKey;
 import ru.dimension.db.storage.bdb.entity.column.EColumn;
-import org.xerial.snappy.Snappy;
 
 @Log4j2
 public class EnumBdbImpl extends QueryBdbApi implements EnumDAO {

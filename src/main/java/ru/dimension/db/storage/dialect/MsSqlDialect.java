@@ -7,7 +7,13 @@ import ru.dimension.db.metadata.DataType;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.profile.CProfile;
+
+import java.util.ArrayList;
+import java.util.List;
+import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
 
 public class MsSqlDialect implements DatabaseDialect {
 
@@ -89,6 +95,63 @@ public class MsSqlDialect implements DatabaseDialect {
     } else {
       throw new RuntimeException("Not supported datatype for time-series column: " + tsCProfile.getColName());
     }
+  }
+
+  @Override
+  public String getWhereClassWithCompositeFilter(CProfile tsCProfile, CompositeFilter compositeFilter) {
+    StringBuilder whereClause = new StringBuilder();
+    whereClause.append("WHERE ")
+        .append(tsCProfile.getColName().toLowerCase())
+        .append(" BETWEEN ? AND ?");
+
+    if (compositeFilter != null && !compositeFilter.getConditions().isEmpty()) {
+      whereClause.append(" AND (");
+
+      List<String> conditions = new ArrayList<>();
+      for (FilterCondition condition : compositeFilter.getConditions()) {
+        String conditionStr = buildCondition(condition);
+        conditions.add(conditionStr);
+      }
+
+      String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+      whereClause.append(String.join(joinOperator, conditions))
+          .append(")");
+    }
+
+    return whereClause.toString();
+  }
+
+  private String buildCondition(FilterCondition condition) {
+    CProfile filterProfile = condition.getCProfile();
+    CompareFunction compareFunction = condition.getCompareFunction();
+    String[] filterData = condition.getFilterData();
+
+    if (filterData == null || filterData.length == 0) {
+      return "";
+    }
+
+    String columnName = filterProfile.getColName().toLowerCase();
+    StringBuilder conditionBuilder = new StringBuilder();
+
+    for (String value : filterData) {
+      if (conditionBuilder.length() > 0) {
+        conditionBuilder.append(" OR ");
+      }
+      if (value == null || value.trim().isEmpty()) {
+        conditionBuilder.append("(").append(columnName).append(" IS NULL OR ")
+            .append(columnName).append(" = '')");
+      } else {
+        String escapedValue = value.trim().replace("'", "''");
+        if (compareFunction == CompareFunction.CONTAIN) {
+          conditionBuilder.append("LOWER(").append(columnName).append(") LIKE '%")
+              .append(escapedValue.toLowerCase()).append("%'");
+        } else {
+          conditionBuilder.append(columnName).append(" = '").append(escapedValue).append("'");
+        }
+      }
+    }
+
+    return conditionBuilder.length() == 0 ? "" : "(" + conditionBuilder + ")";
   }
 
   private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {

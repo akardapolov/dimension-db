@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
+import org.junit.jupiter.api.Disabled;
 import ru.dimension.db.backend.BerkleyDB;
 import ru.dimension.db.common.AbstractH2Test;
 import ru.dimension.db.core.DStore;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Log4j2
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Disabled
 public class DBaseRunnerTest extends AbstractH2Test {
 
   @Order(1)

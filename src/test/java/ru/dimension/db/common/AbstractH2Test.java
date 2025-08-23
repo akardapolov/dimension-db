@@ -23,6 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.DBase;
 import ru.dimension.db.backend.BerkleyDB;
@@ -43,6 +44,9 @@ import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.LoadDataType;
 import ru.dimension.db.model.PermutationState;
 import ru.dimension.db.model.Person;
+import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
@@ -620,6 +624,7 @@ public abstract class AbstractH2Test implements JdbcSource {
                                                .findAny()
                                                .orElseThrow(),
                              GroupFunction.COUNT,
+                             null,
                              begin,
                              end);
   }
@@ -744,16 +749,26 @@ public abstract class AbstractH2Test implements JdbcSource {
   public List<GanttColumnCount> getListGanttColumnTwoLevelGrouping(DStore dStore, TProfile tProfile,
                                                                    CProfile firstLevelGroupBy, CProfile secondLevelGroupBy, long begin, long end)
       throws BeginEndWrongOrderException, GanttColumnNotSupportedException, SqlColMetadataException {
-    return dStore.getGantt(tProfile.getTableName(), firstLevelGroupBy, secondLevelGroupBy, begin, end);
+    return dStore.getGanttCount(tProfile.getTableName(), firstLevelGroupBy, secondLevelGroupBy, null, begin, end);
   }
 
-  protected void assertForGanttColumn(List<GanttColumnCount> expected, List<GanttColumnCount> actual) {
-    expected.forEach(e ->
-        assertEquals(e.getGantt(), actual.stream()
-            .filter(f -> f.getKey().equals(e.getKey()))
-            .findAny()
-            .orElseThrow()
-            .getGantt()));
+  protected void assertForGanttColumn(List<GanttColumnCount> expected,
+                                      List<GanttColumnCount> actual) {
+    assertEquals(expected.size(), actual.size(),"Number of GanttColumnCount entries differs");
+
+    Map<String, Map<String, Integer>> expectedMap = expected.stream()
+        .collect(Collectors.toMap(GanttColumnCount::getKey, GanttColumnCount::getGantt));
+
+    Map<String, Map<String, Integer>> actualMap = actual.stream()
+        .collect(Collectors.toMap(GanttColumnCount::getKey, GanttColumnCount::getGantt));
+
+    assertEquals(expectedMap.keySet(), actualMap.keySet(), "Keys don't match");
+
+    expectedMap.forEach((key, expectedGantt) -> {
+      Map<String, Integer> actualGantt = actualMap.get(key);
+      assertEquals(expectedGantt, actualGantt,
+                   () -> "Gantt values differ for key: " + key);
+    });
   }
 
   public List<StackedColumn> getListStackedDataBySqlCol(DStore dStore,
@@ -764,7 +779,7 @@ public abstract class AbstractH2Test implements JdbcSource {
                                                         int end)
       throws BeginEndWrongOrderException, SqlColMetadataException {
     return dStore.getStacked(tProfile.getTableName(), cProfiles.stream()
-        .filter(k -> k.getColName().equalsIgnoreCase(colName)).findAny().orElseThrow(), GroupFunction.COUNT, begin, end);
+        .filter(k -> k.getColName().equalsIgnoreCase(colName)).findAny().orElseThrow(), GroupFunction.COUNT, null, begin, end);
   }
 
   public List<StackedColumn> getListStackedDataBySqlColFilter(DStore dStore,
@@ -784,12 +799,18 @@ public abstract class AbstractH2Test implements JdbcSource {
         .filter(k -> k.getColName().equalsIgnoreCase(colNameFilter))
         .findAny()
         .orElseThrow();
+
+    CompositeFilter compositeFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            cProfileFilter,
+            new String[]{filter},
+            CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+
     return dStore.getStacked(tProfile.getTableName(),
                              cProfile,
                              GroupFunction.COUNT,
-                             cProfileFilter,
-                             new String[]{filter},
-                             CompareFunction.EQUAL,
+                             compositeFilter,
                              begin, end);
   }
 

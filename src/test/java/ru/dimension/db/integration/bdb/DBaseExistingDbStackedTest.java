@@ -84,6 +84,7 @@ public class DBaseExistingDbStackedTest {
         TABLE_NAME,
         groupProfile,
         GROUP_FUNCTION,
+        null,
         BEGIN_TIMESTAMP,
         END_TIMESTAMP
     );

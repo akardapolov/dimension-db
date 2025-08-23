@@ -664,7 +664,7 @@ public class DBaseCHQueryGanttTest implements ClickHouse {
                                                                     long begin,
                                                                     long end)
       throws BeginEndWrongOrderException, GanttColumnNotSupportedException, SqlColMetadataException {
-    return dStore.getGantt(tProfile.getTableName(), firstLevelGroupBy, secondLevelGroupBy, begin, end);
+    return dStore.getGanttCount(tProfile.getTableName(), firstLevelGroupBy, secondLevelGroupBy, null, begin, end);
   }
 
   private List<GanttColumnCount> getListGanttColumnTwoLevelGrouping(DStore dStore,
@@ -674,7 +674,7 @@ public class DBaseCHQueryGanttTest implements ClickHouse {
                                                                     long begin,
                                                                     long end)
       throws BeginEndWrongOrderException, GanttColumnNotSupportedException, SqlColMetadataException {
-    return dStore.getGantt(tProfile.getTableName(), firstLevelGroupBy, secondLevelGroupBy, batchSize, begin, end);
+    return dStore.getGanttCount(tProfile.getTableName(), firstLevelGroupBy, secondLevelGroupBy, null, batchSize, begin, end);
   }
 
   private String getGanttTestData(String fileName) throws IOException {

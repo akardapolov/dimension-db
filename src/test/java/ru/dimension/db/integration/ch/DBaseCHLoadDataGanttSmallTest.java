@@ -284,9 +284,7 @@ public class DBaseCHLoadDataGanttSmallTest implements ClickHouse {
   ) throws Exception {
     CProfile firstLevel = findCProfile(cProfiles, firstColName);
     CProfile secondLevel = findCProfile(cProfiles, secondColName);
-    return dStore.getGantt(
-        tProfile.getTableName(), firstLevel, secondLevel, begin, end
-    );
+    return dStore.getGanttCount(tProfile.getTableName(), firstLevel, secondLevel, null, begin, end);
   }
 
   private List<GanttColumnCount> getGanttDataActual(
@@ -295,9 +293,7 @@ public class DBaseCHLoadDataGanttSmallTest implements ClickHouse {
   ) throws Exception {
     CProfile firstLevel = findCProfile(cProfiles, firstColName);
     CProfile secondLevel = findCProfile(cProfiles, secondColName);
-    return dStore.getGantt(
-        tProfile.getTableName(), firstLevel, secondLevel, batchSize, begin, end
-    );
+    return dStore.getGanttCount(tProfile.getTableName(), firstLevel, secondLevel, null, batchSize, begin, end);
   }
 
   private CProfile findCProfile(List<CProfile> cProfiles, String colName) {

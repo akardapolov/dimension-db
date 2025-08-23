@@ -87,11 +87,11 @@ public class DBaseOracleSQLTest extends AbstractOracleSQLTest {
     CProfile cProfileRaw = cProfiles.stream().filter(f -> f.getColName().equals("VALUE_RAW")).findAny().get();
 
     List<StackedColumn> stackedColumnsHistogram =
-        dStore.getStacked(tProfile.getTableName(), cProfileHistogram, GroupFunction.COUNT, 0, Long.MAX_VALUE);
+        dStore.getStacked(tProfile.getTableName(), cProfileHistogram, GroupFunction.COUNT, null, 0, Long.MAX_VALUE);
     List<StackedColumn> stackedColumnsEnum =
-        dStore.getStacked(tProfile.getTableName(), cProfileEnum, GroupFunction.COUNT, 0, Long.MAX_VALUE);
+        dStore.getStacked(tProfile.getTableName(), cProfileEnum, GroupFunction.COUNT, null, 0, Long.MAX_VALUE);
     List<StackedColumn> stackedColumnsRaw =
-        dStore.getStacked(tProfile.getTableName(), cProfileRaw, GroupFunction.COUNT, 0, Long.MAX_VALUE);
+        dStore.getStacked(tProfile.getTableName(), cProfileRaw, GroupFunction.COUNT, null, 0, Long.MAX_VALUE);
 
     System.out.println(stackedColumnsHistogram);
     System.out.println(stackedColumnsEnum);
@@ -118,11 +118,11 @@ public class DBaseOracleSQLTest extends AbstractOracleSQLTest {
     CProfile cProfileEvent = cProfiles.stream().filter(f -> f.getColName().equals("EVENT")).findAny().get();
 
     List<StackedColumn> stackedColumnsBySampleTime =
-        dStore.getStacked(tProfile.getTableName(), cProfileSampleTime, GroupFunction.COUNT, 0, Long.MAX_VALUE);
+        dStore.getStacked(tProfile.getTableName(), cProfileSampleTime, GroupFunction.COUNT, null, 0, Long.MAX_VALUE);
     List<StackedColumn> stackedColumnsBySqlId =
-        dStore.getStacked(tProfile.getTableName(), cProfileSqlId, GroupFunction.COUNT, 0, Long.MAX_VALUE);
+        dStore.getStacked(tProfile.getTableName(), cProfileSqlId, GroupFunction.COUNT, null, 0, Long.MAX_VALUE);
     List<StackedColumn> stackedColumnsByEvent =
-        dStore.getStacked(tProfile.getTableName(), cProfileEvent, GroupFunction.COUNT, 0, Long.MAX_VALUE);
+        dStore.getStacked(tProfile.getTableName(), cProfileEvent, GroupFunction.COUNT, null, 0, Long.MAX_VALUE);
 
     System.out.println(stackedColumnsBySampleTime);
     System.out.println(stackedColumnsBySqlId);
@@ -371,7 +371,7 @@ public class DBaseOracleSQLTest extends AbstractOracleSQLTest {
 
   private String getStackedColumnKey(String tableName, CProfile cProfile)
       throws BeginEndWrongOrderException, SqlColMetadataException {
-    return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, 0, Long.MAX_VALUE)
+    return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, Long.MAX_VALUE)
         .stream()
         .findAny()
         .orElseThrow()
@@ -395,6 +395,6 @@ public class DBaseOracleSQLTest extends AbstractOracleSQLTest {
 
   private List<GanttColumnCount> getGanttColumn(String tableName, CProfile cProfileFirst, CProfile cProfileSecond)
       throws BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
-    return dStore.getGantt(tableName, cProfileFirst, cProfileSecond, 0, Long.MAX_VALUE);
+    return dStore.getGanttCount(tableName, cProfileFirst, cProfileSecond, null, 0, Long.MAX_VALUE);
   }
 }

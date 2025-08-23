@@ -26,6 +26,9 @@ import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
+import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
@@ -77,7 +80,7 @@ public class DBaseClickHouseSQLStackedTest extends AbstractBackendSQLTest {
     CProfile cProfile = getCProfileByName("TRIP_TYPE");
 
     long[] timestamps = getUnixBeginEndTimestamps();
-    List<StackedColumn> actual = dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT, timestamps[0], timestamps[1]);
+    List<StackedColumn> actual = dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT, null, timestamps[0], timestamps[1]);
 
     assertData("trip_type.json", actual);
   }
@@ -148,7 +151,7 @@ public class DBaseClickHouseSQLStackedTest extends AbstractBackendSQLTest {
     CProfile cProfile = getCProfileByName("PASSENGER_COUNT");
 
     long[] timestamps = getUnixBeginEndTimestamps();
-    List<StackedColumn> actual = dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT, timestamps[0], timestamps[1]);
+    List<StackedColumn> actual = dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT, null, timestamps[0], timestamps[1]);
 
     assertData("passenger_count.json", actual);
   }
@@ -168,13 +171,16 @@ public class DBaseClickHouseSQLStackedTest extends AbstractBackendSQLTest {
     String filter = "36552792";
 
     long[] timestamps = getUnixBeginEndTimestamps();
+
+    // Create CompositeFilter with AND logic (single condition)
+    FilterCondition condition = new FilterCondition(cProfileFilter, new String[]{filter}, CompareFunction.EQUAL);
+    CompositeFilter compositeFilter = new CompositeFilter(List.of(condition), LogicalOperator.AND);
+
     List<StackedColumn> actual =
         dStore.getStacked(tProfile.getTableName(),
                           cProfile,
                           GroupFunction.COUNT,
-                          cProfileFilter,
-                          new String[]{filter},
-                          CompareFunction.EQUAL,
+                          compositeFilter,
                           timestamps[0],
                           timestamps[0]);
 
@@ -196,10 +202,13 @@ public class DBaseClickHouseSQLStackedTest extends AbstractBackendSQLTest {
     String filter = "1";
 
     long[] timestamps = getUnixBeginEndTimestamps();
+
+    // Create CompositeFilter with AND logic (single condition)
+    FilterCondition condition = new FilterCondition(cProfileFilter, new String[]{filter}, CompareFunction.EQUAL);
+    CompositeFilter compositeFilter = new CompositeFilter(List.of(condition), LogicalOperator.AND);
+
     List<StackedColumn> actual =
-        dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT,
-                          cProfileFilter, new String[]{filter}, CompareFunction.EQUAL,
-                          timestamps[0], timestamps[1]);
+        dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT, compositeFilter, timestamps[0], timestamps[1]);
 
     assertData("trip_type_filter_vendor_id.json", actual);
   }
@@ -224,9 +233,9 @@ public class DBaseClickHouseSQLStackedTest extends AbstractBackendSQLTest {
 
     long[] timestamps = getUnixBeginEndTimestamps();
     List<StackedColumn> actualSum =
-        dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.SUM, timestamps[0], timestamps[1]);
+        dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.SUM, null, timestamps[0], timestamps[1]);
     List<StackedColumn> actualAvg =
-        dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.AVG, timestamps[0], timestamps[1]);
+        dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.AVG, null, timestamps[0], timestamps[1]);
 
     assertEquals(85054314756844435D,
                  actualSum.stream().findAny().orElseThrow().getKeySum().get(cProfile.getColName().toLowerCase()));
@@ -289,6 +298,6 @@ public class DBaseClickHouseSQLStackedTest extends AbstractBackendSQLTest {
 
   private List<StackedColumn> getListStackedColumn(DStore dStore,
                                                    CProfile cProfile, long begin, long end) throws BeginEndWrongOrderException, SqlColMetadataException {
-    return dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT, begin, end);
+    return dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT, null, begin, end);
   }
 }

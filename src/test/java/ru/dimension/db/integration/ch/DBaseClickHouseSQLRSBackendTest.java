@@ -16,6 +16,9 @@ import ru.dimension.db.exception.BeginEndWrongOrderException;
 import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
@@ -117,7 +120,7 @@ public class DBaseClickHouseSQLRSBackendTest extends AbstractBackendSQLTest {
   public void getDistinctTest() throws BeginEndWrongOrderException {
     CProfile cProfile = getCProfileByName(tProfile, "CH_DT_CHAR");
 
-    List<String> listActual = dStore.getDistinct(tableName, cProfile, OrderBy.DESC, 100, 0L, 4394908640000L);
+    List<String> listActual = dStore.getDistinct(tableName, cProfile, OrderBy.DESC, null, 100, 0L, 4394908640000L);
 
     assertEquals(List.of("A"), listActual);
   }
@@ -151,17 +154,24 @@ public class DBaseClickHouseSQLRSBackendTest extends AbstractBackendSQLTest {
   private void assertDistinctResults(CProfile targetProfile, CProfile filterProfile,
                                      String[] filterValues, CompareFunction compareFunction,
                                      List<String> expectedResults) throws BeginEndWrongOrderException {
+    CompositeFilter compositeFilter = new CompositeFilter(
+        List.of(new FilterCondition(filterProfile,
+                                    filterValues,
+                                    compareFunction)),
+        LogicalOperator.AND);
+
+    if (filterProfile == null || filterValues == null) {
+      compositeFilter = null;
+    }
+
     List<String> actualResults = dStore.getDistinct(
         tableName,
         targetProfile,
         OrderBy.ASC,
+        compositeFilter,
         100,
         0L,
-        4394908640000L,
-        filterProfile,
-        filterValues,
-        compareFunction
-    );
+        4394908640000L);
     assertEquals(expectedResults, actualResults);
   }
 

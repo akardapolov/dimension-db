@@ -1,7 +1,6 @@
 package ru.dimension.db.integration.pqsql;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
@@ -12,6 +11,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 import ru.dimension.db.common.AbstractBackendSQLTest;
 import ru.dimension.db.exception.BeginEndWrongOrderException;
 import ru.dimension.db.exception.SqlColMetadataException;
@@ -19,17 +23,15 @@ import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.sql.BatchResultSet;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Log4j2
 @TestInstance(Lifecycle.PER_CLASS)
@@ -129,8 +131,8 @@ public class DBasePgSQLRSBackendTest extends AbstractBackendSQLTest {
     CProfile cProfile = getCProfileByName(tProfile,"PG_DT_CHAR");
     CProfile cProfileEmpty = getCProfileByName(tProfile,"PG_DT_CHAR_EMPTY");
 
-    List<String> listActual = dStore.getDistinct(tableName, cProfile, OrderBy.DESC, 100, 0L, 1697357130000L);
-    List<String> listEmptyActual = dStore.getDistinct(tableName, cProfileEmpty, OrderBy.DESC, 100, 0L, 1697357130000L);
+    List<String> listActual = dStore.getDistinct(tableName, cProfile, OrderBy.DESC, null, 100, 0L, 1697357130000L);
+    List<String> listEmptyActual = dStore.getDistinct(tableName, cProfileEmpty, OrderBy.DESC, null, 100, 0L, 1697357130000L);
 
     assertEquals(List.of("A"), listActual);
     assertEquals(List.of(""), listEmptyActual);
@@ -167,17 +169,22 @@ public class DBasePgSQLRSBackendTest extends AbstractBackendSQLTest {
   private void assertDistinctResults(CProfile targetProfile, CProfile filterProfile,
                                      String[] filterValues, CompareFunction compareFunction,
                                      List<String> expectedResults) throws BeginEndWrongOrderException {
+    CompositeFilter compositeFilter = new CompositeFilter(
+        List.of(new FilterCondition(filterProfile, filterValues, compareFunction)),
+        LogicalOperator.AND);
+
+    if (filterProfile == null || filterValues == null) {
+      compositeFilter = null;
+    }
+
     List<String> actualResults = dStore.getDistinct(
         tableName,
         targetProfile,
         OrderBy.ASC,
+        compositeFilter,
         100,
         0L,
-        1697357130000L,
-        filterProfile,
-        filterValues,
-        compareFunction
-    );
+        1697357130000L);
     assertEquals(expectedResults, actualResults);
   }
 
@@ -245,9 +252,7 @@ public class DBasePgSQLRSBackendTest extends AbstractBackendSQLTest {
         .orElseThrow();
 
     List<StackedColumn> stackedColumns =
-        dStore.getStacked(tableName, cProfile, GroupFunction.COUNT,
-                          null, null, null,
-                          0, 4394908640000L);
+        dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, 4394908640000L);
 
     assertEquals(4, stackedColumns.get(0).getKeyCount().get(""));
   }

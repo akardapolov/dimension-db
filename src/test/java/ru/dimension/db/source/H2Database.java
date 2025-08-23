@@ -20,7 +20,9 @@ import lombok.Getter;
 import ru.dimension.db.core.DStore;
 import ru.dimension.db.exception.EnumByteExceedException;
 import ru.dimension.db.exception.SqlColMetadataException;
+import ru.dimension.db.model.Manager;
 import ru.dimension.db.model.Person;
+import ru.dimension.db.model.QManager;
 import ru.dimension.db.model.QPerson;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.TProfile;
@@ -68,6 +70,21 @@ public class H2Database {
     new SQLInsertClause(connection, dialect, relationalPathBase)
         .columns(qp.id, qp.firstname, qp.lastname, qp.house, qp.city, qp.birthday)
         .values(p.getId(), p.getFirstname(), p.getLastname(), p.getHouse(), p.getCity(), p.getBirthday()).execute();
+  }
+
+  public void insert(Manager manager) {
+    QManager qm = new QManager("manager");
+
+    SQLTemplates dialect = new HSQLDBTemplates(); // SQL-dialect
+
+    RelationalPathBase relationalPathBase =
+        new RelationalPathBase(qm.getType(), qm.getMetadata(), "", "manager");
+
+    new SQLInsertClause(connection, dialect, relationalPathBase)
+        .columns(qm.id, qm.firstname, qm.lastname, qm.house, qm.city, qm.birthday, qm.salary, qm.kpi)
+        .values(manager.getId(), manager.getFirstname(), manager.getLastname(),
+                manager.getHouse(), manager.getCity(), manager.getBirthday(),
+                manager.getSalary(), manager.getKpi()).execute();
   }
 
   public List<List<Object>> getData(String select) throws SQLException {

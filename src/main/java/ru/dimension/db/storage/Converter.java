@@ -15,7 +15,6 @@ import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Wrapper;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,9 +26,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.model.profile.CProfile;
-import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.service.mapping.Mapper;
 import ru.dimension.db.storage.helper.ClickHouseHelper;
+import ru.dimension.db.util.DateHelper;
 
 @Log4j2
 public class Converter {
@@ -350,9 +349,9 @@ public class Converter {
   }
 
   private String getDateForLong(int key) {
-    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
-    Date dtDate = new Date(dimensionDAO.getLongById(key));
-    return simpleDateFormat.format(dtDate);
+    return Instant.ofEpochMilli(dimensionDAO.getLongById(key))
+        .atZone(ZoneId.systemDefault())
+        .format(DateHelper.FORMATTER);
   }
 
   private String getCanonicalHost(String host) {

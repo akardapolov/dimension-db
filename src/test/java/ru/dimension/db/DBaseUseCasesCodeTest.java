@@ -50,6 +50,10 @@ import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.source.H2Database;
 import ru.dimension.db.sql.BatchResultSet;
+import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -104,16 +108,13 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
 
   @BeforeAll
   public void initialization() throws SQLException, IOException {
-    // TODO Fix bug - @TempDir created only one temp directory for class
     databaseDirDirect = createSubDirWithPostfix(databaseDir, "direct");
     databaseDirJdbc = createSubDirWithPostfix(databaseDir, "jdbc");
     databaseDirCsv = createSubDirWithPostfix(databaseDir, "csv");
 
-    // Create test data using H2 database
     h2Db = new H2Database("jdbc:h2:mem:use_case_test");
     loadDataTablePersonH2(h2Db);
 
-    // DBase initialization for Direct, JDBC and CSV mode
     configDirect = new DBaseTestConfig(databaseDirDirect, h2Db);
     configJdbc = new DBaseTestConfig(databaseDirJdbc, h2Db);
     configCsv = new DBaseTestConfig(databaseDirCsv, h2Db);
@@ -123,71 +124,43 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   @Test
   public void getTProfile() throws TableNameEmptyException {
     log.info("Use case: get table metadata");
-
     loadMetadataDirect(configDirect, GET_TABLE_PROFILE_USE_CASE_TABLE_NAME,
-                       TType.REGULAR,
-                       IType.GLOBAL,
-                       AType.ON_LOAD,
-                       BType.BERKLEYDB,
-                       true);
-
+                       TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
     TProfile tProfile = configDirect.getDStore().getTProfile(GET_TABLE_PROFILE_USE_CASE_TABLE_NAME);
-
     assertEquals(GET_TABLE_PROFILE_USE_CASE_TABLE_NAME, tProfile.getTableName());
-
     log.info(tProfile);
   }
 
   @Order(2)
   @Test
   public void loadDirectTableMetadata() throws TableNameEmptyException {
-    log.info("Use case: load table metadata in direct mode from SProfile configuration");
-
+    log.info("Use case: load table metadata in direct mode");
     SProfile sProfile = getSProfileDirect(LOAD_DIRECT_METADATA_USE_CASE_TABLE_NAME,
-                                          TType.TIME_SERIES,
-                                          IType.GLOBAL,
-                                          AType.ON_LOAD,
-                                          BType.BERKLEYDB,
-                                          true);
-
+                                          TType.TIME_SERIES, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
     TProfile tProfile = configDirect.getDStore().loadDirectTableMetadata(sProfile);
-
     assertEquals(LOAD_DIRECT_METADATA_USE_CASE_TABLE_NAME, tProfile.getTableName());
-
     log.info(tProfile);
   }
 
   @Order(3)
   @Test
   public void loadJdbcTableMetadata() throws TableNameEmptyException, SQLException {
-    log.info("Use case: load table metadata from JDBC Connection");
-
+    log.info("Use case: load table metadata from JDBC");
     SProfile sProfile = getSProfileJdbc(LOAD_JDBC_METADATA_USE_CASE_TABLE_NAME, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
-
-    TProfile tProfile = configDirect.getDStore()
-        .loadJdbcTableMetadata(configDirect.getH2DbConnection(), select, sProfile);
-
+    TProfile tProfile = configDirect.getDStore().loadJdbcTableMetadata(configDirect.getH2DbConnection(), select, sProfile);
     assertEquals(LOAD_JDBC_METADATA_USE_CASE_TABLE_NAME, tProfile.getTableName());
-
     log.info(tProfile);
   }
 
   @Order(4)
   @Test
   public void loadCsvTableMetadata() throws TableNameEmptyException {
-    log.info("Use case: load table metadata from CSV file");
-
-    String fileName = new File("").getAbsolutePath() + FILE_SEPARATOR +
-        Paths.get("src", "test", "resources", "csv", "file-l.csv");
-
+    log.info("Use case: load table metadata from CSV");
+    String fileName = new File("").getAbsolutePath() + FILE_SEPARATOR + Paths.get("src", "test", "resources", "csv", "file-l.csv");
     String csvSplitBy = ",";
-
     SProfile sProfile = getSProfileCsv(LOAD_CSV_METADATA_USE_CASE_TABLE_NAME, fileName, csvSplitBy, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
-
     TProfile tProfile = configCsv.getDStore().loadCsvTableMetadata(fileName, csvSplitBy, sProfile);
-
     assertEquals(LOAD_CSV_METADATA_USE_CASE_TABLE_NAME, tProfile.getTableName());
-
     log.info(tProfile);
   }
 
@@ -195,81 +168,49 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   @Test
   public void setTimestampColumn() throws TableNameEmptyException {
     log.info("Use case: update table profile with new timestamp column");
-
-    loadMetadataDirect(configDirect,
-                       SET_TIMESTAMP_COLUMN_USE_CASE_TABLE_NAME,
-                       TType.REGULAR,
-                       IType.GLOBAL,
-                       AType.ON_LOAD,
-                       BType.BERKLEYDB,
-                       true);
-
+    loadMetadataDirect(configDirect, SET_TIMESTAMP_COLUMN_USE_CASE_TABLE_NAME,
+                       TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
     TProfile tProfile = configDirect.getDStore().getTProfile(SET_TIMESTAMP_COLUMN_USE_CASE_TABLE_NAME);
-
-    CProfile cProfileBeforeTimestamp = tProfile.getCProfiles()
-        .stream()
-        .filter(f -> f.getCsType().isTimeStamp())
-        .findAny()
-        .orElseThrow();
-    CProfile cProfileAfterTimestamp = tProfile.getCProfiles()
-        .stream()
-        .filter(f -> f.getColName().equals("LONG_FIELD"))
-        .findAny()
-        .orElseThrow();
-
+    CProfile cProfileBeforeTimestamp = tProfile.getCProfiles().stream()
+        .filter(f -> f.getCsType().isTimeStamp()).findAny().orElseThrow();
+    CProfile cProfileAfterTimestamp = tProfile.getCProfiles().stream()
+        .filter(f -> f.getColName().equals("LONG_FIELD")).findAny().orElseThrow();
     assertTrue(cProfileBeforeTimestamp.getCsType().isTimeStamp());
     assertFalse(cProfileAfterTimestamp.getCsType().isTimeStamp());
-
     configDirect.getDStore().setTimestampColumn(SET_TIMESTAMP_COLUMN_USE_CASE_TABLE_NAME, cProfileAfterTimestamp.getColName());
-
     assertFalse(cProfileBeforeTimestamp.getCsType().isTimeStamp());
     assertTrue(cProfileAfterTimestamp.getCsType().isTimeStamp());
-
     log.info(tProfile);
   }
 
   @Order(6)
   @Test
   public void putDataDirect() throws TableNameEmptyException, EnumByteExceedException, SqlColMetadataException {
-    log.info("Use case: save data in table using intermediate table structure");
-
+    log.info("Use case: save data in table using direct mode");
     TProfile tProfile = setupDirectProfile(PUT_DIRECT_USE_CASE_TABLE_NAME, configDirect);
-
     List<List<Object>> data = prepareData();
-
     configDirect.getDStore().putDataDirect(PUT_DIRECT_USE_CASE_TABLE_NAME, data);
-
     assertData(tProfile.getTableName(), List.of(Arrays.asList(1707387748310L, 17073877482L, 17073877482D, "a31bce67-d1ab-485b-9ffa-850385e298ac")));
-
     log.info(tProfile);
   }
 
   @Order(7)
   @Test
   public void putDataJdbcBatch() throws TableNameEmptyException, SQLException {
-    log.info("Use case: save data in table using JDBC connection");
-
+    log.info("Use case: save data via JDBC batch");
     TProfile tProfile = setupJdbcProfile(PUT_JDBC_USE_CASE_TABLE_NAME);
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     assertRawDataJdbc(tProfile.getTableName(), Long.MIN_VALUE, Long.MAX_VALUE);
-
     log.info(tProfile);
   }
 
   @Order(8)
   @Test
-  public void putDataJdbc()
-      throws TableNameEmptyException, EnumByteExceedException, SqlColMetadataException, SQLException {
-    log.info("Use case: save data in table using JDBC connection");
-
+  public void putDataJdbc() throws TableNameEmptyException, EnumByteExceedException, SqlColMetadataException, SQLException {
+    log.info("Use case: save data via JDBC");
     TProfile tProfile = setupJdbcProfile(PUT_JDBC_BATCH_USE_CASE_TABLE_NAME);
-
     putDataJdbcBatch(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     assertRawDataJdbc(tProfile.getTableName(), Long.MIN_VALUE, Long.MAX_VALUE);
-
     log.info(tProfile);
   }
 
@@ -277,11 +218,8 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   @Test
   public void getBlockKeyTailList() throws Exception {
     log.info("Use case: get block key tail list");
-
     TProfile tProfile = setupJdbcProfile(GET_BLOCK_KEY_TAIL_USE_CASE_TABLE_NAME);
-
     putDataJdbcBatch(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     testBlockKeyTail(tProfile.getTableName(), 1, 3);
     testBlockKeyTail(tProfile.getTableName(), 1, 2);
     testBlockKeyTail(tProfile.getTableName(), 2, 3);
@@ -289,11 +227,9 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
     List<StackedColumn> expectedBlock = List.of(
         new StackedColumn(1, 3, Map.of("Ivanov", 2, "Petrov", 1), null, null)
     );
-
     List<StackedColumn> expectedEdgeCaseTail = List.of(
         new StackedColumn(1, 3, Map.of("Ivanov", 2), null, null)
     );
-
     List<StackedColumn> expectedEdgeCaseBegin = List.of(
         new StackedColumn(1, 3, Map.of("Ivanov", 1, "Petrov", 1), null, null)
     );
@@ -301,272 +237,370 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
     String lastName = "LASTNAME";
     GroupFunction groupFunction = GroupFunction.COUNT;
 
-    List<StackedColumn> actualBlock = getStackedFilter(tProfile, lastName, groupFunction, 1, 3, null, null, null);
+    List<StackedColumn> actualBlock = getStackedFilter(tProfile, lastName, groupFunction, null, 1, 3);
     assertEquals(expectedBlock, actualBlock);
 
-    List<StackedColumn> actualEdgeCaseTail = getStackedFilter(tProfile, lastName, groupFunction, 1, 2, null, null, null);
+    List<StackedColumn> actualEdgeCaseTail = getStackedFilter(tProfile, lastName, groupFunction, null, 1, 2);
     assertEquals(expectedEdgeCaseTail, actualEdgeCaseTail);
 
-    List<StackedColumn> actualEdgeCaseBegin = getStackedFilter(tProfile, lastName, groupFunction, 2, 3, null, null, null);
+    List<StackedColumn> actualEdgeCaseBegin = getStackedFilter(tProfile, lastName, groupFunction, null, 2, 3);
     assertEquals(expectedEdgeCaseBegin, actualEdgeCaseBegin);
   }
 
   @Order(10)
   @Test
-  public void getStacked()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException {
-    log.info("Use case: get stacked data using JDBC connection");
-
+  public void getStacked() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException {
+    log.info("Use case: get stacked data");
     TProfile tProfile = setupJdbcProfile(GET_STACKED_USE_CASE_TABLE_NAME);
     GroupFunction groupFunction = GroupFunction.COUNT;
     long begin = 1;
     long end = 3;
-
-    List<StackedColumn> actual = getStackedFilter(tProfile, "LASTNAME", groupFunction, begin, end, null, null, null);
-
+    List<StackedColumn> actual = getStackedFilter(tProfile, "LASTNAME", groupFunction, null, begin, end);
     assertResults(actual, "Ivanov", 2, "Petrov", 1);
   }
 
   @Order(11)
   @Test
-  public void getStackedCountFilter()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException {
-    log.info("Use case: get stacked data with filter using JDBC connection");
-
+  public void getStackedCountFilter() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException {
+    log.info("Use case: get stacked data with filter");
     TProfile tProfile = setupJdbcProfile(GET_STACKED_FILTER_USE_CASE_TABLE_NAME);
     GroupFunction groupFunction = GroupFunction.COUNT;
     long begin = 1;
     long end = 3;
 
-    List<StackedColumn> actualMsk = getStackedFilter(tProfile, "LASTNAME", groupFunction, begin, end,
-                                               "CITY", new String[] {"Moscow"}, CompareFunction.EQUAL);
+    CompositeFilter moscowFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "CITY"),
+            new String[]{"Moscow"},
+            CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualMsk = getStackedFilter(tProfile, "LASTNAME", groupFunction, moscowFilter, begin, end);
     assertResults(actualMsk, "Ivanov", 2);
 
-    List<StackedColumn> actualEkb = getStackedFilter(tProfile, "LASTNAME", groupFunction, begin, end,
-                                               "CITY", new String[] {"Yekaterinburg"}, CompareFunction.EQUAL);
+    CompositeFilter ekbFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "CITY"),
+            new String[]{"Yekaterinburg"},
+            CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualEkb = getStackedFilter(tProfile, "LASTNAME", groupFunction, ekbFilter, begin, end);
     assertResults(actualEkb, "Petrov", 1);
 
-    List<StackedColumn> actualLastNameNov = getStackedFilter(tProfile, "LASTNAME", groupFunction, begin, end,
-                                               "LASTNAME", new String[] {"nov"}, CompareFunction.CONTAIN);
-    List<StackedColumn> actualLastNameRov = getStackedFilter(tProfile, "LASTNAME", groupFunction, begin, end,
-                                                    "LASTNAME", new String[] {"rov"}, CompareFunction.CONTAIN);
+    CompositeFilter novFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "LASTNAME"),
+            new String[]{"nov"},
+            CompareFunction.CONTAIN)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualLastNameNov = getStackedFilter(tProfile, "LASTNAME", groupFunction, novFilter, begin, end);
+
+    CompositeFilter rovFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "LASTNAME"),
+            new String[]{"rov"},
+            CompareFunction.CONTAIN)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualLastNameRov = getStackedFilter(tProfile, "LASTNAME", groupFunction, rovFilter, begin, end);
 
     assertResults(actualLastNameNov, "Ivanov", 2);
     assertResults(actualLastNameRov, "Petrov", 1);
   }
 
+  @Order(11)
+  @Test
+  public void getStackedCountMultipleFilter() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException {
+    log.info("Use case: get stacked data with multiple filter conditions");
+    TProfile tProfile = setupJdbcProfile(GET_STACKED_FILTER_USE_CASE_TABLE_NAME);
+    GroupFunction groupFunction = GroupFunction.COUNT;
+    long begin = 1;
+    long end = 3;
+
+    // Single condition - Moscow
+    CompositeFilter moscowFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "CITY"),
+            new String[]{"Moscow"},
+            CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+
+    // Multiple conditions - Moscow AND lastname contains "ov"
+    CompositeFilter multiConditionFilter = new CompositeFilter(
+        List.of(
+            new FilterCondition(getCProfileByName(tProfile, "CITY"), new String[]{"Moscow"}, CompareFunction.EQUAL),
+            new FilterCondition(getCProfileByName(tProfile, "LASTNAME"), new String[]{"ov"}, CompareFunction.CONTAIN)
+        ),
+        LogicalOperator.AND);
+
+    List<StackedColumn> actualMsk = getStackedFilter(tProfile, "LASTNAME", groupFunction, moscowFilter, begin, end);
+    List<StackedColumn> actualMulti = getStackedFilter(tProfile, "LASTNAME", groupFunction, multiConditionFilter, begin, end);
+
+    assertResults(actualMsk, "Ivanov", 2);
+    assertResults(actualMulti, "Ivanov", 2);
+  }
+
   @Order(24)
   @Test
   public void getStackedSumFilter() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException {
-    log.info("Use case: get stacked sum data with filter using JDBC connection");
-
+    log.info("Use case: get stacked sum data with filter");
     TProfile tProfile = setupJdbcProfile("table_name_stacked_sum_filter_test");
     GroupFunction groupFunction = GroupFunction.SUM;
     long begin = 1;
     long end = 3;
 
-    List<StackedColumn> actualMsk = getStackedFilter(tProfile, "HOUSE", groupFunction, begin, end,
-                                               "CITY", new String[]{"Moscow"}, CompareFunction.EQUAL);
-    assertEquals(3.0, actualMsk.get(0).getKeySum().get("HOUSE")); // Sum of houses in Moscow (1+2)
+    CompositeFilter moscowFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "CITY"),
+            new String[]{"Moscow"},
+            CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualMsk = getStackedFilter(tProfile, "HOUSE", groupFunction, moscowFilter, begin, end);
+    assertEquals(3.0, actualMsk.get(0).getKeySum().get("HOUSE"));
 
-    List<StackedColumn> actualEkb = getStackedFilter(tProfile, "HOUSE", groupFunction, begin, end,
-                                               "CITY", new String[]{"Yekaterinburg"}, CompareFunction.EQUAL);
-    assertEquals(3.0, actualEkb.get(0).getKeySum().get("HOUSE")); // House value in Yekaterinburg (3)
+    CompositeFilter ekbFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "CITY"),
+            new String[]{"Yekaterinburg"},
+            CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualEkb = getStackedFilter(tProfile, "HOUSE", groupFunction, ekbFilter, begin, end);
+    assertEquals(3.0, actualEkb.get(0).getKeySum().get("HOUSE"));
 
-    List<StackedColumn> actualLastNameOv = getStackedFilter(tProfile, "HOUSE", groupFunction, begin, end,
-                                                      "LASTNAME", new String[]{"ov"}, CompareFunction.CONTAIN);
-    assertEquals(6.0, actualLastNameOv.get(0).getKeySum().get("HOUSE")); // Total sum (1+2+3)
+    CompositeFilter ovFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "LASTNAME"),
+            new String[]{"ov"},
+            CompareFunction.CONTAIN)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualLastNameOv = getStackedFilter(tProfile, "HOUSE", groupFunction, ovFilter, begin, end);
+    assertEquals(6.0, actualLastNameOv.get(0).getKeySum().get("HOUSE"));
   }
 
   @Order(25)
   @Test
   public void getStackedAvgFilter() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException {
-    log.info("Use case: get stacked avg data with filter using JDBC connection");
-
+    log.info("Use case: get stacked avg data with filter");
     TProfile tProfile = setupJdbcProfile("table_name_stacked_avg_filter_test");
     GroupFunction groupFunction = GroupFunction.AVG;
     long begin = 1;
     long end = 3;
 
-    List<StackedColumn> actualMsk = getStackedFilter(tProfile, "HOUSE", groupFunction, begin, end,
-                                               "CITY", new String[]{"Moscow"}, CompareFunction.EQUAL);
-    assertEquals(1.5, actualMsk.get(0).getKeyAvg().get("HOUSE")); // Avg of houses in Moscow (1,2) -> 1.5
+    CompositeFilter moscowFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "CITY"),
+            new String[]{"Moscow"},
+            CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualMsk = getStackedFilter(tProfile, "HOUSE", groupFunction, moscowFilter, begin, end);
+    assertEquals(1.5, actualMsk.get(0).getKeyAvg().get("HOUSE"));
 
-    List<StackedColumn> actualEkb = getStackedFilter(tProfile, "HOUSE", groupFunction, begin, end,
-                                               "CITY", new String[]{"Yekaterinburg"}, CompareFunction.EQUAL);
-    assertEquals(3.0, actualEkb.get(0).getKeyAvg().get("HOUSE")); // House value in Yekaterinburg (3)
+    CompositeFilter ekbFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "CITY"),
+            new String[]{"Yekaterinburg"},
+            CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualEkb = getStackedFilter(tProfile, "HOUSE", groupFunction, ekbFilter, begin, end);
+    assertEquals(3.0, actualEkb.get(0).getKeyAvg().get("HOUSE"));
 
-    List<StackedColumn> actualLastNameOv = getStackedFilter(tProfile, "HOUSE", groupFunction, begin, end,
-                                                      "LASTNAME", new String[]{"ov"}, CompareFunction.CONTAIN);
-    assertEquals(2.0, actualLastNameOv.get(0).getKeyAvg().get("HOUSE")); // Total avg (1+2+3)/3 = 2.0
+    CompositeFilter ovFilter = new CompositeFilter(
+        List.of(new FilterCondition(
+            getCProfileByName(tProfile, "LASTNAME"),
+            new String[]{"ov"},
+            CompareFunction.CONTAIN)),
+        LogicalOperator.AND);
+    List<StackedColumn> actualLastNameOv = getStackedFilter(tProfile, "HOUSE", groupFunction, ovFilter, begin, end);
+    assertEquals(2.0, actualLastNameOv.get(0).getKeyAvg().get("HOUSE"));
   }
 
   private List<StackedColumn> getStackedFilter(TProfile tProfile,
-                                         String columnName,
-                                         GroupFunction groupFunction,
-                                         long begin,
-                                         long end,
-                                         String filterColumnName,
-                                         String[] filterData,
-                                         CompareFunction compareFunction)
+                                               String columnName,
+                                               GroupFunction groupFunction,
+                                               CompositeFilter compositeFilter,
+                                               long begin,
+                                               long end)
       throws SQLException, BeginEndWrongOrderException, SqlColMetadataException {
 
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     CProfile cProfile = getCProfileByName(tProfile, columnName);
-
-    if (filterColumnName != null && filterData != null && compareFunction != null) {
-      CProfile cProfileFilter = getCProfileByName(tProfile, filterColumnName);
-      return configJdbc.getDStore().getStacked(
-          tProfile.getTableName(),
-          cProfile,
-          groupFunction,
-          cProfileFilter,
-          filterData,
-          compareFunction,
-          begin,
-          end
-      );
-    } else {
-      return configJdbc.getDStore().getStacked(
-          tProfile.getTableName(),
-          cProfile,
-          groupFunction,
-          begin,
-          end
-      );
-    }
+    return configJdbc.getDStore().getStacked(
+        tProfile.getTableName(),
+        cProfile,
+        groupFunction,
+        compositeFilter,
+        begin,
+        end);
   }
 
   @Order(12)
   @Test
-  public void getGantt()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
-    log.info("Use case: get gantt data using JDBC connection");
-
+  public void getGantt() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
+    log.info("Use case: get gantt data");
     TProfile tProfile = setupJdbcProfile(GET_GANTT_USE_CASE_TABLE_NAME);
     CProfile firstGrpBy = getCProfileByName(tProfile, "LASTNAME");
     CProfile secondGrpBy = getCProfileByName(tProfile, "CITY");
     long begin = 1;
     long end = 3;
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     List<GanttColumnCount> expected = Arrays.asList(
         new GanttColumnCount("Petrov", Map.of("Yekaterinburg", 1)),
         new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
     );
-
-    List<GanttColumnCount> actual = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy, begin, end);
-    List<GanttColumnCount> actualParallel = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy, 2, begin, end);
-
+    List<GanttColumnCount> actual = configJdbc.getDStore().getGanttCount(
+        tProfile.getTableName(), firstGrpBy, secondGrpBy, null, begin, end);
+    List<GanttColumnCount> actualParallel =
+        configJdbc.getDStore().getGanttCount(tProfile.getTableName(), firstGrpBy, secondGrpBy, null, 2, begin, end);
     assertForGanttColumn(expected, actual);
     assertForGanttColumn(expected, actualParallel);
   }
 
   @Order(13)
   @Test
-  public void getGanttFilter()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException,
+  public void getGanttFilter() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException,
       SqlColMetadataException, GanttColumnNotSupportedException {
     log.info("Use case: get gantt data with various filter combinations");
 
-    // Setup test data and profiles
+    // Common Arrange
     TProfile tProfile = setupJdbcProfile(GET_GANTT_FILTER_USE_CASE_TABLE_NAME);
     CProfile firstGrpBy = getCProfileByName(tProfile, "LASTNAME");
     CProfile secondGrpBy = getCProfileByName(tProfile, "CITY");
     CProfile filterColumn = getCProfileByName(tProfile, "LASTNAME");
     long begin = 1;
     long end = 3;
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
 
-    List<GanttColumnCount> actualOv = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy,
-        filterColumn, new String[] {"ov"}, CompareFunction.CONTAIN, begin, end);
-    List<GanttColumnCount> expectedOv = Arrays.asList(
-        new GanttColumnCount("Petrov", Map.of("Yekaterinburg", 1)),
-        new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
-    );
-    assertForGanttColumn(expectedOv, actualOv);
+    // Test Case 1: CONTAIN filter with "ov"
+    {
+      CompositeFilter ovFilter = new CompositeFilter(
+          List.of(new FilterCondition(filterColumn, new String[]{"ov"}, CompareFunction.CONTAIN)),
+          LogicalOperator.AND
+      );
 
-    List<GanttColumnCount> actualNov = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy,
-        filterColumn, new String[] {"nov"}, CompareFunction.CONTAIN, begin, end);
-    List<GanttColumnCount> expectedNov = Arrays.asList(
-        new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
-    );
-    assertForGanttColumn(expectedNov, actualNov);
+      List<GanttColumnCount> actualOv = configJdbc.getDStore().getGanttCount(
+          tProfile.getTableName(), firstGrpBy, secondGrpBy, ovFilter, 1, begin, end);
 
-    List<GanttColumnCount> actualExact = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy,
-        filterColumn, new String[] {"Ivanov"}, CompareFunction.EQUAL, begin, end);
-    List<GanttColumnCount> expectedExact = Arrays.asList(
-        new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
-    );
-    assertForGanttColumn(expectedExact, actualExact);
+      List<GanttColumnCount> expectedOv = Arrays.asList(
+          new GanttColumnCount("Petrov", Map.of("Yekaterinburg", 1)),
+          new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
+      );
+      assertForGanttColumn(expectedOv, actualOv);
+    }
 
-    List<GanttColumnCount> actualMulti = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy,
-        filterColumn, new String[] {"Ivanov", "Petrov"}, CompareFunction.EQUAL, begin, end);
-    List<GanttColumnCount> expectedMulti = Arrays.asList(
-        new GanttColumnCount("Petrov", Map.of("Yekaterinburg", 1)),
-        new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
-    );
-    assertForGanttColumn(expectedMulti, actualMulti);
+    // Test Case 2: CONTAIN filter with "nov"
+    {
+      CompositeFilter novFilter = new CompositeFilter(
+          List.of(new FilterCondition(filterColumn, new String[]{"nov"}, CompareFunction.CONTAIN)),
+          LogicalOperator.AND
+      );
 
-    List<GanttColumnCount> actualNoMatch = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy,
-        filterColumn, new String[] {"xyz"}, CompareFunction.CONTAIN, begin, end);
-    assertTrue(actualNoMatch.isEmpty());
+      List<GanttColumnCount> actualNov = configJdbc.getDStore().getGanttCount(
+          tProfile.getTableName(), firstGrpBy, secondGrpBy, novFilter, 1, begin, end);
 
-    CProfile cityFilterColumn = getCProfileByName(tProfile, "CITY");
-    List<GanttColumnCount> actualCityFilter = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy,
-        cityFilterColumn, new String[] {"Moscow"}, CompareFunction.EQUAL, begin, end);
-    List<GanttColumnCount> expectedCityFilter = Arrays.asList(
-        new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
-    );
-    assertForGanttColumn(expectedCityFilter, actualCityFilter);
+      List<GanttColumnCount> expectedNov = Arrays.asList(
+          new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
+      );
+      assertForGanttColumn(expectedNov, actualNov);
+    }
 
-    List<GanttColumnCount> actualCaseSensitive = configJdbc.getDStore().getGantt(
-        tProfile.getTableName(), firstGrpBy, secondGrpBy,
-        filterColumn, new String[] {"ivanov"}, CompareFunction.EQUAL, begin, end);
-    assertTrue(actualCaseSensitive.isEmpty());
+    // Test Case 3: EQUAL filter with "Ivanov"
+    {
+      CompositeFilter exactFilter = new CompositeFilter(
+          List.of(new FilterCondition(filterColumn, new String[]{"Ivanov"}, CompareFunction.EQUAL)),
+          LogicalOperator.AND
+      );
+
+      List<GanttColumnCount> actualExact = configJdbc.getDStore().getGanttCount(
+          tProfile.getTableName(), firstGrpBy, secondGrpBy, exactFilter, 1, begin, end);
+
+      List<GanttColumnCount> expectedExact = Arrays.asList(
+          new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
+      );
+      assertForGanttColumn(expectedExact, actualExact);
+    }
+
+    // Test Case 4: EQUAL filter with multiple values
+    {
+      CompositeFilter multiFilter = new CompositeFilter(
+          List.of(new FilterCondition(filterColumn, new String[]{"Ivanov", "Petrov"}, CompareFunction.EQUAL)),
+          LogicalOperator.AND
+      );
+
+      List<GanttColumnCount> actualMulti = configJdbc.getDStore().getGanttCount(
+          tProfile.getTableName(), firstGrpBy, secondGrpBy, multiFilter, 1, begin, end);
+
+      List<GanttColumnCount> expectedMulti = Arrays.asList(
+          new GanttColumnCount("Petrov", Map.of("Yekaterinburg", 1)),
+          new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
+      );
+      assertForGanttColumn(expectedMulti, actualMulti);
+    }
+
+    // Test Case 5: CONTAIN filter with no matches
+    {
+      CompositeFilter noMatchFilter = new CompositeFilter(
+          List.of(new FilterCondition(filterColumn, new String[]{"xyz"}, CompareFunction.CONTAIN)),
+          LogicalOperator.AND
+      );
+
+      List<GanttColumnCount> actualNoMatch = configJdbc.getDStore().getGanttCount(
+          tProfile.getTableName(), firstGrpBy, secondGrpBy, noMatchFilter, 1, begin, end);
+
+      assertTrue(actualNoMatch.isEmpty());
+    }
+
+    // Test Case 6: Filter on different column (CITY)
+    {
+      CProfile cityFilterColumn = getCProfileByName(tProfile, "CITY");
+      CompositeFilter cityFilter = new CompositeFilter(
+          List.of(new FilterCondition(cityFilterColumn, new String[]{"Moscow"}, CompareFunction.EQUAL)),
+          LogicalOperator.AND
+      );
+
+      List<GanttColumnCount> actualCityFilter = configJdbc.getDStore().getGanttCount(
+          tProfile.getTableName(), firstGrpBy, secondGrpBy, cityFilter, 1, begin, end);
+
+      List<GanttColumnCount> expectedCityFilter = Arrays.asList(
+          new GanttColumnCount("Ivanov", Map.of("Moscow", 2))
+      );
+      assertForGanttColumn(expectedCityFilter, actualCityFilter);
+    }
+
+    // Test Case 7: Case-sensitive filter
+    {
+      CompositeFilter caseSensitiveFilter = new CompositeFilter(
+          List.of(new FilterCondition(filterColumn, new String[]{"ivanov"}, CompareFunction.EQUAL)),
+          LogicalOperator.AND
+      );
+
+      List<GanttColumnCount> actualCaseSensitive = configJdbc.getDStore().getGanttCount(
+          tProfile.getTableName(), firstGrpBy, secondGrpBy, caseSensitiveFilter, 1, begin, end);
+
+      assertTrue(actualCaseSensitive.isEmpty());
+    }
   }
 
   @Order(14)
   @Test
-  public void getGanttSum()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException,
+  public void getGanttSum() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException,
       SqlColMetadataException, GanttColumnNotSupportedException {
     log.info("Use case: get gantt sum data grouped by lastname and firstname");
-
     TProfile tProfile = setupJdbcProfile(GET_GANTT_FILTER_USE_CASE_TABLE_NAME);
     CProfile lastNameGrpBy = getCProfileByName(tProfile, "LASTNAME");
-    CProfile firstNameGrpBy = getCProfileByName(tProfile, "FIRSTNAME");
     CProfile houseSumColumn = getCProfileByName(tProfile, "HOUSE");
     long begin = 1;
     long end = 3;
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
 
-    // Test 1: Group by LASTNAME, sum HOUSE
-    List<GanttColumnSum> actualLastName = configJdbc.getDStore().getGanttSum(
-        tProfile.getTableName(), lastNameGrpBy, houseSumColumn, begin, end);
-
+    List<GanttColumnSum> actualLastName = configJdbc.getDStore()
+        .getGanttSum(tProfile.getTableName(), lastNameGrpBy, houseSumColumn, null, begin, end);
     List<GanttColumnSum> expectedLastName = Arrays.asList(
         new GanttColumnSum("Petrov", 3.0),
         new GanttColumnSum("Ivanov", 3.0)
     );
     assertGanttSumColumnsEqual(expectedLastName, actualLastName);
 
-    // Test 2: Group by FIRSTNAME, sum HOUSE
-    List<GanttColumnSum> actualFirstName = configJdbc.getDStore().getGanttSum(
-        tProfile.getTableName(), firstNameGrpBy, houseSumColumn, begin, end);
-
+    CProfile firstNameGrpBy = getCProfileByName(tProfile, "FIRSTNAME");
+    List<GanttColumnSum> actualFirstName = configJdbc.getDStore()
+        .getGanttSum(tProfile.getTableName(), firstNameGrpBy, houseSumColumn, null, begin, end);
     List<GanttColumnSum> expectedFirstName = Arrays.asList(
         new GanttColumnSum("Alex", 1.0),
         new GanttColumnSum("Ivan", 2.0),
@@ -574,10 +608,8 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
     );
     assertGanttSumColumnsEqual(expectedFirstName, actualFirstName);
 
-    // Test 3: Filtered time range (begin=2, end=2)
     List<GanttColumnSum> actualFiltered = configJdbc.getDStore().getGanttSum(
-        tProfile.getTableName(), lastNameGrpBy, houseSumColumn, 2, 2);
-
+        tProfile.getTableName(), lastNameGrpBy, houseSumColumn, null, 2, 2);
     List<GanttColumnSum> expectedFiltered = Arrays.asList(
         new GanttColumnSum("Ivanov", 2.0)
     );
@@ -586,188 +618,133 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
 
   private void assertGanttSumColumnsEqual(List<GanttColumnSum> expected, List<GanttColumnSum> actual) {
     assertEquals(expected.size(), actual.size(), "Number of result rows mismatch");
-
     Map<String, Double> expectedMap = expected.stream()
         .collect(Collectors.toMap(GanttColumnSum::getKey, GanttColumnSum::getValue));
-
     Map<String, Double> actualMap = actual.stream()
         .collect(Collectors.toMap(GanttColumnSum::getKey, GanttColumnSum::getValue));
-
     assertEquals(expectedMap, actualMap, "Result content mismatch");
   }
 
   @Order(15)
   @Test
-  public void getDistinct()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException {
+  public void getDistinct() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException {
     log.info("Use case: get distinct data values");
-
     TProfile tProfile = setupJdbcProfile(GET_DISTINCT_USE_CASE_TABLE_NAME);
     CProfile cProfileFirstName = getCProfileByName(tProfile, "FIRSTNAME");
     CProfile cProfileLastName = getCProfileByName(tProfile, "LASTNAME");
     long begin = 1;
     long end = 3;
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
 
     List<String> actualFirstNameDesc = configJdbc.getDStore()
-        .getDistinct(tProfile.getTableName(), cProfileFirstName, OrderBy.DESC, 10, begin, end);
+        .getDistinct(tProfile.getTableName(), cProfileFirstName, OrderBy.DESC, null, 10, begin, end);
     List<String> actualLastNameDesc = configJdbc.getDStore()
-        .getDistinct(tProfile.getTableName(), cProfileLastName, OrderBy.DESC, 10, begin, end);
-
+        .getDistinct(tProfile.getTableName(), cProfileLastName, OrderBy.DESC, null, 10, begin, end);
     List<String> actualFirstNameAsc = configJdbc.getDStore()
-        .getDistinct(tProfile.getTableName(), cProfileFirstName, OrderBy.ASC, 10, begin, end);
+        .getDistinct(tProfile.getTableName(), cProfileFirstName, OrderBy.ASC, null, 10, begin, end);
     List<String> actualLastNameAsc = configJdbc.getDStore()
-        .getDistinct(tProfile.getTableName(), cProfileLastName, OrderBy.ASC, 10, begin, end);
-
+        .getDistinct(tProfile.getTableName(), cProfileLastName, OrderBy.ASC, null, 10, begin, end);
     List<String> actualFirstNameAscLimitTwo = configJdbc.getDStore()
-        .getDistinct(tProfile.getTableName(), cProfileFirstName, OrderBy.ASC, 2, begin, end);
+        .getDistinct(tProfile.getTableName(), cProfileFirstName, OrderBy.ASC, null, 2, begin, end);
     List<String> actualLastNameAscLimitOne = configJdbc.getDStore()
-        .getDistinct(tProfile.getTableName(), cProfileLastName, OrderBy.ASC, 1, begin, end);
+        .getDistinct(tProfile.getTableName(), cProfileLastName, OrderBy.ASC, null, 1, begin, end);
 
     assertEquals(List.of("Oleg", "Ivan", "Alex"), actualFirstNameDesc);
     assertEquals(List.of("Petrov", "Ivanov"), actualLastNameDesc);
-
     assertEquals(List.of("Alex", "Ivan", "Oleg"), actualFirstNameAsc);
     assertEquals(List.of("Ivanov", "Petrov"), actualLastNameAsc);
-
     assertEquals(List.of("Alex", "Ivan"), actualFirstNameAscLimitTwo);
     assertEquals(List.of("Ivanov"), actualLastNameAscLimitOne);
   }
 
   @Order(15)
   @Test
-  public void getDistinctWithFilter()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException {
+  public void getDistinctWithFilter() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException {
     log.info("Use case: get distinct data values with filtering");
-
     TProfile tProfile = setupJdbcProfile("table_name_distinct_filter_test");
     CProfile cProfileFirstName = getCProfileByName(tProfile, "FIRSTNAME");
     CProfile cProfileLastName = getCProfileByName(tProfile, "LASTNAME");
     CProfile cProfileCity = getCProfileByName(tProfile, "CITY");
     long begin = 1;
     long end = 3;
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
 
+    CompositeFilter compositeFilterMoscow = new CompositeFilter(
+        List.of(new FilterCondition(cProfileCity, new String[]{"Moscow"}, CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+
     List<String> actualMoscow = configJdbc.getDStore().getDistinct(
-        tProfile.getTableName(),
-        cProfileFirstName,
-        OrderBy.ASC,
-        10,
-        begin,
-        end,
-        cProfileCity,
-        new String[] {"Moscow"},
-        CompareFunction.EQUAL
-    );
+        tProfile.getTableName(), cProfileFirstName, OrderBy.ASC, compositeFilterMoscow, 10, begin, end);
     assertEquals(List.of("Alex", "Ivan"), actualMoscow);
 
+    CompositeFilter compositeFilterContainOv = new CompositeFilter(
+        List.of(new FilterCondition(cProfileLastName, new String[]{"ov"}, CompareFunction.CONTAIN)),
+        LogicalOperator.AND);
+
     List<String> actualContainOv = configJdbc.getDStore().getDistinct(
-        tProfile.getTableName(),
-        cProfileFirstName,
-        OrderBy.ASC,
-        10,
-        begin,
-        end,
-        cProfileLastName,
-        new String[] {"ov"},
-        CompareFunction.CONTAIN
-    );
+        tProfile.getTableName(), cProfileFirstName, OrderBy.ASC, compositeFilterContainOv, 10, begin, end);
     assertEquals(List.of("Alex", "Ivan", "Oleg"), actualContainOv);
 
+    CompositeFilter compositeFilterLimit = new CompositeFilter(
+        List.of(new FilterCondition(cProfileFirstName, new String[]{"Ivan"}, CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+
     List<String> actualLimit = configJdbc.getDStore().getDistinct(
-        tProfile.getTableName(),
-        cProfileLastName,
-        OrderBy.ASC,
-        1,
-        begin,
-        end,
-        cProfileFirstName,
-        new String[] {"Ivan"},
-        CompareFunction.EQUAL
-    );
+        tProfile.getTableName(), cProfileLastName, OrderBy.ASC, compositeFilterLimit, 1, begin, end);
     assertEquals(List.of("Ivanov"), actualLimit);
 
+    CompositeFilter compositeFilterNoMatch = new CompositeFilter(
+        List.of(new FilterCondition(cProfileCity, new String[]{"London"}, CompareFunction.EQUAL)),
+        LogicalOperator.AND);
+
     List<String> actualNoMatch = configJdbc.getDStore().getDistinct(
-        tProfile.getTableName(),
-        cProfileFirstName,
-        OrderBy.ASC,
-        10,
-        begin,
-        end,
-        cProfileCity,
-        new String[] {"London"},
-        CompareFunction.EQUAL
-    );
+        tProfile.getTableName(), cProfileFirstName, OrderBy.ASC, compositeFilterNoMatch, 10, begin, end);
     assertTrue(actualNoMatch.isEmpty());
 
-    List<String> actualMultiFilter = configJdbc.getDStore().getDistinct(
-        tProfile.getTableName(),
-        cProfileCity,
-        OrderBy.DESC,
-        10,
-        begin,
-        end,
-        cProfileFirstName,
-        new String[] {"Alex", "Oleg"},
-        CompareFunction.EQUAL
-    );
+    CompositeFilter compositeFilterMulti = new CompositeFilter(
+        List.of(new FilterCondition(cProfileFirstName, new String[]{"Alex", "Oleg"}, CompareFunction.EQUAL)),
+        LogicalOperator.AND);
 
+    List<String> actualMultiFilter = configJdbc.getDStore().getDistinct(
+        tProfile.getTableName(), cProfileCity, OrderBy.DESC, compositeFilterMulti, 10, begin, end);
     assertEquals(new HashSet<>(List.of("Yekaterinburg", "Moscow")), new HashSet<>(actualMultiFilter));
   }
 
   @Order(16)
   @Test
-  public void getRawDataAll()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
-    log.info("Use case: get raw data using JDBC connection");
-
+  public void getRawDataAll() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
+    log.info("Use case: get raw data");
     TProfile tProfile = setupJdbcProfile(GET_RAW_USE_CASE_TABLE_NAME);
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     assertRawDataJdbc(tProfile.getTableName(), 1, 3);
   }
 
   @Order(17)
   @Test
-  public void getRawDataAllFilter()
-      throws SQLException, TableNameEmptyException {
-    log.info("Use case: get raw data with filter using JDBC connection");
-
+  public void getRawDataAllFilter() throws SQLException, TableNameEmptyException {
+    log.info("Use case: get raw data with filter");
     TProfile tProfile = setupJdbcProfile(GET_RAW_FILTER_USE_CASE_TABLE_NAME);
-
     CProfile cProfileFilter = getCProfileByName(tProfile, "FIRSTNAME");
     String filter = "Alex";
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     List<List<Object>> actual = configJdbc.getDStore().getRawDataAll(tProfile.getTableName(), cProfileFilter, filter, 1, 3);
     List<List<Object>> expected = new ArrayList<>();
     expected.add(Arrays.asList(new String[]{"1", "Alex", "Ivanov", "1", "Moscow", "01.01.2023 01:01:01"}));
-
     assertEquals(expected.size(), actual.size());
     assertForRaw(expected, actual);
   }
 
   @Order(18)
   @Test
-  public void getRawDataByColumn()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
-    log.info("Use case: get raw data for column using JDBC connection");
-
+  public void getRawDataByColumn() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
+    log.info("Use case: get raw data for column");
     TProfile tProfile = setupJdbcProfile(GET_RAW_COLUMN_USE_CASE_TABLE_NAME);
-
     CProfile cProfile = getCProfileByName(tProfile, "FIRSTNAME");
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     List<List<Object>> actual = configJdbc.getDStore().getRawDataByColumn(tProfile.getTableName(), cProfile, 1, 3);
     List<List<Object>> expected = new ArrayList<>();
     loadExpected(expected);
-    Predicate<List<Object>> filter = e -> (e.get(0) == "1" | e.get(0) == "2" | e.get(0) == "3");
-
+    Predicate<List<Object>> filter = e -> (e.get(0).equals("1") || e.get(0).equals("2") || e.get(0).equals("3"));
     assertEquals(expected.stream().filter(filter).count(), actual.size());
     assertForRaw(expected.stream().filter(filter).map(map -> List.of(map.get(0), map.get(1))).collect(Collectors.toList()), actual);
   }
@@ -776,159 +753,142 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   @Test
   public void getBatchResultSetRegularTable() throws TableNameEmptyException, SqlColMetadataException, IOException {
     log.info("Use case: get raw data using BatchResultSet for regular table with CSV");
-
-    String fileName = new File("").getAbsolutePath() + FILE_SEPARATOR +
-        Paths.get("src", "test", "resources", "csv", "file.csv");
-
+    String fileName = new File("").getAbsolutePath() + FILE_SEPARATOR + Paths.get("src", "test", "resources", "csv", "file.csv");
     String csvSplitBy = ",";
-
-    SProfile sProfile = getSProfileCsv(GET_RESULT_SET_REGULAR_USE_CASE_TABLE_NAME, fileName, csvSplitBy, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, false);
-
+    SProfile sProfile = getSProfileCsv(GET_RESULT_SET_REGULAR_USE_CASE_TABLE_NAME, fileName, csvSplitBy,
+                                       TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, false);
     TProfile tProfile = configCsv.getDStore().loadCsvTableMetadata(fileName, csvSplitBy, sProfile);
-
     configCsv.getDStore().putDataCsvBatch(tProfile.getTableName(), fileName, csvSplitBy, 2);
-
     assertDataCsvBatchTest(configCsv.getDStore(), sProfile, fileName, false, 10, false);
   }
 
   @Order(20)
   @Test
-  public void getBatchResultSetTimeSeriesTable()
-      throws SQLException, TableNameEmptyException {
-    log.info("Use case: get raw data using BatchResultSet for time series tables with JDBC connection");
-
+  public void getBatchResultSetTimeSeriesTable() throws SQLException, TableNameEmptyException {
+    log.info("Use case: get raw data using BatchResultSet for time series tables");
     TProfile tProfile = setupJdbcProfile(GET_RESULT_SET_TIME_SERIES_USE_CASE_TABLE_NAME);
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-
     BatchResultSet batchResultSet = configJdbc.getDStore().getBatchResultSet(tProfile.getTableName(), 1, 3, 10);
-
     List<List<Object>> actual = new ArrayList<>();
     while (batchResultSet.next()) {
       List<List<Object>> var = batchResultSet.getObject();
       log.info("Output by fetchSize: " + var);
-
       actual.addAll(var);
     }
     List<List<Object>> expected = new ArrayList<>();
     loadExpected(expected);
-
     assertEquals(expected.size(), actual.size());
     assertForRaw(expected, actual);
   }
 
   @Order(21)
   @Test
-  public void getFirst()
-      throws SQLException, TableNameEmptyException {
-    log.info("Use case: get stacked data using JDBC connection");
-
+  public void getFirst() throws SQLException, TableNameEmptyException {
+    log.info("Use case: get first timestamp");
     TProfile tProfile = setupJdbcProfile(GET_FIRST_TIMESTAMP_USE_CASE_TABLE_NAME);
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-    long begin = Long.MIN_VALUE;
-    long end = Long.MAX_VALUE;
-
-    long first = configJdbc.getDStore().getFirst(tProfile.getTableName(), begin, end);
-
+    long first = configJdbc.getDStore().getFirst(tProfile.getTableName(), Long.MIN_VALUE, Long.MAX_VALUE);
     assertEquals(1L, first);
   }
 
   @Order(22)
   @Test
   public void getLast() throws SQLException, TableNameEmptyException {
-    log.info("Use case: get stacked data using JDBC connection");
-
+    log.info("Use case: get last timestamp");
     TProfile tProfile = setupJdbcProfile(GET_LAST_TIMESTAMP_USE_CASE_TABLE_NAME);
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
-    long begin = Long.MIN_VALUE;
-    long end = Long.MAX_VALUE;
-
-    long last = configJdbc.getDStore().getLast(tProfile.getTableName(), begin, end);
-
+    long last = configJdbc.getDStore().getLast(tProfile.getTableName(), Long.MIN_VALUE, Long.MAX_VALUE);
     assertEquals(3L, last);
   }
 
   @Order(23)
   @Test
-  public void getGanttSumFiltered()
-      throws SQLException, TableNameEmptyException, BeginEndWrongOrderException,
+  public void getGanttSumFiltered() throws SQLException, TableNameEmptyException, BeginEndWrongOrderException,
       SqlColMetadataException, GanttColumnNotSupportedException {
     log.info("Use case: get filtered gantt sum data");
-
     TProfile tProfile = setupJdbcProfile("table_name_gantt_sum_filtered_test");
     CProfile lastNameGrpBy = getCProfileByName(tProfile, "LASTNAME");
     CProfile houseSumColumn = getCProfileByName(tProfile, "HOUSE");
     CProfile firstNameFilter = getCProfileByName(tProfile, "FIRSTNAME");
     long begin = 1;
     long end = 3;
-
     putDataJdbc(configJdbc.getDStore(), tProfile, configJdbc.getH2DbConnection(), "SELECT * FROM person");
+
+    CompositeFilter filterFirstNameEqual = new CompositeFilter(
+        List.of(new FilterCondition(firstNameFilter,
+                                    new String[]{"Ivan"}, CompareFunction.EQUAL)),
+        LogicalOperator.AND);
 
     List<GanttColumnSum> actualIvan = configJdbc.getDStore().getGanttSum(
         tProfile.getTableName(),
         lastNameGrpBy,
         houseSumColumn,
-        firstNameFilter,
-        new String[]{"Ivan"},
-        CompareFunction.EQUAL,
+        filterFirstNameEqual,
         begin,
-        end
-    );
-
+        end);
     List<GanttColumnSum> expectedIvan = List.of(
         new GanttColumnSum("Ivanov", 2.0)
     );
-
     assertGanttSumColumnsEqual(expectedIvan, actualIvan);
+
+    CompositeFilter filterFirstNameContain = new CompositeFilter(
+        List.of(new FilterCondition(firstNameFilter,
+                                    new String[]{"e"}, CompareFunction.CONTAIN)),
+        LogicalOperator.AND);
 
     List<GanttColumnSum> actualContainE = configJdbc.getDStore().getGanttSum(
         tProfile.getTableName(),
         lastNameGrpBy,
         houseSumColumn,
-        firstNameFilter,
-        new String[]{"e"},
-        CompareFunction.CONTAIN,
+        filterFirstNameContain,
         begin,
-        end
-    );
-
+        end);
     List<GanttColumnSum> expectedContainE = Arrays.asList(
         new GanttColumnSum("Ivanov", 1.0),
         new GanttColumnSum("Petrov", 3.0)
     );
-
     assertGanttSumColumnsEqual(expectedContainE, actualContainE);
   }
 
-  protected void assertForGanttColumn(List<GanttColumnCount> expected, List<GanttColumnCount> actual) {
-    expected.forEach(e ->
-                         assertEquals(e.getGantt(), actual.stream()
-                             .filter(f -> f.getKey().equals(e.getKey()))
-                             .findAny()
-                             .orElseThrow()
-                             .getGantt()));
+  protected void assertForGanttColumn(List<GanttColumnCount> expected,
+                                      List<GanttColumnCount> actual) {
+    assertEquals(expected.size(), actual.size(),"Number of GanttColumnCount entries differs");
+
+    Map<String, Map<String, Integer>> expectedMap = expected.stream()
+        .collect(Collectors.toMap(GanttColumnCount::getKey, GanttColumnCount::getGantt));
+
+    Map<String, Map<String, Integer>> actualMap = actual.stream()
+        .collect(Collectors.toMap(GanttColumnCount::getKey, GanttColumnCount::getGantt));
+
+    assertEquals(expectedMap.keySet(), actualMap.keySet(), "Keys don't match");
+
+    expectedMap.forEach((key, expectedGantt) -> {
+      Map<String, Integer> actualGantt = actualMap.get(key);
+      assertEquals(expectedGantt, actualGantt,
+                   () -> "Gantt values differ for key: " + key);
+    });
   }
 
   private void testBlockKeyTail(String tableName, long begin, long end) throws Exception {
     List<BlockKeyTail> result = configJdbc.getDStore().getBlockKeyTailList(tableName, begin, end);
-
     Assertions.assertEquals(1, result.size(), "The result size should be 1.");
     Assertions.assertEquals(begin, result.getFirst().getKey(), "The key should match the begin value.");
     Assertions.assertEquals(end, result.getLast().getTail(), "The tail should match the end value.");
   }
 
-  private void assertResults(List<StackedColumn> actual, String firstValue, int expectedFirstValueCount) throws AssertionError {
+  private void assertResults(List<StackedColumn> actual, String firstValue, int expectedFirstValueCount) {
     assertNotNull(actual);
     assertEquals(1, actual.size());
     assertEquals(firstListStackedValue(actual, firstValue), expectedFirstValueCount);
   }
 
-  private void assertResults(List<StackedColumn> actual, String firstValue, int expectedFirstValueCount, String secondValue, int expectedSecondValueCount) throws AssertionError {
+  private void assertResults(List<StackedColumn> actual, String firstValue, int expectedFirstValueCount,
+                             String secondValue, int expectedSecondValueCount) {
     assertResults(actual, firstValue, expectedFirstValueCount);
     assertEquals(firstListStackedValue(actual, secondValue), expectedSecondValueCount);
   }
 
-  public Object firstListStackedValue(List<StackedColumn> list, String key) {
+  public int firstListStackedValue(List<StackedColumn> list, String key) {
     return list.stream()
         .map(column -> column.getKeyCount().get(key))
         .filter(Objects::nonNull)
@@ -938,22 +898,19 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
 
   private TProfile setupJdbcProfile(String tableName) throws SQLException, TableNameEmptyException {
     SProfile sProfile = getSProfileJdbc(tableName, TType.TIME_SERIES, IType.LOCAL, AType.ON_LOAD, BType.BERKLEYDB, true);
-    sProfile.getCsTypeMap()
-        .put("ID", CSType.builder().isTimeStamp(true).sType(SType.RAW).cType(CType.LONG).dType(DataType.LONG).build());
+    sProfile.getCsTypeMap().put("ID", CSType.builder()
+        .isTimeStamp(true).sType(SType.RAW).cType(CType.LONG).dType(DataType.LONG).build());
     return configJdbc.getDStore().loadJdbcTableMetadata(configJdbc.getH2DbConnection(), select, sProfile);
   }
 
-  private void assertData(String actualTableName,
-                          List<List<Object>> expectedData) {
+  private void assertData(String actualTableName, List<List<Object>> expectedData) {
     List<List<Object>> actualData = configDirect.getDStore()
         .getRawDataAll(actualTableName, Long.MIN_VALUE, Long.MAX_VALUE);
     assertEquals(expectedData.toString(), actualData.toString());
     assertEquals(expectedData.size(), actualData.size());
   }
 
-  private void assertRawDataJdbc(String tableName,
-                                 long begin,
-                                 long end) {
+  private void assertRawDataJdbc(String tableName, long begin, long end) {
     List<List<Object>> actual = configJdbc.getDStore().getRawDataAll(tableName, begin, end);
     List<List<Object>> expected = new ArrayList<>();
     loadExpected(expected);
@@ -964,18 +921,16 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   private void loadDataTablePersonH2(H2Database h2Db) throws SQLException {
     String tableName = "PERSON";
     String createTableSql = String.format("""
-                                              CREATE TABLE %s (
-                                                id        INT,
-                                                firstname VARCHAR(64),
-                                                lastname  VARCHAR(64),
-                                                house     INT,
-                                                city      VARCHAR(64),
-                                                birthday  TIMESTAMP
-                                              )
-                                              """, tableName);
-
+                CREATE TABLE %s (
+                  id        INT,
+                  firstname VARCHAR(64),
+                  lastname  VARCHAR(64),
+                  house     INT,
+                  city      VARCHAR(64),
+                  birthday  TIMESTAMP
+                )
+                """, tableName);
     h2Db.execute(createTableSql);
-
     LocalDateTime birthday = LocalDateTime.of(2023, 1, 1, 1, 1, 1);
     h2Db.insert(Person.builder().id(1).firstname("Alex").lastname("Ivanov").house(1).city("Moscow").birthday(birthday).build());
     h2Db.insert(Person.builder().id(2).firstname("Ivan").lastname("Ivanov").house(2).city("Moscow").birthday(birthday).build());
@@ -988,8 +943,7 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
     expected.add(Arrays.asList(new String[]{"3", "Oleg", "Petrov", "3", "Yekaterinburg", "01.01.2023 01:01:01"}));
   }
 
-  protected void assertForRaw(List<List<Object>> expected,
-                              List<List<Object>> actual) {
+  protected void assertForRaw(List<List<Object>> expected, List<List<Object>> actual) {
     for (int i = 0; i < expected.size(); i++) {
       for (int j = 0; j < expected.get(i).size(); j++) {
         assertEquals(String.valueOf(expected.get(i).get(j)), String.valueOf(actual.get(i).get(j)));
@@ -997,8 +951,7 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
     }
   }
 
-  private CProfile getCProfileByName(TProfile tProfile,
-                                     String colName) {
+  private CProfile getCProfileByName(TProfile tProfile, String colName) {
     return tProfile.getCProfiles().stream()
         .filter(f -> f.getColName().equals(colName))
         .findAny().orElseThrow();
@@ -1009,7 +962,6 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
     if (!subDir.mkdir()) {
       throw new RuntimeException("Failed to create subdirectory: " + subDirName);
     }
-
     return subDir;
   }
 

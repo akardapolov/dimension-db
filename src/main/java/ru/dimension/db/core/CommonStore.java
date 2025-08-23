@@ -22,11 +22,11 @@ import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.handler.MetaModelHandler;
 import ru.dimension.db.handler.MetadataHandler;
-import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.MetaModel;
 import ru.dimension.db.model.MetaModel.TableMetadata;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.BlockKeyTail;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
@@ -593,37 +593,24 @@ public abstract class CommonStore implements DStore {
   public List<StackedColumn> getStacked(String tableName,
                                         CProfile cProfile,
                                         GroupFunction groupFunction,
+                                        CompositeFilter compositeFilter,
                                         long begin,
                                         long end)
       throws SqlColMetadataException, BeginEndWrongOrderException {
-
     if (begin > end) {
       throw new BeginEndWrongOrderException("Begin value must be less the end one..");
     }
 
-    return this.groupByOneService.getListStackedColumn(tableName, cProfile, groupFunction, begin, end);
-  }
-
-
-  @Override
-  public List<StackedColumn> getStacked(String tableName,
-                                        CProfile cProfile,
-                                        GroupFunction groupFunction,
-                                        CProfile cProfileFilter,
-                                        String[] filterData,
-                                        CompareFunction compareFunction,
-                                        long begin,
-                                        long end)
-      throws SqlColMetadataException, BeginEndWrongOrderException {
-    return this.groupByOneService.getListStackedColumnFilter(tableName, cProfile, groupFunction, cProfileFilter, filterData, compareFunction, begin, end);
+    return this.groupByOneService.getStacked(tableName, cProfile, groupFunction, compositeFilter, begin, end);
   }
 
   @Override
-  public List<GanttColumnCount> getGantt(String tableName,
-                                         CProfile firstGrpBy,
-                                         CProfile secondGrpBy,
-                                         long begin,
-                                         long end)
+  public List<GanttColumnCount> getGanttCount(String tableName,
+                                              CProfile firstGrpBy,
+                                              CProfile secondGrpBy,
+                                              CompositeFilter compositeFilter,
+                                              long begin,
+                                              long end)
       throws BeginEndWrongOrderException, SqlColMetadataException {
 
     if (firstGrpBy.getCsType().isTimeStamp() | secondGrpBy.getCsType().isTimeStamp()) {
@@ -637,57 +624,27 @@ public abstract class CommonStore implements DStore {
     log.info("First column profile: " + firstGrpBy);
     log.info("Second column profile: " + secondGrpBy);
 
-    return this.groupByService.getListGanttColumn(tableName, firstGrpBy, secondGrpBy, begin, end);
+    return this.groupByService.getGanttCount(tableName, firstGrpBy, secondGrpBy, compositeFilter, begin, end);
   }
 
   @Override
-  public List<GanttColumnCount> getGantt(String tableName,
-                                         CProfile firstGrpBy,
-                                         CProfile secondGrpBy,
-                                         int batchSize,
-                                         long begin,
-                                         long end)
+  public List<GanttColumnCount> getGanttCount(String tableName,
+                                              CProfile firstGrpBy,
+                                              CProfile secondGrpBy,
+                                              CompositeFilter compositeFilter,
+                                              int batchSize,
+                                              long begin,
+                                              long end)
       throws BeginEndWrongOrderException, SqlColMetadataException {
 
-    BType backendType = metaModel.getMetadata().get(tableName).getBackendType();
-
-    if (!BType.BERKLEYDB.equals(backendType)) {
-      throw new RuntimeException("Not supported for backend type: " + backendType);
-    }
-
-    return groupByService.getListGanttColumn(tableName, firstGrpBy, secondGrpBy, batchSize, begin, end);
-  }
-
-  @Override
-  public List<GanttColumnCount> getGantt(String tableName,
-                                         CProfile firstGrpBy,
-                                         CProfile secondGrpBy,
-                                         CProfile cProfileFilter,
-                                         String[] filterData,
-                                         CompareFunction compareFunction,
-                                         long begin,
-                                         long end)
-      throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException {
-
-    if (firstGrpBy.getCsType().isTimeStamp() | secondGrpBy.getCsType().isTimeStamp()) {
-      throw new SqlColMetadataException("Group by not supported for timestamp column..");
-    }
-
-    if (begin > end) {
-      throw new BeginEndWrongOrderException("Begin value must be less the end one..");
-    }
-
-    log.info("First column profile: " + firstGrpBy);
-    log.info("Second column profile: " + secondGrpBy);
-
-    return this.groupByService.getListGanttColumn(tableName, firstGrpBy, secondGrpBy,
-                                                  cProfileFilter, filterData, compareFunction, begin, end);
+    return groupByService.getGanttCount(tableName, firstGrpBy, secondGrpBy, compositeFilter, batchSize, begin, end);
   }
 
   @Override
   public List<GanttColumnSum> getGanttSum(String tableName,
                                           CProfile firstGrpBy,
                                           CProfile secondGrpBy,
+                                          CompositeFilter compositeFilter,
                                           long begin,
                                           long end)
       throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException {
@@ -702,38 +659,14 @@ public abstract class CommonStore implements DStore {
     log.info("First column profile: " + firstGrpBy);
     log.info("Second column profile: " + secondGrpBy);
 
-    return this.groupByService.getListGanttSumColumn(tableName, firstGrpBy, secondGrpBy, begin, end);
-  }
-
-  @Override
-  public List<GanttColumnSum> getGanttSum(String tableName,
-                                          CProfile firstGrpBy,
-                                          CProfile secondGrpBy,
-                                          CProfile cProfileFilter,
-                                          String[] filterData,
-                                          CompareFunction compareFunction,
-                                          long begin,
-                                          long end)
-      throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException {
-    if (firstGrpBy.getCsType().isTimeStamp() | secondGrpBy.getCsType().isTimeStamp()) {
-      throw new SqlColMetadataException("Group by not supported for timestamp column..");
-    }
-
-    if (begin > end) {
-      throw new BeginEndWrongOrderException("Begin value must be less the end one..");
-    }
-
-    log.info("First column profile: " + firstGrpBy);
-    log.info("Second column profile: " + secondGrpBy);
-
-    return this.groupByService.getListGanttSumColumn(tableName, firstGrpBy, secondGrpBy,
-                                                     cProfileFilter, filterData, compareFunction, begin, end);
+    return this.groupByService.getGanttSum(tableName, firstGrpBy, secondGrpBy, compositeFilter, begin, end);
   }
 
   @Override
   public List<String> getDistinct(String tableName,
                                   CProfile cProfile,
                                   OrderBy orderBy,
+                                  CompositeFilter compositeFilter,
                                   int limit,
                                   long begin,
                                   long end)
@@ -742,25 +675,7 @@ public abstract class CommonStore implements DStore {
       throw new BeginEndWrongOrderException("Begin value must be less the end one..");
     }
 
-    return groupByService.getDistinct(tableName, cProfile, orderBy, limit, begin, end);
-  }
-
-  @Override
-  public List<String> getDistinct(String tableName,
-                                  CProfile cProfile,
-                                  OrderBy orderBy,
-                                  int limit,
-                                  long begin,
-                                  long end,
-                                  CProfile cProfileFilter,
-                                  String[] filterData,
-                                  CompareFunction compareFunction)
-      throws BeginEndWrongOrderException {
-    if (begin > end) {
-      throw new BeginEndWrongOrderException("Begin value must be less the end one..");
-    }
-
-    return groupByService.getDistinct(tableName, cProfile, orderBy, limit, begin, end, cProfileFilter, filterData, compareFunction);
+    return groupByService.getDistinct(tableName, cProfile, orderBy, compositeFilter, limit, begin, end);
   }
 
   @Override

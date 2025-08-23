@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.profile.CProfile;
 
 public interface DatabaseDialect {
@@ -32,4 +33,7 @@ public interface DatabaseDialect {
                    PreparedStatement ps,
                    int parameterIndex,
                    long dateTime) throws SQLException;
+
+  String getWhereClassWithCompositeFilter(CProfile tsCProfile,
+                                          CompositeFilter compositeFilter);
 }

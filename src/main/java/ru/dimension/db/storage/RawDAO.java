@@ -4,9 +4,9 @@ import com.sleepycat.persist.EntityCursor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
 import ru.dimension.db.model.output.StackedColumn;
@@ -97,7 +97,9 @@ public interface RawDAO {
                      CachedLastLinkedHashMap<Integer, Integer> rawDataTimeStampMapping,
                      List<List<Long>> rawDataTimestamp);
 
-  void putCompressed(byte tableId, long blockId, Map<CType, Map<Integer, List<Object>>> rawDataByType);
+  void putCompressed(byte tableId,
+                     long blockId,
+                     Map<CType, Map<Integer, List<Object>>> rawDataByType);
 
   byte[] getRawByte(byte tableId,
                     long blockId,
@@ -151,43 +153,23 @@ public interface RawDAO {
                                  CProfile tsCProfile,
                                  CProfile cProfile,
                                  GroupFunction groupFunction,
-                                 CProfile cProfileFilter,
-                                 String[] filterData,
-                                 CompareFunction compareFunction,
+                                 CompositeFilter compositeFilter,
                                  long begin,
                                  long end);
 
-  List<GanttColumnCount> getGantt(String tableName,
-                                  CProfile tsCProfile,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  long begin,
-                                  long end);
-
-  List<GanttColumnCount> getGantt(String tableName,
-                                  CProfile tsCProfile,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  CProfile cProfileFilter,
-                                  String[] filterData,
-                                  CompareFunction compareFunction,
-                                  long begin,
-                                  long end);
+  List<GanttColumnCount> getGanttCount(String tableName,
+                                       CProfile tsCProfile,
+                                       CProfile firstGrpBy,
+                                       CProfile secondGrpBy,
+                                       CompositeFilter compositeFilter,
+                                       long begin,
+                                       long end);
 
   List<GanttColumnSum> getGanttSum(String tableName,
                                    CProfile tsCProfile,
                                    CProfile firstGrpBy,
                                    CProfile secondGrpBy,
-                                   long begin,
-                                   long end);
-
-  List<GanttColumnSum> getGanttSum(String tableName,
-                                   CProfile tsCProfile,
-                                   CProfile firstGrpBy,
-                                   CProfile secondGrpBy,
-                                   CProfile cProfileFilter,
-                                   String[] filterData,
-                                   CompareFunction compareFunction,
+                                   CompositeFilter compositeFilter,
                                    long begin,
                                    long end);
 
@@ -195,20 +177,10 @@ public interface RawDAO {
                            CProfile tsCProfile,
                            CProfile cProfile,
                            OrderBy orderBy,
+                           CompositeFilter compositeFilter,
                            int limit,
                            long begin,
                            long end);
-
-  List<String> getDistinct(String tableName,
-                           CProfile tsCProfile,
-                           CProfile cProfile,
-                           OrderBy orderBy,
-                           int limit,
-                           long begin,
-                           long end,
-                           CProfile cProfileFilter,
-                           String[] filterData,
-                           CompareFunction compareFunction);
 
   BatchResultSet getBatchResultSet(String tableName,
                                    long begin,

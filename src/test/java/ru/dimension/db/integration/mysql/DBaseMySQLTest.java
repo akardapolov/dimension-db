@@ -22,7 +22,6 @@ import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.output.GanttColumnCount;
-import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
@@ -204,7 +203,7 @@ public class DBaseMySQLTest extends AbstractMySQLTest {
 
   private String getStackedColumnKey(String tableName, CProfile cProfile)
       throws BeginEndWrongOrderException, SqlColMetadataException {
-    return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, 0, Long.MAX_VALUE)
+    return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, Long.MAX_VALUE)
         .get(0)
         .getKeyCount()
         .keySet()
@@ -224,6 +223,6 @@ public class DBaseMySQLTest extends AbstractMySQLTest {
 
   private List<GanttColumnCount> getGanttColumn(String tableName, CProfile cProfileFirst, CProfile cProfileSecond)
       throws BeginEndWrongOrderException, SqlColMetadataException, GanttColumnNotSupportedException {
-    return dStore.getGantt(tableName, cProfileFirst, cProfileSecond, 0, Long.MAX_VALUE);
+    return dStore.getGanttCount(tableName, cProfileFirst, cProfileSecond, null, 0, Long.MAX_VALUE);
   }
 }

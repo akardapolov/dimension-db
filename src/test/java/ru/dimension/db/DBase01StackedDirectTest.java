@@ -173,18 +173,18 @@ public class DBase01StackedDirectTest extends AbstractH2Test {
         .findAny()
         .orElseThrow();
 
-    List<String> expectedFirstNameDescAll = List.of("Tan", "Vedel", "Mirko", "Semenov", "Пирогов", "Шаляпин", "Тихий", "Sui", "Petrov", "Ivanov");
-    List<String> expectedFirstNameDescThree = List.of("Tan", "Vedel", "Mirko");
-    List<String> expectedFirstNameAscFour = List.of("Ivanov", "Petrov", "Sui");
+    List<String> expectedFirstNameDescAll = List.of("Шаляпин", "Тихий", "Пирогов", "Vedel", "Tan", "Sui", "Semenov", "Petrov", "Mirko", "Ivanov");
+    List<String> expectedFirstNameDescThree = List.of("Шаляпин", "Тихий", "Пирогов");
+    List<String> expectedFirstNameAscFour = List.of("Ivanov", "Mirko", "Petrov");
 
     List<String> actualFirstNameDescAll =
-        dStore.getDistinct(tProfile.getTableName(), cProfile, OrderBy.DESC, 10, 1, 50);
+        dStore.getDistinct(tProfile.getTableName(), cProfile, OrderBy.DESC, null, 10, 1, 50);
 
     List<String> actualFirstNameDescThree =
-        dStore.getDistinct(tProfile.getTableName(), cProfile, OrderBy.DESC, 3, 1, 50);
+        dStore.getDistinct(tProfile.getTableName(), cProfile, OrderBy.DESC, null, 3, 1, 50);
 
     List<String> actualFirstNameAscFour =
-        dStore.getDistinct(tProfile.getTableName(), cProfile, OrderBy.ASC, 3, 1, 50);
+        dStore.getDistinct(tProfile.getTableName(), cProfile, OrderBy.ASC, null, 3, 1, 50);
 
     assertEquals(expectedFirstNameDescAll, actualFirstNameDescAll);
     assertEquals(expectedFirstNameDescThree, actualFirstNameDescThree);

@@ -9,9 +9,9 @@ import ru.dimension.db.exception.EnumByteExceedException;
 import ru.dimension.db.exception.GanttColumnNotSupportedException;
 import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.exception.TableNameEmptyException;
-import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.BlockKeyTail;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
@@ -157,31 +157,10 @@ public interface DStore {
   /**
    * Get list stacked data by column
    *
-   * @param tableName     - Table name
-   * @param cProfile      - Column profile
-   * @param groupFunction - COUNT, SUM or AVG
-   * @param begin         - start of range
-   * @param end           - end of range
-   * @return {@literal List<StackedColumn>} - list data in StackedColumn
-   * @throws SqlColMetadataException
-   * @throws BeginEndWrongOrderException
-   */
-  List<StackedColumn> getStacked(String tableName,
-                                 CProfile cProfile,
-                                 GroupFunction groupFunction,
-                                 long begin,
-                                 long end)
-      throws SqlColMetadataException, BeginEndWrongOrderException;
-
-  /**
-   * Get list stacked data by column
-   *
    * @param tableName       - Table name
    * @param cProfile        - Column profile
    * @param groupFunction   - COUNT, SUM or AVG
-   * @param cProfileFilter  - Column profile filter
-   * @param filterData      - Array of filter values for column profile filter
-   * @param compareFunction - Compares filterData values using EQUAL or CONTAINS functions
+   * @param compositeFilter - Composite filter with multiple conditions (AND/OR logic)
    * @param begin           - start of range
    * @param end             - end of range
    * @return {@literal List<StackedColumn>} - list data in StackedColumn
@@ -191,9 +170,7 @@ public interface DStore {
   List<StackedColumn> getStacked(String tableName,
                                  CProfile cProfile,
                                  GroupFunction groupFunction,
-                                 CProfile cProfileFilter,
-                                 String[] filterData,
-                                 CompareFunction compareFunction,
+                                 CompositeFilter compositeFilter,
                                  long begin,
                                  long end)
       throws SqlColMetadataException, BeginEndWrongOrderException;
@@ -201,96 +178,54 @@ public interface DStore {
   /**
    * Get list of gantt data in single threading
    *
-   * @param tableName   - Table name
-   * @param firstGrpBy  - Column profile for first level
-   * @param secondGrpBy - Column profile for second level
-   * @param begin       - start of range
-   * @param end         - end of range
+   * @param tableName       - Table name
+   * @param firstGrpBy      - Column profile for first level
+   * @param secondGrpBy     - Column profile for second level
+   * @param compositeFilter - Composite filter with multiple conditions (AND/OR logic)
+   * @param begin           - start of range
+   * @param end             - end of range
    * @return {@literal List<GanttColumn>} - list data in GanttColumn
    * @throws SqlColMetadataException
    * @throws BeginEndWrongOrderException
    */
-  List<GanttColumnCount> getGantt(String tableName,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  long begin,
-                                  long end)
+  List<GanttColumnCount> getGanttCount(String tableName,
+                                       CProfile firstGrpBy,
+                                       CProfile secondGrpBy,
+                                       CompositeFilter compositeFilter,
+                                       long begin,
+                                       long end)
       throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException;
 
   /**
    * Get list of gantt data using multithreading
    *
-   * @param tableName   - Table name
-   * @param firstGrpBy  - Column profile for first level
-   * @param secondGrpBy - Column profile for second level
-   * @param batchSize   - batch size of multithreading
-   * @param begin       - start of range
-   * @param end         - end of range
-   * @return {@literal List<GanttColumn>} - list data in GanttColumn
-   * @throws SqlColMetadataException
-   * @throws BeginEndWrongOrderException
-   */
-  List<GanttColumnCount> getGantt(String tableName,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  int batchSize,
-                                  long begin,
-                                  long end)
-      throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException;
-
-  /**
-   * Get list of gantt data
-   *
    * @param tableName       - Table name
    * @param firstGrpBy      - Column profile for first level
    * @param secondGrpBy     - Column profile for second level
-   * @param cProfileFilter  - Column profile filter
-   * @param filterData      - Array of filter values for column profile filter
-   * @param compareFunction - Compares filterData values using EQUAL or CONTAINS functions
+   * @param compositeFilter - Composite filter with multiple conditions (AND/OR logic)
+   * @param batchSize       - batch size of multithreading
    * @param begin           - start of range
    * @param end             - end of range
    * @return {@literal List<GanttColumn>} - list data in GanttColumn
    * @throws SqlColMetadataException
    * @throws BeginEndWrongOrderException
    */
-  List<GanttColumnCount> getGantt(String tableName,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  CProfile cProfileFilter,
-                                  String[] filterData,
-                                  CompareFunction compareFunction,
-                                  long begin,
-                                  long end)
-  throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException;
+  List<GanttColumnCount> getGanttCount(String tableName,
+                                       CProfile firstGrpBy,
+                                       CProfile secondGrpBy,
+                                       CompositeFilter compositeFilter,
+                                       int batchSize,
+                                       long begin,
+                                       long end)
+      throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException;
 
   /**
    * Get list of one-level gantt data using sum function
    *
-   * @param tableName   - Table name
-   * @param firstGrpBy  - Column profile for first level
-   * @param secondGrpBy - Column profile for second level (ONLY number data type supported)
-   * @param begin       - start of range
-   * @param end         - end of range
-   * @return {@literal List<GanttColumn>} - list data in GanttColumn
-   * @throws SqlColMetadataException
-   * @throws BeginEndWrongOrderException
-   */
-  List<GanttColumnSum> getGanttSum(String tableName,
-                                   CProfile firstGrpBy,
-                                   CProfile secondGrpBy,
-                                   long begin,
-                                   long end)
-      throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException;
-
-  /**
-   * Get list of one-level gantt data using sum function with filter
-   *
    * @param tableName       - Table name
    * @param firstGrpBy      - Column profile for first level
    * @param secondGrpBy     - Column profile for second level (ONLY number data type supported)
-   * @param cProfileFilter  - Column profile filter
-   * @param filterData      - Array of filter values for column profile filter
-   * @param compareFunction - Compares filterData values using EQUAL or CONTAINS functions
+   * @param compositeFilter - Composite filter with multiple conditions (AND/OR logic)
    * @param begin           - start of range
    * @param end             - end of range
    * @return {@literal List<GanttColumn>} - list data in GanttColumn
@@ -300,9 +235,7 @@ public interface DStore {
   List<GanttColumnSum> getGanttSum(String tableName,
                                    CProfile firstGrpBy,
                                    CProfile secondGrpBy,
-                                   CProfile cProfileFilter,
-                                   String[] filterData,
-                                   CompareFunction compareFunction,
+                                   CompositeFilter compositeFilter,
                                    long begin,
                                    long end)
       throws SqlColMetadataException, BeginEndWrongOrderException, GanttColumnNotSupportedException;
@@ -310,47 +243,23 @@ public interface DStore {
   /**
    * Get list of distinct data by column
    *
-   * @param tableName   - Table name
-   * @param cProfile    - Column profile for first level
-   * @param orderBy     - ASC or DESC order
-   * @param limit       - limit data in list
-   * @param begin       - start of range
-   * @param end         - end of range
+   * @param tableName       - Table name
+   * @param cProfile        - Column profile for first level
+   * @param compositeFilter - Composite filter with multiple conditions (AND/OR logic)
+   * @param orderBy         - ASC or DESC order
+   * @param limit           - limit data in list
+   * @param begin           - start of range
+   * @param end             - end of range
    * @return {@literal List<String>} - list distinct data
    * @throws BeginEndWrongOrderException
    */
   List<String> getDistinct(String tableName,
                            CProfile cProfile,
                            OrderBy orderBy,
+                           CompositeFilter compositeFilter,
                            int limit,
                            long begin,
                            long end)
-      throws BeginEndWrongOrderException;
-
-  /**
-   * Get list of distinct data by column
-   *
-   * @param tableName   - Table name
-   * @param cProfile    - Column profile for first level
-   * @param orderBy     - ASC or DESC order
-   * @param limit       - limit data in list
-   * @param begin       - start of range
-   * @param end         - end of range
-   * @param cProfileFilter  - Column profile filter
-   * @param filterData      - Array of filter values for column profile filter
-   * @param compareFunction - Compares filterData values using EQUAL or CONTAINS functions
-   * @return {@literal List<String>} - list distinct data
-   * @throws BeginEndWrongOrderException
-   */
-  List<String> getDistinct(String tableName,
-                           CProfile cProfile,
-                           OrderBy orderBy,
-                           int limit,
-                           long begin,
-                           long end,
-                           CProfile cProfileFilter,
-                           String[] filterData,
-                           CompareFunction compareFunction)
       throws BeginEndWrongOrderException;
 
   /**

@@ -441,18 +441,15 @@ public class StoreLocalServiceImpl extends CommonServiceApi implements StoreLoca
                                     boolean compression,
                                     UStore uStore) {
 
-    uStore.getHistogramDataMap().forEach((colId, hEntry) -> {
-      if (!hEntry.getIndex().isEmpty()) {
+    uStore.getHistogramDataMap().forEach((colId, h) -> {
+      if (h.getSize() > 0) {
         if (compression) {
-          this.histogramDAO.putCompressedKeysValues(tableID, blockId, colId,
-                                                    hEntry.getIndex().stream().mapToInt(Integer::intValue).toArray(),
-                                                    hEntry.getValue().stream().mapToInt(Integer::intValue).toArray());
+          this.histogramDAO.putCompressedKeysValues(tableID, blockId, colId, h.getIndices(), h.getValues());
         } else {
-          this.histogramDAO.put(tableID, blockId, colId, getArrayFromMapHEntry(hEntry));
+          this.histogramDAO.put(tableID, blockId, colId, getArrayFromMapHEntry(h));
         }
       }
     });
-
   }
 
   @Override

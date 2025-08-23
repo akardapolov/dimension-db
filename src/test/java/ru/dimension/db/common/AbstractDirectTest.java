@@ -241,7 +241,7 @@ public abstract class AbstractDirectTest {
   public List<GanttColumnCount> getListGanttColumnTwoLevelGrouping(DStore dStore, TProfile tProfile,
                                                                    CProfile firstLevelGroupBy, CProfile secondLevelGroupBy, long begin, long end)
       throws BeginEndWrongOrderException, GanttColumnNotSupportedException, SqlColMetadataException {
-    return dStore.getGantt(tProfile.getTableName(), firstLevelGroupBy, secondLevelGroupBy, begin, end);
+    return dStore.getGanttCount(tProfile.getTableName(), firstLevelGroupBy, secondLevelGroupBy, null, begin, end);
   }
 
   protected void compareKeySetForMapDataType(Map<String, Integer> expectedMap, List<StackedColumn> listMapActual) {
@@ -258,7 +258,7 @@ public abstract class AbstractDirectTest {
                                                         List<CProfile> cProfiles, String colName, GroupFunction groupFunction, long begin, long end)
       throws BeginEndWrongOrderException, SqlColMetadataException {
     return dStore.getStacked(tProfile.getTableName(), cProfiles.stream()
-        .filter(k -> k.getColName().equalsIgnoreCase(colName)).findAny().orElseThrow(), groupFunction, begin, end);
+        .filter(k -> k.getColName().equalsIgnoreCase(colName)).findAny().orElseThrow(), groupFunction, null, begin, end);
   }
 
   public Object findListStackedKey(List<StackedColumn> list, String filter) {
