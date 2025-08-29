@@ -875,26 +875,26 @@ Table 25. Data for 2016
 
 Table 26. Load profiles
 
-| # | TType       | IType  | AType          | Compression | Load (min) | Size (GB) |
-|--:|-------------|--------|----------------|-------------|------------|-----------|
-| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 31,47      | 9,225     |
-| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 27,12      | 11,396    |
-| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 27,98      | 12,060    |
-| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 26,82      | 11,604    |
+| # | TType       | IType  | AType          | Compression | Load (min)    | Size (GB) |
+|--:|-------------|--------|----------------|-------------|---------------|-----------|
+| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 30 min 16 sec | 9,270     |
+| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 32 min 55 sec | 11,246    |
+| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 27 min 48 sec | 11,273    |
+| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 32 min 37 sec | 11,901    |
 
 Table 27. Performance tests for gantt API
 
 | № | Test name        | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | PASS_ONCE <br/>Execution time <br/>(single/2-thread) (sec) | PASS_EACH <br/>Execution time <br/>(single/2-thread) (sec) |
 |---|------------------|----------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|
-| 1 | getGanttRawRaw   | 13,4 / 10,6                                              | 17,8 / 11,1                                              | 18,9 / 11,0                                                | 16,1 / 10,4                                                |
-| 2 | getGanttEnumEnum | 4,4 / 2,3                                                | 11,9 / 8,3                                               | 11,5 / 7,7                                                 | 11,4 / 8,0                                                 |
-| 3 | getGanttHistHist | 2,2 / 1,2                                                | 14,6 / 10,3                                              | 14,1 / 10,2                                                | 13,5 / 9,8                                                 |
-| 4 | getGanttHistRaw  | 10,1 / 7,8                                               | 13,6 / 9,4                                               | 12,8 / 9,3                                                 | 12,2 / 9,1                                                 |
-| 5 | getGanttHistEnum | 3,5 / 2,3                                                | 15,5 / 10,4                                              | 14,2 / 9,9                                                 | 14,1 / 10,0                                                |
-| 6 | getGanttEnumRaw  | 9,4 / 7,1                                                | 18,3 / 11,8                                              | 15,5 / 11,1                                                | 15,4 / 11,5                                                |
-| 7 | getGanttEnumHist | 4,2 / 2,6                                                | 16,9 / 12,5                                              | 16,5 / 12,2                                                | 16,4 / 12,3                                                |
-| 8 | getGanttRawHist  | 11,0 / 8,1                                               | 16,3 / 11,9                                              | 15,9 / 11,4                                                | 15,7 / 13,2                                                |
-| 9 | getGanttRawEnum  | 8,9 / 6,5                                                | 15,7 / 12,1                                              | 15,5 / 10,8                                                | 16,1 / 11,5                                                |
+| 1 | getGanttRawRaw   | 12,2 / 7,4                                               | 18,4 / 8,8                                               | 18,2 / 8,9                                                 | 15,8 / 8,9                                                 |
+| 2 | getGanttEnumEnum | 4,9 / 2,6                                                | 11,0 / 6,8                                               | 11,8 / 7,3                                                 | 11,5 / 7,2                                                 |
+| 3 | getGanttHistHist | 2,6 / 1,0                                                | 13,1 / 8,6                                               | 13,6 / 8,6                                                 | 15,1 / 8,5                                                 |
+| 4 | getGanttHistRaw  | 7,9 / 5,5                                                | 11,2 / 7,5                                               | 12,4 / 7,8                                                 | 10,7 / 7,8                                                 |
+| 5 | getGanttHistEnum | 5,0 / 2,6                                                | 12,5 / 8,3                                               | 13,7 / 8,6                                                 | 13,1 / 8,3                                                 |
+| 6 | getGanttEnumRaw  | 9,4 / 7,1                                                | 13,6 / 9,4                                               | 14,0 / 9,5                                                 | 13,7 / 9,7                                                 |
+| 7 | getGanttEnumHist | 4,9 / 2,8                                                | 17,5 / 10,3                                              | 15,4 / 10,2                                                | 14,4 / 10,2                                                |
+| 8 | getGanttRawHist  | 8,5 / 5,4                                                | 12,8 / 10,3                                              | 14,3 / 9,9                                                 | 13,3 / 9,6                                                 |
+| 9 | getGanttRawEnum  | 7,7 / 5,4                                                | 13,1 / 8,9                                               | 14,5 / 8,9                                                 | 13,9 / 8,9                                                 |
 
 Table 28. Queries Table
 

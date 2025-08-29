@@ -47,6 +47,8 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
   private final RawDAO rawDAO;
   private final EnumDAO enumDAO;
 
+  private final GroupByNoFilterServiceImpl groupByNoFilterService;
+
   public GroupByServiceImpl(MetaModelApi metaModelApi,
                             Converter converter,
                             HistogramDAO histogramDAO,
@@ -57,6 +59,8 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     this.histogramDAO = histogramDAO;
     this.rawDAO = rawDAO;
     this.enumDAO = enumDAO;
+
+    this.groupByNoFilterService = new GroupByNoFilterServiceImpl(metaModelApi, converter, histogramDAO, rawDAO, enumDAO);
   }
 
   public static List<GanttColumnCount> mergeGanttColumnsByKey(List<GanttTask> tasks) {
@@ -87,6 +91,11 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
       CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
       return rawDAO.getGanttCount(tableName, tsProfile, firstGrpBy, secondGrpBy, compositeFilter, begin, end);
     }
+
+    if (isEmptyFilter(compositeFilter)) {
+      return groupByNoFilterService.getGanttCount(tableName, firstGrpBy, secondGrpBy, compositeFilter, begin, end);
+    }
+
     return getListGanttColumnIndexLocal(tableName, firstGrpBy, secondGrpBy, compositeFilter, begin, end);
   }
 
@@ -181,6 +190,10 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                               int batchSize,
                                               long begin,
                                               long end) throws SqlColMetadataException, BeginEndWrongOrderException {
+    if (isEmptyFilter(compositeFilter)) {
+      return groupByNoFilterService.getGanttCount(tableName, firstGrpBy, secondGrpBy, compositeFilter, batchSize, begin, end);
+    }
+
     if (firstGrpBy.getCsType().isTimeStamp() | secondGrpBy.getCsType().isTimeStamp()) {
       throw new SqlColMetadataException("Group by not supported for timestamp column..");
     }
@@ -225,6 +238,10 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                           CompositeFilter compositeFilter,
                                           long begin,
                                           long end) throws SqlColMetadataException {
+    if (isEmptyFilter(compositeFilter)) {
+      return groupByNoFilterService.getGanttSum(tableName, firstGrpBy, secondGrpBy, null, begin, end);
+    }
+
     CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
     if (!tsProfile.getCsType().isTimeStamp()) {
       throw new SqlColMetadataException("Timestamp column not defined");
@@ -314,6 +331,10 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                   int limit,
                                   long begin,
                                   long end) {
+    if (isEmptyFilter(compositeFilter)) {
+      return groupByNoFilterService.getDistinct(tableName, cProfile, orderBy, null, limit, begin, end);
+    }
+
     BType bType = metaModelApi.getBackendType(tableName);
     CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
     if (tsProfile.getColId() == cProfile.getColId()) {

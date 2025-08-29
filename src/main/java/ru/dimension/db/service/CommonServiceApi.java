@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import ru.dimension.db.metadata.DataType;
 import ru.dimension.db.model.CompareFunction;
+import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
@@ -46,6 +48,12 @@ public abstract class CommonServiceApi {
   public Predicate<CProfile> isFloat = Predicate.not(f -> Mapper.isCType(f) != CType.FLOAT);
   public Predicate<CProfile> isDouble = Predicate.not(f -> Mapper.isCType(f) != CType.DOUBLE);
   public Predicate<CProfile> isString = Predicate.not(f -> Mapper.isCType(f) != CType.STRING);
+
+  public boolean isEmptyFilter(CompositeFilter compositeFilter) {
+    return compositeFilter == null
+        || compositeFilter.getConditions().isEmpty()
+        || compositeFilter.getConditions().stream().allMatch(e -> Arrays.stream(e.getFilterData()).allMatch(String::isEmpty));
+  }
 
   public static <T> List<List<T>> transpose(List<List<T>> table) {
     if (table.isEmpty()) {
@@ -532,7 +540,7 @@ public abstract class CommonServiceApi {
                                    TimeZone.getDefault().toZoneId());
   }
 
-  protected int[] getHistogramUnPack(long[] timestamps, int[][] histograms) {
+  /*protected int[] getHistogramUnPack(long[] timestamps, int[][] histograms) {
     int n = timestamps.length;
     if (n == 0) return new int[0];
     int[] indices = histograms[0];
@@ -549,6 +557,34 @@ public abstract class CommonServiceApi {
       unpacked[i] = values[idx];
     }
     return unpacked;
+  }*/
+  protected int[] getHistogramUnPack(long[] timestamps,
+                                     int[][] histograms) {
+    int n = timestamps.length;
+    if (n == 0) {
+      return new int[0];
+    }
+
+    int[] indices = histograms[0];
+    int[] values = histograms[1];
+    int[] histogramsUnPack = new int[n];
+
+    if (indices.length == 0) return histogramsUnPack;
+
+    int currentValue = values[0];
+    int nextIndex = 0;
+    int currentBucketEnd = (indices.length > 1) ? indices[1] : n;
+
+    for (int i = 0; i < n; i++) {
+      if (i == currentBucketEnd && nextIndex < indices.length - 1) {
+        nextIndex++;
+        currentValue = values[nextIndex];
+        currentBucketEnd = (nextIndex < indices.length - 1) ? indices[nextIndex + 1] : n;
+      }
+      histogramsUnPack[i] = currentValue;
+    }
+
+    return histogramsUnPack;
   }
 
   protected List<GanttColumnCount> handleMap(CProfile firstLevelGroupBy,
