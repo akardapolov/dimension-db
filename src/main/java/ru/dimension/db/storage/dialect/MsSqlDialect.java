@@ -132,14 +132,19 @@ public class MsSqlDialect implements DatabaseDialect {
 
     String columnName = filterProfile.getColName().toLowerCase();
     StringBuilder conditionBuilder = new StringBuilder();
+    boolean isNumeric = isNumericType(filterProfile);
 
     for (String value : filterData) {
       if (conditionBuilder.length() > 0) {
         conditionBuilder.append(" OR ");
       }
       if (value == null || value.trim().isEmpty()) {
-        conditionBuilder.append("(").append(columnName).append(" IS NULL OR ")
-            .append(columnName).append(" = '')");
+        if (isNumeric) {
+          conditionBuilder.append(columnName).append(" IS NULL");
+        } else {
+          conditionBuilder.append("(").append(columnName).append(" IS NULL OR ")
+              .append(columnName).append(" = '')");
+        }
       } else {
         String escapedValue = value.trim().replace("'", "''");
         if (compareFunction == CompareFunction.CONTAIN) {
@@ -161,11 +166,16 @@ public class MsSqlDialect implements DatabaseDialect {
 
     String columnName = cProfileFilter.getColName();
     StringBuilder filterClause = new StringBuilder();
+    boolean isNumeric = isNumericType(cProfileFilter);
 
     for (String filterValue : filterData) {
       String condition;
       if (filterValue == null || filterValue.trim().isEmpty()) {
-        condition = columnName + " IS NULL OR " + columnName + " = ''";
+        if (isNumeric) {
+          condition = columnName + " IS NULL";
+        } else {
+          condition = columnName + " IS NULL OR " + columnName + " = ''";
+        }
       } else {
         String formattedValue = filterValue.trim();
         if (CompareFunction.CONTAIN.equals(compareFunction)) {

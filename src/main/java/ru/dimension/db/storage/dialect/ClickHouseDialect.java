@@ -139,14 +139,19 @@ public class ClickHouseDialect implements DatabaseDialect {
 
     String columnName = filterProfile.getColName().toLowerCase();
     StringBuilder conditionBuilder = new StringBuilder();
+    boolean isNumeric = isNumericType(filterProfile);
 
     for (String value : filterData) {
       if (conditionBuilder.length() > 0) {
         conditionBuilder.append(" OR ");
       }
       if (value == null || value.trim().isEmpty()) {
-        conditionBuilder.append("(").append(columnName).append(" IS NULL OR ")
-            .append(columnName).append(" = '')");
+        if (isNumeric) {
+          conditionBuilder.append(columnName).append(" IS NULL");
+        } else {
+          conditionBuilder.append("(").append(columnName).append(" IS NULL OR ")
+              .append(columnName).append(" = '')");
+        }
       } else {
         String escapedValue = value.trim().replace("'", "''").replace("\\", "\\\\");
         if (compareFunction == CompareFunction.CONTAIN) {
@@ -168,6 +173,7 @@ public class ClickHouseDialect implements DatabaseDialect {
 
     String columnName = cProfileFilter.getColName().toLowerCase();
     String operator;
+    boolean isNumeric = isNumericType(cProfileFilter);
 
     switch (compareFunction) {
       case EQUAL -> operator = "=";
@@ -179,7 +185,6 @@ public class ClickHouseDialect implements DatabaseDialect {
 
     StringBuilder filterClause = new StringBuilder();
     for (String filterValue : filterData) {
-
       String condition = "";
 
       if (filterValue == null || filterValue.isBlank()) {
@@ -188,15 +193,17 @@ public class ClickHouseDialect implements DatabaseDialect {
           Map<String, Integer> enumMap = enumParser(cProfileFilter.getColDbTypeName());
           Integer enumValue = enumMap.get(formattedValue.toLowerCase());
           if (enumValue == null) {
-            continue; // Or throw new IllegalArgumentException("Invalid enum value: " + formattedValue);
+            continue;
           }
           formattedValue = String.valueOf(enumValue);
           operator = "=";
           condition = columnName + " " + operator + " '" + formattedValue.replace("\\", "\\\\").replace("'", "\\'") + "'";
         } else {
-          if (filterValue == null || filterValue.isEmpty()) {
+          if (isNumeric) {
+            condition = columnName + " IS NULL";
+          } else if (filterValue == null || filterValue.isEmpty()) {
             condition = columnName + " IS NULL OR " + columnName + " = ''";
-          } else if (filterValue.isBlank()) { // white spaces
+          } else if (filterValue.isBlank()) {
             condition = columnName + " = '" + formattedValue + "'";
           }
         }
@@ -206,7 +213,7 @@ public class ClickHouseDialect implements DatabaseDialect {
           Map<String, Integer> enumMap = enumParser(cProfileFilter.getColDbTypeName());
           Integer enumValue = enumMap.get(formattedValue.toLowerCase());
           if (enumValue == null) {
-            continue; // Or throw new IllegalArgumentException("Invalid enum value: " + formattedValue);
+            continue;
           }
           formattedValue = String.valueOf(enumValue);
           operator = "=";

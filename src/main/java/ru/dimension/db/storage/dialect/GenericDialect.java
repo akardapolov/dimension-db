@@ -93,11 +93,16 @@ public class GenericDialect implements DatabaseDialect {
 
     String columnName = cProfileFilter.getColName();
     StringBuilder filterClause = new StringBuilder();
+    boolean isNumeric = isNumericType(cProfileFilter);
 
     for (String filterValue : filterData) {
       String condition;
       if (filterValue == null || filterValue.trim().isEmpty()) {
-        condition = columnName + " IS NULL OR " + columnName + " = ''";
+        if (isNumeric) {
+          condition = columnName + " IS NULL";
+        } else {
+          condition = columnName + " IS NULL OR " + columnName + " = ''";
+        }
       } else {
         String formattedValue = filterValue.trim();
         if (CompareFunction.CONTAIN.equals(compareFunction)) {

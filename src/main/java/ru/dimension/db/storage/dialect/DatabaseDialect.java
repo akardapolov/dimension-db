@@ -36,4 +36,14 @@ public interface DatabaseDialect {
 
   String getWhereClassWithCompositeFilter(CProfile tsCProfile,
                                           CompositeFilter compositeFilter);
+
+  default boolean isNumericType(CProfile cProfile) {
+    String typeName = cProfile.getColDbTypeName().toUpperCase();
+    return typeName.contains("INT") ||
+        typeName.contains("NUMERIC") ||
+        typeName.contains("DECIMAL") ||
+        typeName.contains("FLOAT") ||
+        typeName.contains("DOUBLE") ||
+        typeName.contains("REAL");
+  }
 }
