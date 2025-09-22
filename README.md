@@ -83,7 +83,7 @@ The library can be used as a lightweight analytical database for backend data pr
 [Return to Contents](#contents)
 
 ## Minimum technical requirements
-**Dimension DB** is compatible with Java 21+ and comes with a small set of dependencies.
+**Dimension DB** is compatible with Java 24+ and comes with a small set of dependencies.
 
 ### Hardware requirements
 
@@ -101,7 +101,7 @@ Table 2. Software requirements
 
 | Software | Requirements             |
 |:---------|:-------------------------|
-| Java     | Java version 21+         |
+| Java     | Java version 24+         |
 | Maven    | Not lower than version 3 |
 | Git      | Latest current version   |
 
@@ -118,7 +118,7 @@ Table 3. Operating system requirements
 ### Getting started with the project
 
 #### Building the project
-Make sure you have JDK 21+, Maven and the latest Git
+Make sure you have JDK 24+, Maven and the latest Git
   ```shell
     java -version
     mvn -version
