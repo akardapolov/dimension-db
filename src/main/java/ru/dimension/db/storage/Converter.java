@@ -266,6 +266,8 @@ public class Converter {
   public double convertIntFromDoubleLong(int objIndex,
                                          CProfile cProfile) {
     return switch (cProfile.getCsType().getDType()) {
+      case UINT8, UINT16, INT16, INT2, INT4, INT8, INT32,
+           NUMBER, INTEGER, SMALLINT, INT, TINYINT, BIT, TIME, TIMETZ -> objIndex;
       case FLOAT64, DECIMAL, FLOAT4, REAL, FLOAT8, FLOAT32, FLOAT, NUMERIC, MONEY, SMALLMONEY, DOUBLE ->
           dimensionDAO.getDoubleById(objIndex);
       case LONG, OID, UINT32, UINT64, SERIAL, SMALLSERIAL, BIGSERIAL, BIGINT, INT64, INT128, INT256 ->

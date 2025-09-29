@@ -144,7 +144,15 @@ public class DBaseCHQueryStackedTest implements ClickHouse {
     long begin = getUnixTimestampNoOffset(LocalDateTime.of(2016, 1, 1, 0, 0, 0, 0));
     long end = getUnixTimestampNoOffset(LocalDateTime.of(2016, 12, 31, 23, 59, 59, 999999999));
 
-    List<StackedColumn> actual = dStore.getStacked(tProfile.getTableName(), cProfile, GroupFunction.COUNT, null, begin, end);
+    long first = dStore.getFirst(tProfile.getTableName(), Long.MIN_VALUE, Long.MAX_VALUE);
+    long last = dStore.getLast(tProfile.getTableName(), Long.MIN_VALUE, Long.MAX_VALUE);
+
+    List<StackedColumn> actual = dStore.getStacked(tProfile.getTableName(),
+                                                   cProfile,
+                                                   GroupFunction.COUNT,
+                                                   null,
+                                                   first,
+                                                   last);
 
     Map<String, IntSummaryStatistics> batchData = actual.stream()
         .toList()

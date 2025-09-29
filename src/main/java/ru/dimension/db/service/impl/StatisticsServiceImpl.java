@@ -1,7 +1,6 @@
 package ru.dimension.db.service.impl;
 
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
 import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.service.StatisticsService;
@@ -10,7 +9,7 @@ public class StatisticsServiceImpl implements StatisticsService {
   private static final int HISTORY_SIZE = 5;
 
   // tableId -> colId -> stack of storage types (limited to HISTORY_SIZE)
-  private final Map<Byte, Map<Integer, CircularBuffer<StorageType>>> stats = new HashMap<>();
+  private final Map<Byte, Map<Integer, STypeCircularBuffer>> stats = new HashMap<>();
   private final Map<Byte, Integer> lastAnalyzedColIdMap = new HashMap<>();
   private final Map<Byte, Boolean> fullPassDoneMap = new HashMap<>();
 
@@ -28,19 +27,19 @@ public class StatisticsServiceImpl implements StatisticsService {
   public SType getLastSType(byte tableId, int colId, boolean isTimestamp) {
     if (isTimestamp) return SType.RAW;
 
-    Map<Integer, CircularBuffer<StorageType>> tableStats = stats.get(tableId);
+    Map<Integer, STypeCircularBuffer> tableStats = stats.get(tableId);
     if (tableStats == null) return SType.RAW;
 
-    CircularBuffer<StorageType> history = tableStats.get(colId);
+    STypeCircularBuffer history = tableStats.get(colId);
 
     if (history == null || history.isEmpty()) {
       stats.get(tableId)
-          .computeIfAbsent(colId, k -> new CircularBuffer<>(HISTORY_SIZE))
-          .add(new StorageType(SType.RAW));
+          .computeIfAbsent(colId, k -> new STypeCircularBuffer(HISTORY_SIZE))
+          .add(SType.RAW);
       return SType.RAW;
     }
 
-    return history.getLastAdded().sType();
+    return history.getLastAdded();
   }
   public Integer getLastAnalyzedColId(byte tableId) {
     return lastAnalyzedColIdMap.get(tableId);
@@ -52,8 +51,8 @@ public class StatisticsServiceImpl implements StatisticsService {
 
   public void updateSType(byte tableId, int colId, SType sType) {
     stats.computeIfAbsent(tableId, k -> new HashMap<>())
-        .computeIfAbsent(colId, k -> new CircularBuffer<>(HISTORY_SIZE))
-        .add(new StorageType(sType));
+        .computeIfAbsent(colId, k -> new STypeCircularBuffer(HISTORY_SIZE))
+        .add(sType);
   }
 
   public boolean isFullPassDone(byte tableId) {
@@ -64,29 +63,40 @@ public class StatisticsServiceImpl implements StatisticsService {
     fullPassDoneMap.put(tableId, true);
   }
 
-  private record StorageType(SType sType) {}
+  private static class STypeCircularBuffer {
+    private final byte[] buffer;
+    private int head;
+    private int tail;
+    private int count;
+    private final int capacity;
 
-  private static class CircularBuffer<T> {
-    private final LinkedList<T> stack = new LinkedList<>();
-    private final int maxSize;
-
-    CircularBuffer(int size) {
-      this.maxSize = size;
+    STypeCircularBuffer(int capacity) {
+      this.capacity = capacity;
+      this.buffer = new byte[capacity];
+      this.head = 0;
+      this.tail = 0;
+      this.count = 0;
     }
 
-    void add(T item) {
-      stack.addLast(item);
-      if (stack.size() > maxSize) {
-        stack.removeFirst();
+    void add(SType sType) {
+      buffer[tail] = sType.getKey();
+      tail = (tail + 1) % capacity;
+
+      if (count < capacity) {
+        count++;
+      } else {
+        head = (head + 1) % capacity;
       }
     }
 
-    boolean isEmpty() {
-      return stack.isEmpty();
+    SType getLastAdded() {
+      if (count == 0) throw new IllegalStateException("Buffer is empty");
+      int lastIndex = (tail - 1 + capacity) % capacity;
+      return SType.values()[buffer[lastIndex] - 1];
     }
 
-    T getLastAdded() {
-      return stack.getLast();
+    boolean isEmpty() {
+      return count == 0;
     }
   }
 }

@@ -1,23 +1,16 @@
 package ru.dimension.db.model.profile.cstype;
 
+import lombok.Getter;
+
+@Getter
 public enum SType {
-  RAW(1, "Raw data"),
-  HISTOGRAM(2, "Histograms value"),
-  ENUM(3, "Predefined list of constants");
+  RAW((byte) 0x01),        // 1
+  HISTOGRAM((byte) 0x02),  // 2
+  ENUM((byte) 0x03);       // 3
 
   private final byte key;
-  private final String value;
 
-  SType(int key, String value) {
-    this.key = (byte) key;
-    this.value = value;
-  }
-
-  public byte getKey() {
-    return key;
-  }
-
-  public String getValue() {
-    return value;
+  SType(byte key) {
+    this.key = key;
   }
 }

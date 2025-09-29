@@ -34,7 +34,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @Log4j2
 @TestInstance(Lifecycle.PER_CLASS)
 @Disabled
-public class DBaseCHQueryGanttTest implements ClickHouse {
+public class DBaseCHQueryGanttCountTest implements ClickHouse {
   private static final StringBuilder markdownTable = new StringBuilder();
   private static final StringBuilder markdownQueryTable = new StringBuilder();
   private int testCounter = 1;
@@ -578,7 +578,7 @@ public class DBaseCHQueryGanttTest implements ClickHouse {
     // Parallel execution (4 threads)
     Instant startParallel = Instant.now();
     try {
-      actualParallel = getGanttDataActual("PICKUP_CDELIGIBIL", "CAB_TYPE", 2);
+      actualParallel = getGanttDataActual("PICKUP_CDELIGIBIL", "CAB_TYPE", batchSize);
     } finally {
       Instant endParallel = Instant.now();
       executionTimeParallel = Duration.between(startParallel, endParallel).toMillis() / 1000.0;

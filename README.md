@@ -152,9 +152,10 @@ To build and install the **Dimension DB** jar file into your local Maven reposit
   ```
 
 Notes:
-- Running project build includes execution of unit tests, which take about 7-8 minutes.
-- This is mainly the execution time of tests from the **Dimension DBRunnerTest** class, in which various configurations for 45 tests are launched.
-- Information on tests from **Dimension DBRunnerTest** is presented in the table:
+- Building the project may include running unit tests from **Dimension DBRunnerTest** and **DBaseRunnerUseCasesTest**, which take approximately 25 minutes to complete.
+- The majority of this time is consumed by the **DimensionDBRunnerTest** class, which runs 45 tests with various configurations.
+- Both **Dimension DBRunnerTest** and **DBaseRunnerUseCasesTest** are disabled by default using the **@Disabled** annotation.
+- The **DimensionDBRunnerTest** class contains tests with different permutation levels, as detailed below:
 
 Table 4. Parameters and statistics for **Dimension DBRunnerTest** tests
 
@@ -164,11 +165,16 @@ Table 4. Parameters and statistics for **Dimension DBRunnerTest** tests
 | testPermutationPartial | PARTIAL          | 1 944                    | 87 480      | ~ 2 minutes    |
 | testPermutationAll     | ALL              | 26 244                   | 1 180 980   | ~ 25 minutes   |
 
-- To reduce the time of building and installing the project, you can disable the launch of all tests from this class using the **-Dtest=!Dimension DBRunnerTest** switch or use the **@Disabled** annotation for a class or method
+- To reduce build time by skipping these tests, use the following Maven commands:
 ```shell
-mvn clean test -Dtest=!DBaseRunnerTest
-mvn clean package -Dtest=!DBaseRunnerTest
-mvn clean install -Dtest=!DBaseRunnerTest
+# Skip DimensionDBRunnerTest during testing phase
+mvn clean test -Dtest=!DimensionDBRunnerTest
+
+# Skip during packaging
+mvn clean package -Dtest=!DimensionDBRunnerTest
+
+# Skip during installation
+mvn clean install -Dtest=!DimensionDBRunnerTest
 ```
 
 [Return to Contents](#contents)
@@ -877,24 +883,24 @@ Table 26. Load profiles
 
 | # | TType       | IType  | AType          | Compression | Load (min)    | Size (GB) |
 |--:|-------------|--------|----------------|-------------|---------------|-----------|
-| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 30 min 16 sec | 9,270     |
-| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 32 min 55 sec | 11,246    |
-| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 27 min 48 sec | 11,273    |
-| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 32 min 37 sec | 11,901    |
+| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 26 min 3 sec  | 9,175     |
+| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 22 min 42 sec | 11,801    |
+| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 21 min 46 sec | 11,968    |
+| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 22 min 59 sec | 11,924    |
 
 Table 27. Performance tests for gantt API
 
 | № | Test name        | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | PASS_ONCE <br/>Execution time <br/>(single/2-thread) (sec) | PASS_EACH <br/>Execution time <br/>(single/2-thread) (sec) |
 |---|------------------|----------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|
-| 1 | getGanttRawRaw   | 12,2 / 7,4                                               | 18,4 / 8,8                                               | 18,2 / 8,9                                                 | 15,8 / 8,9                                                 |
-| 2 | getGanttEnumEnum | 4,9 / 2,6                                                | 11,0 / 6,8                                               | 11,8 / 7,3                                                 | 11,5 / 7,2                                                 |
-| 3 | getGanttHistHist | 2,6 / 1,0                                                | 13,1 / 8,6                                               | 13,6 / 8,6                                                 | 15,1 / 8,5                                                 |
-| 4 | getGanttHistRaw  | 7,9 / 5,5                                                | 11,2 / 7,5                                               | 12,4 / 7,8                                                 | 10,7 / 7,8                                                 |
-| 5 | getGanttHistEnum | 5,0 / 2,6                                                | 12,5 / 8,3                                               | 13,7 / 8,6                                                 | 13,1 / 8,3                                                 |
-| 6 | getGanttEnumRaw  | 9,4 / 7,1                                                | 13,6 / 9,4                                               | 14,0 / 9,5                                                 | 13,7 / 9,7                                                 |
-| 7 | getGanttEnumHist | 4,9 / 2,8                                                | 17,5 / 10,3                                              | 15,4 / 10,2                                                | 14,4 / 10,2                                                |
-| 8 | getGanttRawHist  | 8,5 / 5,4                                                | 12,8 / 10,3                                              | 14,3 / 9,9                                                 | 13,3 / 9,6                                                 |
-| 9 | getGanttRawEnum  | 7,7 / 5,4                                                | 13,1 / 8,9                                               | 14,5 / 8,9                                                 | 13,9 / 8,9                                                 |
+| 1 | getGanttRawRaw   | 13,6 / 8,5                                               | 13,7 / 10,7                                              | 13,1 / 8,5                                                 | 14,4 / 8,8                                                 |
+| 2 | getGanttEnumEnum | 4,3 / 2,4                                                | 10,4 / 7,9                                               | 9,5 / 6,7                                                  | 10,1 / 7,2                                                 |
+| 3 | getGanttHistHist | 3,4 / 1,8                                                | 13,1 / 9,1                                               | 11,5 / 8,0                                                 | 12,2 / 9,2                                                 |
+| 4 | getGanttHistRaw  | 9,0 / 6,3                                                | 11,1 / 8,3                                               | 10,0 / 7,7                                                 | 10,9 / 7,4                                                 |
+| 5 | getGanttHistEnum | 3,5 / 1,9                                                | 13,4 / 8,4                                               | 11,6 / 8,1                                                 | 12,1 / 7,9                                                 |
+| 6 | getGanttEnumRaw  | 7,7 / 5,2                                                | 12,9 / 9,8                                               | 12,5 / 9,8                                                 | 13,5 / 9,9                                                 |
+| 7 | getGanttEnumHist | 3,6 / 1,9                                                | 14,1 / 10,4                                              | 14,2 / 10,3                                                | 14,0 / 11,2                                                |
+| 8 | getGanttRawHist  | 9,3 / 6,6                                                | 12,9 / 9,4                                               | 12,8 / 9,6                                                 | 13,1 / 9,4                                                 |
+| 9 | getGanttRawEnum  | 10,5 / 7,2                                               | 12,7 / 9,2                                               | 12,6 / 9,0                                                 | 13,4 / 8,9                                                 |
 
 Table 28. Queries Table
 

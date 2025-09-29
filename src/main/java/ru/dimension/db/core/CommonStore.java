@@ -38,10 +38,7 @@ import ru.dimension.db.model.profile.cstype.CSType;
 import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.TType;
-import ru.dimension.db.service.EnumService;
-import ru.dimension.db.service.GroupByOneService;
 import ru.dimension.db.service.GroupByService;
-import ru.dimension.db.service.HistogramService;
 import ru.dimension.db.service.RawService;
 import ru.dimension.db.service.StatisticsService;
 import ru.dimension.db.service.StoreService;
@@ -69,11 +66,8 @@ public abstract class CommonStore implements DStore {
   protected EnumDAO enumDAO;
 
   protected GroupByService groupByService;
-  protected GroupByOneService groupByOneService;
-  protected HistogramService histogramsService;
   protected RawService rawService;
   protected StoreService storeService;
-  protected EnumService enumService;
 
   protected Converter converter;
   protected StatisticsService statisticsService;
@@ -601,7 +595,7 @@ public abstract class CommonStore implements DStore {
       throw new BeginEndWrongOrderException("Begin value must be less the end one..");
     }
 
-    return this.groupByOneService.getStacked(tableName, cProfile, groupFunction, compositeFilter, begin, end);
+    return this.groupByService.getStacked(tableName, cProfile, groupFunction, compositeFilter, begin, end);
   }
 
   @Override

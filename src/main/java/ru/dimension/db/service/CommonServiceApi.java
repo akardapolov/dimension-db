@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.stream.IntStream;
 import ru.dimension.db.metadata.DataType;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
@@ -540,24 +542,6 @@ public abstract class CommonServiceApi {
                                    TimeZone.getDefault().toZoneId());
   }
 
-  /*protected int[] getHistogramUnPack(long[] timestamps, int[][] histograms) {
-    int n = timestamps.length;
-    if (n == 0) return new int[0];
-    int[] indices = histograms[0];
-    int[] values = histograms[1];
-    int[] unpacked = new int[n];
-    if (indices.length == 0) return unpacked;
-
-    int idx = 0, bucketEnd = (indices.length > 1) ? indices[1] : n;
-    for (int i = 0; i < n; i++) {
-      if (i == bucketEnd && idx < indices.length - 1) {
-        idx++;
-        bucketEnd = (idx < indices.length - 1) ? indices[idx + 1] : n;
-      }
-      unpacked[i] = values[idx];
-    }
-    return unpacked;
-  }*/
   protected int[] getHistogramUnPack(long[] timestamps,
                                      int[][] histograms) {
     int n = timestamps.length;
@@ -567,24 +551,24 @@ public abstract class CommonServiceApi {
 
     int[] indices = histograms[0];
     int[] values = histograms[1];
-    int[] histogramsUnPack = new int[n];
+    int[] unpacked = new int[n];
 
-    if (indices.length == 0) return histogramsUnPack;
-
-    int currentValue = values[0];
-    int nextIndex = 0;
-    int currentBucketEnd = (indices.length > 1) ? indices[1] : n;
-
-    for (int i = 0; i < n; i++) {
-      if (i == currentBucketEnd && nextIndex < indices.length - 1) {
-        nextIndex++;
-        currentValue = values[nextIndex];
-        currentBucketEnd = (nextIndex < indices.length - 1) ? indices[nextIndex + 1] : n;
-      }
-      histogramsUnPack[i] = currentValue;
+    if (indices.length == 0) {
+      return unpacked;
     }
 
-    return histogramsUnPack;
+    int currentIndex = 0;
+    int currentValue = values[0];
+
+    for (int i = 0; i < n; i++) {
+      if (currentIndex + 1 < indices.length && i >= indices[currentIndex + 1]) {
+        currentIndex++;
+        currentValue = values[currentIndex];
+      }
+      unpacked[i] = currentValue;
+    }
+
+    return unpacked;
   }
 
   protected List<GanttColumnCount> handleMap(CProfile firstLevelGroupBy,
@@ -829,5 +813,45 @@ public abstract class CommonServiceApi {
         }
       }
     }
+  }
+
+  protected BitSet acceptedRows(long[] timestamps,
+                              long begin,
+                              long end,
+                              CompositeFilter filter,
+                              Map<FilterCondition, String[]> cache) {
+    BitSet bs = new BitSet(timestamps.length);
+    for (int i = 0; i < timestamps.length; i++) {
+      long ts = timestamps[i];
+      if (ts >= begin && ts <= end) {
+        if (filter == null || filter.getConditions().isEmpty()) {
+          bs.set(i);
+          continue;
+        }
+        String[] row = new String[filter.getConditions().size()];
+        int idx = 0;
+        for (FilterCondition c : filter.getConditions()) {
+          String v = cache.get(c)[i];
+          v = formatFloatingPoint(v, c.getCProfile().getCsType().getCType());
+          row[idx++] = v;
+        }
+        if (filter.test(row)) bs.set(i);
+      }
+    }
+    return bs;
+  }
+
+  private String formatFloatingPoint(String value, CType cType) {
+    if (cType != CType.FLOAT && cType != CType.DOUBLE) return value;
+    try {
+      double num = Double.parseDouble(value);
+      return String.format("%.1f", num).replace(",", ".");
+    } catch (NumberFormatException e) {
+      return value;
+    }
+  }
+
+  protected boolean checkSTypeILocal(SType first, SType second, SType firstCompare, SType secondCompare) {
+    return first.equals(firstCompare) && second.equals(secondCompare);
   }
 }

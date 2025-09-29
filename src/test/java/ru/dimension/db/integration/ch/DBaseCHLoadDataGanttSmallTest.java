@@ -257,7 +257,7 @@ public class DBaseCHLoadDataGanttSmallTest implements ClickHouse {
   }
 
   private String getGanttTestData(String fileName) throws IOException {
-    return Files.readString(Paths.get("src", "test", "resources", "json", "gantt_small", fileName));
+    return Files.readString(Paths.get("src", "test", "resources", "json", "gantt-small", fileName));
   }
 
   private List<GanttColumnCount> getGanttDataActual(
