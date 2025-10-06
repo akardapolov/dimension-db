@@ -1,3 +1,4 @@
+// MapArrayUtil.java remains unchanged
 package ru.dimension.db.util;
 
 import java.util.Arrays;
@@ -12,21 +13,15 @@ import lombok.experimental.UtilityClass;
 public class MapArrayUtil {
 
   public static String arrayToString(Object obj) {
-    if (obj instanceof long[] longArray) {
-      return Arrays.toString(longArray);
-    } else if (obj instanceof int[] intArray) {
-      return Arrays.toString(intArray);
-    } else if (obj instanceof short[] shortArray) {
-      return Arrays.toString(shortArray);
-    } else if (obj instanceof byte[] byteArray) {
-      return Arrays.toString(byteArray);
-    } else if (obj instanceof double[] doubleArray) {
-      return Arrays.toString(doubleArray);
-    } else if (obj instanceof String[] stringArray) {
-      return Arrays.toString(stringArray);
-    } else {
-      throw new IllegalArgumentException("Object is not an array of a supported type.");
-    }
+    return switch (obj) {
+      case long[] longArray -> Arrays.toString(longArray);
+      case int[] intArray -> Arrays.toString(intArray);
+      case short[] shortArray -> Arrays.toString(shortArray);
+      case byte[] byteArray -> Arrays.toString(byteArray);
+      case double[] doubleArray -> Arrays.toString(doubleArray);
+      case String[] stringArray -> Arrays.toString(stringArray);
+      case null, default -> throw new IllegalArgumentException("Object is not an array of a supported type.");
+    };
   }
 
   @FunctionalInterface

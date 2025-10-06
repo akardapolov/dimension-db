@@ -72,18 +72,6 @@ public interface DStore {
       throws SQLException, TableNameEmptyException;
 
   /**
-   * Load metadata from csv file
-   *
-   * @param fileName - CSV file name
-   * @param sProfile - Storage profile
-   * @return TProfile - Table profile
-   */
-  TProfile loadCsvTableMetadata(String fileName,
-                                String csvSplitBy,
-                                SProfile sProfile)
-      throws TableNameEmptyException;
-
-  /**
    * Update Table profile with new timestamp column
    *
    * @param tableName           - Table name
@@ -125,19 +113,6 @@ public interface DStore {
                         ResultSet resultSet,
                         Integer batchSize)
       throws SqlColMetadataException, EnumByteExceedException;
-
-  /**
-   * Save data in table for csv file in batch mode
-   *
-   * @param tableName - Table name
-   * @param fileName  - CSV file name
-   */
-  void putDataCsvBatch(String tableName,
-                       String fileName,
-                       String csvSplitBy,
-                       Integer batchSize)
-      throws SqlColMetadataException;
-
 
   /**
    * Get list of blocks with key and tail in selected range

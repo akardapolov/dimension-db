@@ -3,8 +3,6 @@ package ru.dimension.db.service;
 import static ru.dimension.db.util.MapArrayUtil.parseStringToTypedArray;
 import static ru.dimension.db.util.MapArrayUtil.parseStringToTypedMap;
 
-import java.sql.Date;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.AbstractMap.SimpleImmutableEntry;
@@ -13,19 +11,20 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.metadata.DataType;
-import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
 import ru.dimension.db.model.output.GanttColumnCount;
-import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
@@ -40,7 +39,9 @@ import ru.dimension.db.storage.bdb.entity.MetadataKey;
 import ru.dimension.db.storage.bdb.entity.column.EColumn;
 import ru.dimension.db.storage.helper.EnumHelper;
 import ru.dimension.db.util.CachedLastLinkedHashMap;
+import ru.dimension.db.util.DateHelper;
 
+@Log4j2
 public abstract class CommonServiceApi {
 
   public Predicate<CProfile> isNotTimestamp = Predicate.not(f -> f.getCsType().isTimeStamp());
@@ -50,12 +51,6 @@ public abstract class CommonServiceApi {
   public Predicate<CProfile> isFloat = Predicate.not(f -> Mapper.isCType(f) != CType.FLOAT);
   public Predicate<CProfile> isDouble = Predicate.not(f -> Mapper.isCType(f) != CType.DOUBLE);
   public Predicate<CProfile> isString = Predicate.not(f -> Mapper.isCType(f) != CType.STRING);
-
-  public boolean isEmptyFilter(CompositeFilter compositeFilter) {
-    return compositeFilter == null
-        || compositeFilter.getConditions().isEmpty()
-        || compositeFilter.getConditions().stream().allMatch(e -> Arrays.stream(e.getFilterData()).allMatch(String::isEmpty));
-  }
 
   public static <T> List<List<T>> transpose(List<List<T>> table) {
     if (table.isEmpty()) {
@@ -104,33 +99,12 @@ public abstract class CommonServiceApi {
     return new int[][]{hEntry.getIndices(), hEntry.getValues()};
   }
 
-  public CProfile getTimestampProfile(List<CProfile> cProfileList) {
-    for (CProfile profile : cProfileList) {
-      if (profile.getCsType().isTimeStamp()) {
-        return profile;
-      }
-    }
-    throw new RuntimeException("Not found timestamp column");
-  }
-
   protected <T, V> void setMapValue(Map<T, Map<V, Integer>> map,
                                     T vFirst,
                                     V vSecond,
                                     int sum) {
     map.computeIfAbsent(vFirst, k -> new HashMap<>())
         .merge(vSecond, sum, Integer::sum);
-  }
-
-  protected int[][] getArrayInt(List<List<Integer>> rawDataInt) {
-    int size = rawDataInt.size();
-    int[][] result = new int[size][];
-    for (int i = 0; i < size; i++) {
-      List<Integer> row = rawDataInt.get(i);
-      int[] arr = new int[row.size()];
-      for (int j = 0; j < row.size(); j++) arr[j] = row.get(j);
-      result[i] = arr;
-    }
-    return result;
   }
 
   protected long[][] getArrayLong(List<List<Long>> rawDataLong) {
@@ -155,18 +129,6 @@ public abstract class CommonServiceApi {
       result[i] = arr;
     }
     return result;
-  }
-
-  protected float[][] getArrayFloat(List<List<Float>> rawDataFloat) {
-    int size = rawDataFloat.size();
-    float[][] array = new float[size][];
-    for (int i = 0; i < size; i++) {
-      List<Float> row = rawDataFloat.get(i);
-      float[] arr = new float[row.size()];
-      for (int j = 0; j < row.size(); j++) arr[j] = row.get(j);
-      array[i] = arr;
-    }
-    return array;
   }
 
   protected String[][] getArrayString(List<List<String>> rawDataString) {
@@ -458,19 +420,6 @@ public abstract class CommonServiceApi {
     }
   }
 
-  protected <V, T> void fillColumnDataSet(V[] columValues,
-                                          long[] timestamps,
-                                          long begin,
-                                          long end,
-                                          Set<T> columnData) {
-    if (columValues.length == 0) return;
-    for (int i = 0; i < timestamps.length; i++) {
-      if (timestamps[i] >= begin && timestamps[i] <= end) {
-        columnData.add((T) columValues[i]);
-      }
-    }
-  }
-
   protected SType getSType(int colId, Metadata metadata) {
     for (int id : metadata.getRawColIds())      if (id == colId) return SType.RAW;
     for (int id : metadata.getEnumColIds())     if (id == colId) return SType.ENUM;
@@ -507,34 +456,7 @@ public abstract class CommonServiceApi {
   }
 
   private String getDateForLongShorted(int longDate) {
-    SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
-    return sdf.format(new Date(((long) longDate) * 1000L));
-  }
-
-  protected boolean filter(String filterValue,
-                           String[] filterData,
-                           CompareFunction compareFunction) {
-    if (compareFunction == null || filterData == null || filterValue == null || filterData.length == 0) {
-      return true;
-    }
-    switch (compareFunction) {
-      case EQUAL -> {
-        for (String filter : filterData) {
-          if (filter.equals(filterValue))
-            return true;
-        }
-        return false;
-      }
-      case CONTAIN -> {
-        String lower = filterValue.toLowerCase();
-        for (String filter : filterData) {
-          if (lower.contains(filter.toLowerCase()))
-            return true;
-        }
-        return false;
-      }
-      default -> throw new IllegalArgumentException("Unsupported CompareFunction: " + compareFunction);
-    }
+    return DateHelper.format(longDate);
   }
 
   protected LocalDateTime toLocalDateTime(long epochMilli) {
@@ -573,24 +495,25 @@ public abstract class CommonServiceApi {
 
   protected List<GanttColumnCount> handleMap(CProfile firstLevelGroupBy,
                                              CProfile secondLevelGroupBy,
-                                             Map<String, Map<String, Integer>> mapFinalIn) {
+                                             Map<String, Map<String, Integer>> mapFinalIn,
+                                             CompositeFilter compositeFilter) {
     List<GanttColumnCount> list = new ArrayList<>();
     Map<String, Map<String, Integer>> mapFinalOut = new HashMap<>();
 
     if (DataType.MAP.equals(firstLevelGroupBy.getCsType().getDType())) {
-      handlerFirstLevelMap(mapFinalIn, mapFinalOut);
+      handlerFirstLevelMap(mapFinalIn, mapFinalOut, firstLevelGroupBy, compositeFilter);
     }
 
     if (DataType.MAP.equals(secondLevelGroupBy.getCsType().getDType())) {
       if (DataType.MAP.equals(firstLevelGroupBy.getCsType().getDType())) {
         Map<String, Map<String, Integer>> updates = new HashMap<>();
-        handlerSecondLevelMap(mapFinalOut, updates);
+        handlerSecondLevelMap(mapFinalOut, updates, secondLevelGroupBy, compositeFilter);
         mapFinalOut.clear();
-        updates.forEach((key, value) -> {
-          value.forEach((updateKey, updateValue) -> setMapValue(mapFinalOut, key, updateKey, updateValue));
-        });
+        updates.forEach((key, value) ->
+                            value.forEach((updateKey, updateValue) -> setMapValue(mapFinalOut, key, updateKey, updateValue))
+        );
       } else {
-        handlerSecondLevelMap(mapFinalIn, mapFinalOut);
+        handlerSecondLevelMap(mapFinalIn, mapFinalOut, secondLevelGroupBy, compositeFilter);
       }
     }
 
@@ -602,7 +525,11 @@ public abstract class CommonServiceApi {
   }
 
   private void handlerFirstLevelMap(Map<String, Map<String, Integer>> mapFinalIn,
-                                    Map<String, Map<String, Integer>> mapFinalOut) {
+                                    Map<String, Map<String, Integer>> mapFinalOut,
+                                    CProfile cProfile,
+                                    CompositeFilter compositeFilter) {
+    Set<String> filterKeys = getFilterDataForProfile(cProfile, compositeFilter);
+
     for (Map.Entry<String, Map<String, Integer>> entry : mapFinalIn.entrySet()) {
       Map<String, Long> parsedMap = parsedMap(entry.getKey());
       if (parsedMap.isEmpty()) {
@@ -611,9 +538,12 @@ public abstract class CommonServiceApi {
         }
       } else {
         for (Map.Entry<String, Long> parsedEntry : parsedMap.entrySet()) {
-          for (Map.Entry<String, Integer> innerEntry : entry.getValue().entrySet()) {
-            setMapValue(mapFinalOut, parsedEntry.getKey(), innerEntry.getKey(),
-                        Math.toIntExact(parsedEntry.getValue()) * innerEntry.getValue());
+          String mapKey = parsedEntry.getKey();
+          if (filterKeys == null || filterKeys.contains(mapKey)) {
+            for (Map.Entry<String, Integer> innerEntry : entry.getValue().entrySet()) {
+              setMapValue(mapFinalOut, mapKey, innerEntry.getKey(),
+                          Math.toIntExact(parsedEntry.getValue()) * innerEntry.getValue());
+            }
           }
         }
       }
@@ -621,7 +551,10 @@ public abstract class CommonServiceApi {
   }
 
   private void handlerSecondLevelMap(Map<String, Map<String, Integer>> mapFinalIn,
-                                     Map<String, Map<String, Integer>> mapFinalOut) {
+                                     Map<String, Map<String, Integer>> mapFinalOut,
+                                     CProfile cProfile,
+                                     CompositeFilter compositeFilter) {
+    Set<String> filterKeys = getFilterDataForProfile(cProfile, compositeFilter);
     for (Map.Entry<String, Map<String, Integer>> entry : mapFinalIn.entrySet()) {
       for (Map.Entry<String, Integer> innerEntry : entry.getValue().entrySet()) {
         Map<String, Long> parsedMap = parsedMap(innerEntry.getKey());
@@ -629,8 +562,11 @@ public abstract class CommonServiceApi {
           setMapValue(mapFinalOut, entry.getKey(), Mapper.STRING_NULL, innerEntry.getValue());
         } else {
           for (Map.Entry<String, Long> parsedEntry : parsedMap.entrySet()) {
-            setMapValue(mapFinalOut, entry.getKey(), parsedEntry.getKey(),
-                        Math.toIntExact(parsedEntry.getValue()) * innerEntry.getValue());
+            String mapKey = parsedEntry.getKey();
+            if (filterKeys == null || filterKeys.contains(mapKey)) {
+              setMapValue(mapFinalOut, entry.getKey(), mapKey,
+                          Math.toIntExact(parsedEntry.getValue()) * innerEntry.getValue());
+            }
           }
         }
       }
@@ -644,54 +580,6 @@ public abstract class CommonServiceApi {
         Long::parseLong,
         "="
     );
-  }
-
-  protected List<StackedColumn> handleArray(List<StackedColumn> sColumnList) {
-    List<StackedColumn> sColumnListParsedMap = new ArrayList<>(sColumnList.size());
-
-    for (StackedColumn stackedColumn : sColumnList) {
-      Map<String, Integer> keyCount = new HashMap<>();
-      for (Map.Entry<String, Integer> entry : stackedColumn.getKeyCount().entrySet()) {
-        String[] array = parseStringToTypedArray(entry.getKey(), ",");
-        for (String element : array) {
-          keyCount.merge(element.trim(), entry.getValue(), Integer::sum);
-        }
-      }
-      sColumnListParsedMap.add(StackedColumn.builder()
-                                   .key(stackedColumn.getKey())
-                                   .tail(stackedColumn.getTail())
-                                   .keyCount(keyCount).build());
-    }
-
-    return sColumnListParsedMap;
-  }
-
-  protected List<StackedColumn> handleMap(List<StackedColumn> sColumnList) {
-    List<StackedColumn> sColumnListParsedMap = new ArrayList<>(sColumnList.size());
-
-    for (StackedColumn stackedColumn : sColumnList) {
-      Map<String, Integer> keyCount = new HashMap<>();
-      for (Map.Entry<String, Integer> entry : stackedColumn.getKeyCount().entrySet()) {
-        Map<String, Long> parsedMap = parseStringToTypedMap(
-            entry.getKey(),
-            String::new,
-            Long::parseLong,
-            "="
-        );
-
-        for (Entry<String, Long> pair : parsedMap.entrySet()) {
-          long newCount = (pair.getValue() == null) ? 0 : pair.getValue() * entry.getValue();
-          keyCount.merge(pair.getKey(), Math.toIntExact(newCount), Integer::sum);
-        }
-      }
-
-      sColumnListParsedMap.add(StackedColumn.builder()
-                                   .key(stackedColumn.getKey())
-                                   .tail(stackedColumn.getTail())
-                                   .keyCount(keyCount).build());
-    }
-
-    return sColumnListParsedMap;
   }
 
   protected <T> void fillArrayList(List<List<T>> array,
@@ -714,23 +602,24 @@ public abstract class CommonServiceApi {
 
   protected Map<String, Map<String, Integer>> handleArray(CProfile firstLevelGroupBy,
                                                           CProfile secondLevelGroupBy,
-                                                          Map<String, Map<String, Integer>> mapFinalIn) {
+                                                          Map<String, Map<String, Integer>> mapFinalIn,
+                                                          CompositeFilter compositeFilter) {
     Map<String, Map<String, Integer>> mapFinalOut = new HashMap<>();
 
     if (DataType.ARRAY.equals(firstLevelGroupBy.getCsType().getDType())) {
-      handlerFirstLevelArray(mapFinalIn, mapFinalOut);
+      handlerFirstLevelArray(mapFinalIn, mapFinalOut, firstLevelGroupBy, compositeFilter);
     }
 
     if (DataType.ARRAY.equals(secondLevelGroupBy.getCsType().getDType())) {
       if (DataType.ARRAY.equals(firstLevelGroupBy.getCsType().getDType())) {
         Map<String, Map<String, Integer>> updates = new HashMap<>();
-        handlerSecondLevelArray(mapFinalOut, updates);
+        handlerSecondLevelArray(mapFinalOut, updates, secondLevelGroupBy, compositeFilter);
         mapFinalOut.clear();
-        updates.forEach((key, value) -> {
-          value.forEach((updateKey, updateValue) -> setMapValue(mapFinalOut, key, updateKey, updateValue));
-        });
+        updates.forEach((key, value) ->
+                            value.forEach((updateKey, updateValue) -> setMapValue(mapFinalOut, key, updateKey, updateValue))
+        );
       } else {
-        handlerSecondLevelArray(mapFinalIn, mapFinalOut);
+        handlerSecondLevelArray(mapFinalIn, mapFinalOut, secondLevelGroupBy, compositeFilter);
       }
     }
 
@@ -781,7 +670,10 @@ public abstract class CommonServiceApi {
   }
 
   private void handlerFirstLevelArray(Map<String, Map<String, Integer>> mapFinalIn,
-                                      Map<String, Map<String, Integer>> mapFinalOut) {
+                                      Map<String, Map<String, Integer>> mapFinalOut,
+                                      CProfile cProfile,
+                                      CompositeFilter compositeFilter) {
+    Set<String> filterElements = getFilterDataForProfile(cProfile, compositeFilter);
     for (Map.Entry<String, Map<String, Integer>> entry : mapFinalIn.entrySet()) {
       String[] array = parseStringToTypedArray(entry.getKey(), ",");
       if (array.length == 0) {
@@ -791,8 +683,10 @@ public abstract class CommonServiceApi {
       } else {
         for (String element : array) {
           String trimmed = element.trim();
-          for (Map.Entry<String, Integer> innerEntry : entry.getValue().entrySet()) {
-            setMapValue(mapFinalOut, trimmed, innerEntry.getKey(), innerEntry.getValue());
+          if (filterElements == null || filterElements.contains(trimmed)) {
+            for (Map.Entry<String, Integer> innerEntry : entry.getValue().entrySet()) {
+              setMapValue(mapFinalOut, trimmed, innerEntry.getKey(), innerEntry.getValue());
+            }
           }
         }
       }
@@ -800,7 +694,10 @@ public abstract class CommonServiceApi {
   }
 
   private void handlerSecondLevelArray(Map<String, Map<String, Integer>> mapFinalIn,
-                                       Map<String, Map<String, Integer>> mapFinalOut) {
+                                       Map<String, Map<String, Integer>> mapFinalOut,
+                                       CProfile cProfile,
+                                       CompositeFilter compositeFilter) {
+    Set<String> filterElements = getFilterDataForProfile(cProfile, compositeFilter);
     for (Map.Entry<String, Map<String, Integer>> entry : mapFinalIn.entrySet()) {
       for (Map.Entry<String, Integer> innerEntry : entry.getValue().entrySet()) {
         String[] array = parseStringToTypedArray(innerEntry.getKey(), ",");
@@ -808,7 +705,10 @@ public abstract class CommonServiceApi {
           setMapValue(mapFinalOut, entry.getKey(), Mapper.STRING_NULL, innerEntry.getValue());
         } else {
           for (String element : array) {
-            setMapValue(mapFinalOut, entry.getKey(), element, innerEntry.getValue());
+            String trimmed = element.trim();
+            if (filterElements == null || filterElements.contains(trimmed)) {
+              setMapValue(mapFinalOut, entry.getKey(), trimmed, innerEntry.getValue());
+            }
           }
         }
       }
@@ -816,10 +716,10 @@ public abstract class CommonServiceApi {
   }
 
   protected BitSet acceptedRows(long[] timestamps,
-                              long begin,
-                              long end,
-                              CompositeFilter filter,
-                              Map<FilterCondition, String[]> cache) {
+                                long begin,
+                                long end,
+                                CompositeFilter filter,
+                                Map<FilterCondition, String[]> cache) {
     BitSet bs = new BitSet(timestamps.length);
     for (int i = 0; i < timestamps.length; i++) {
       long ts = timestamps[i];
@@ -828,14 +728,42 @@ public abstract class CommonServiceApi {
           bs.set(i);
           continue;
         }
-        String[] row = new String[filter.getConditions().size()];
-        int idx = 0;
-        for (FilterCondition c : filter.getConditions()) {
-          String v = cache.get(c)[i];
-          v = formatFloatingPoint(v, c.getCProfile().getCsType().getCType());
-          row[idx++] = v;
+
+        boolean rowAccepted = true;
+        if (filter.getOperator() == LogicalOperator.AND) {
+          // AND: all conditions must be true
+          for (FilterCondition c : filter.getConditions()) {
+            String[] values = cache.get(c);
+            if (values == null || i >= values.length) {
+              rowAccepted = false;
+              break;
+            }
+            String v = values[i];
+            v = formatFloatingPoint(v, c.getCProfile().getCsType().getCType());
+            if (!valueMatchesCondition(v, c)) {
+              rowAccepted = false;
+              break;
+            }
+          }
+        } else {
+          // OR: at least one condition must be true
+          rowAccepted = false;
+          for (FilterCondition c : filter.getConditions()) {
+            String[] values = cache.get(c);
+            if (values != null && i < values.length) {
+              String v = values[i];
+              v = formatFloatingPoint(v, c.getCProfile().getCsType().getCType());
+              if (valueMatchesCondition(v, c)) {
+                rowAccepted = true;
+                break;
+              }
+            }
+          }
         }
-        if (filter.test(row)) bs.set(i);
+
+        if (rowAccepted) {
+          bs.set(i);
+        }
       }
     }
     return bs;
@@ -853,5 +781,193 @@ public abstract class CommonServiceApi {
 
   protected boolean checkSTypeILocal(SType first, SType second, SType firstCompare, SType secondCompare) {
     return first.equals(firstCompare) && second.equals(secondCompare);
+  }
+
+  protected boolean evaluateRowFilter(CompositeFilter filter, int rowIndex, Map<CProfile, String[]> filterValuesMap) {
+    if (filter == null || filter.getConditions().isEmpty()) {
+      return true;
+    }
+
+    List<Boolean> results = new ArrayList<>();
+    for (FilterCondition condition : filter.getConditions()) {
+      String[] values = filterValuesMap.get(condition.getCProfile());
+      if (values == null || rowIndex >= values.length) {
+        results.add(false);
+        continue;
+      }
+      String rawValue = values[rowIndex];
+      results.add(valueMatchesCondition(rawValue, condition));
+    }
+
+    if (filter.getOperator() == LogicalOperator.AND) {
+      return results.stream().allMatch(Boolean::booleanValue);
+    } else {
+      return results.stream().anyMatch(Boolean::booleanValue);
+    }
+  }
+
+  protected boolean valueMatchesCondition(String rawValue, FilterCondition condition) {
+    DataType dataType = condition.getCProfile().getCsType().getDType();
+
+    if (DataType.MAP.equals(dataType)) {
+      return mapValueMatches(rawValue, condition.getFilterData());
+    } else if (DataType.ARRAY.equals(dataType)) {
+      return arrayValueMatches(rawValue, condition.getFilterData());
+    } else {
+      return scalarValueMatches(rawValue, condition);
+    }
+  }
+
+  protected boolean scalarValueMatches(String rawValue, FilterCondition condition) {
+    if (rawValue == null) {
+      return false;
+    }
+    String[] filterData = condition.getFilterData();
+    if (filterData == null || filterData.length == 0) {
+      return true;
+    }
+
+    switch (condition.getCompareFunction()) {
+      case EQUAL:
+        for (String filter : filterData) {
+          if (filter != null && filter.equals(rawValue)) {
+            return true;
+          }
+        }
+        return false;
+      case CONTAIN:
+        String lowerValue = rawValue.toLowerCase();
+        for (String filter : filterData) {
+          if (filter != null && lowerValue.contains(filter.toLowerCase())) {
+            return true;
+          }
+        }
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  protected boolean mapValueMatches(String rawValue, String[] filterKeys) {
+    if (rawValue == null || rawValue.isEmpty() || filterKeys == null || filterKeys.length == 0) {
+      return false;
+    }
+    try {
+      Map<String, Long> parsedMap = parseStringToTypedMap(rawValue, String::new, Long::parseLong, "=");
+      for (String key : filterKeys) {
+        if (key != null && parsedMap.containsKey(key.trim())) {
+          return true;
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse map for filtering: '{}'", rawValue, e);
+      // Fallback: check if raw string contains any filter key
+      for (String key : filterKeys) {
+        if (key != null && rawValue.contains(key.trim())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  protected boolean arrayValueMatches(String rawValue, String[] filterElements) {
+    if (rawValue == null || rawValue.isEmpty() || filterElements == null || filterElements.length == 0) {
+      return false;
+    }
+    try {
+      String[] array = parseStringToTypedArray(rawValue, ",");
+      Set<String> elements = Arrays.stream(array)
+          .map(String::trim)
+          .collect(Collectors.toSet());
+      for (String filter : filterElements) {
+        if (filter != null && elements.contains(filter.trim())) {
+          return true;
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse array for filtering: '{}'", rawValue, e);
+      // Fallback: check if raw string contains any filter element
+      for (String filter : filterElements) {
+        if (filter != null && rawValue.contains(filter.trim())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  protected void processValueByDataType(String value, Map<String, Integer> valueCounts, CProfile cProfile, CompositeFilter compositeFilter) {
+    DataType dataType = cProfile.getCsType().getDType();
+
+    if (DataType.MAP.equals(dataType)) {
+      processMapValue(value, valueCounts, cProfile, compositeFilter);
+    } else if (DataType.ARRAY.equals(dataType)) {
+      processArrayValue(value, valueCounts, cProfile, compositeFilter);
+    } else {
+      processScalarValue(value, valueCounts);
+    }
+  }
+
+  protected void processMapValue(String value, Map<String, Integer> valueCounts, CProfile cProfile, CompositeFilter compositeFilter) {
+    try {
+      Map<String, Long> parsedMap = parseStringToTypedMap(
+          value,
+          String::new,
+          Long::parseLong,
+          "="
+      );
+
+      Set<String> filterKeys = getFilterDataForProfile(cProfile, compositeFilter);
+
+      for (Map.Entry<String, Long> mapEntry : parsedMap.entrySet()) {
+        String mapKey = mapEntry.getKey();
+        if (filterKeys == null || filterKeys.contains(mapKey)) {
+          long multiplier = mapEntry.getValue() != null ? mapEntry.getValue() : 1;
+          valueCounts.merge(mapKey, (int) multiplier, Integer::sum);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse map value: '{}' for column {}", value, cProfile.getColName(), e);
+      if(getFilterDataForProfile(cProfile, compositeFilter) == null) {
+        valueCounts.merge(value, 1, Integer::sum);
+      }
+    }
+  }
+
+  protected void processArrayValue(String value, Map<String, Integer> valueCounts, CProfile cProfile, CompositeFilter compositeFilter) {
+    try {
+      String[] array = parseStringToTypedArray(value, ",");
+      Set<String> filterElements = getFilterDataForProfile(cProfile, compositeFilter);
+
+      for (String element : array) {
+        String trimmedElement = element.trim();
+        if (!trimmedElement.isEmpty()) {
+          if (filterElements == null || filterElements.contains(trimmedElement)) {
+            valueCounts.merge(trimmedElement, 1, Integer::sum);
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse array value: '{}' for column {}", value, cProfile.getColName(), e);
+      if (getFilterDataForProfile(cProfile, compositeFilter) == null) {
+        valueCounts.merge(value, 1, Integer::sum);
+      }
+    }
+  }
+
+  protected Set<String> getFilterDataForProfile(CProfile cProfile, CompositeFilter compositeFilter) {
+    if (compositeFilter == null) {
+      return null;
+    }
+    return compositeFilter.getConditions().stream()
+        .filter(c -> c.getCProfile().equals(cProfile))
+        .findFirst()
+        .map(c -> new LinkedHashSet<>(Arrays.asList(c.getFilterData())))
+        .orElse(null);
+  }
+
+  protected void processScalarValue(String value, Map<String, Integer> valueCounts) {
+    valueCounts.compute(value, (k, count) -> count == null ? 1 : count + 1);
   }
 }

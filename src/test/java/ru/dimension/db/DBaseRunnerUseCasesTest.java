@@ -4,13 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static ru.dimension.db.config.FileConfig.FILE_SEPARATOR;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,7 +29,6 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import ru.dimension.db.backend.BerkleyDB;
-import ru.dimension.db.common.mode.CSVMode;
 import ru.dimension.db.common.mode.DirectMode;
 import ru.dimension.db.common.mode.JDBCMode;
 import ru.dimension.db.config.DBaseConfig;
@@ -74,7 +71,7 @@ import ru.dimension.db.sql.BatchResultSet;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Disabled
-public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode, CSVMode {
+public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode {
 
   private H2Database h2Db;
 
@@ -210,7 +207,6 @@ public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode, CSVMode {
     testGetTProfile(testCfg);
     testLoadDirectTableMetadata(testCfg);
     testLoadJdbcTableMetadata(testCfg);
-    testLoadCsvTableMetadata(testCfg);
     testSetTimestampColumn(testCfg);
     testPutDataDirect(testCfg);
     testPutDataJdbcBatch(testCfg);
@@ -229,7 +225,6 @@ public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode, CSVMode {
     testGetRawDataAll(testCfg);
     testGetRawDataAllFilter(testCfg);
     testGetRawDataByColumn(testCfg);
-    testGetBatchResultSetRegularTable(testCfg);
     testGetBatchResultSetTimeSeriesTable(testCfg);
     testGetFirst(testCfg);
     testGetLast(testCfg);
@@ -253,13 +248,6 @@ public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode, CSVMode {
     SProfile sp = getSProfileJdbc(table, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
     sp.getCsTypeMap().put("ID", CSType.builder().isTimeStamp(true).sType(SType.RAW).cType(CType.LONG).build());
     assertEquals(table, cfg.getDStore().loadJdbcTableMetadata(cfg.getH2DbConnection(), "SELECT * FROM person", sp).getTableName());
-  }
-
-  private void testLoadCsvTableMetadata(DBaseTestConfig cfg) throws TableNameEmptyException, IOException {
-    String table = "uc_load_csv_md";
-    String file = new File("").getAbsolutePath() + FILE_SEPARATOR + Paths.get("src", "test", "resources", "csv", "file-l.csv");
-    SProfile sp = getSProfileCsv(table, file, ",", TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
-    assertEquals(table, cfg.getDStore().loadCsvTableMetadata(file, ",", sp).getTableName());
   }
 
   private void testSetTimestampColumn(DBaseTestConfig cfg) throws TableNameEmptyException {
@@ -445,24 +433,6 @@ public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode, CSVMode {
     putDataJdbcBatch(cfg.getDStore(), tp, cfg.getH2DbConnection(), "SELECT * FROM person");
     List<List<Object>> res = cfg.getDStore().getRawDataByColumn(table, getCProfileByName(tp, "FIRSTNAME"), 1, 3);
     assertEquals(3, res.size());
-  }
-
-  private void testGetBatchResultSetRegularTable(DBaseTestConfig cfg) throws Exception {
-    String file = new File("").getAbsolutePath() + FILE_SEPARATOR + Paths.get("src", "test", "resources", "csv", "file.csv");
-    String table = "uc_batch_regular";
-    SProfile sp = getSProfileCsv(table, file, ",", TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, false);
-    TProfile tp = cfg.getDStore().loadCsvTableMetadata(file, ",", sp);
-    cfg.getDStore().putDataCsvBatch(table, file, ",", 2);
-
-    BatchResultSet brs = null;
-    try {
-      brs = cfg.getDStore().getBatchResultSet(table, 10);
-      int rows = 0;
-      while (brs.next()) rows += brs.getObject().size();
-      assertTrue(rows > 0);
-    } finally {
-
-    }
   }
 
   private void testGetBatchResultSetTimeSeriesTable(DBaseTestConfig cfg) throws Exception {

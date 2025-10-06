@@ -93,7 +93,7 @@ public enum DataType {
   OID(123, "OID"),
   NAME(124, "NAME"),
 
-  // CSV
+  // Java
   LONG(125, "LONG"),
   DOUBLE(126, "DOUBLE"),
   STRING(127, "STRING");

@@ -1,0 +1,14 @@
+[
+  {
+    "key": 0,
+    "tail": 0,
+    "keyCount": {
+      "": 1270100,
+      "Manhattan": 63625943,
+      "Bronx": 1034889,
+      "Brooklyn": 6516594,
+      "Queens": 5956419,
+      "Staten Island": 20605
+    }
+  }
+]

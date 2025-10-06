@@ -14,7 +14,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.io.TempDir;
 import ru.dimension.db.DBase;
 import ru.dimension.db.backend.BerkleyDB;
 import ru.dimension.db.config.DBaseConfig;
@@ -31,11 +37,6 @@ import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.SProfile;
 import ru.dimension.db.model.profile.TProfile;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.junit.jupiter.api.io.TempDir;
 
 @Log4j2
 @TestInstance(Lifecycle.PER_CLASS)
@@ -67,6 +68,10 @@ public abstract class AbstractDirectTest {
   protected String[] array1;
   protected int kMap;
 
+  protected long testLongValue1 = 100L;
+  protected long testLongValue2 = 200L;
+  protected long testLongValue3 = 300L;
+
   protected long startTime = 1707387748310L;
   protected long longValue = 17073877482L;
   protected double doubleValue = 17073877482D;
@@ -94,6 +99,9 @@ public abstract class AbstractDirectTest {
     testMap2.put("val6", 6);
 
     testMap3 = new HashMap<>();
+    testMap3.put("val7", 7);
+    testMap3.put("val8", 8);
+    testMap3.put("val9", 9);
 
     array1 = new String[2];
     array1[0] = "array value 1";
@@ -212,12 +220,24 @@ public abstract class AbstractDirectTest {
     data.get(v.getColId()).add(valueToAdd);
   }
 
+
   private Object determineValue(CProfile profile, int index, Map<String, Integer> mapData, String messageData, String[] array) {
     DataType dType = profile.getCsType().getDType();
+    String colName = profile.getColName();
+
     if (DataType.MAP.equals(dType)) {
       return mapData;
-    } else if (DataType.LONG.equals(dType)) {
+    } else if (DataType.LONG.equals(dType) && "ID".equals(colName)) {
       return index;
+    } else if (DataType.LONG.equals(dType) && "LONG_COL".equals(colName)) {
+      if (testMessage1.equals(messageData)) {
+        return testLongValue1;
+      } else if (testMessage2.equals(messageData)) {
+        return testLongValue2;
+      } else if (testMessage3.equals(messageData)) {
+        return testLongValue3;
+      }
+      return (long) index;
     } else if (DataType.VARCHAR.equals(dType)) {
       return messageData;
     } else if (DataType.ARRAY.equals(dType)) {
@@ -281,6 +301,20 @@ public abstract class AbstractDirectTest {
       }
     }
     return null;
+  }
+
+  protected void assertGanttDataEqualsIgnoreOrder(List<GanttColumnCount> expected,
+                                                  List<GanttColumnCount> actual) {
+    assertEquals(expected.size(), actual.size(), "Gantt data size mismatch");
+
+    // Convert to maps for order-independent comparison
+    Map<String, Map<String, Integer>> expectedMap = expected.stream()
+        .collect(Collectors.toMap(GanttColumnCount::getKey, GanttColumnCount::getGantt));
+
+    Map<String, Map<String, Integer>> actualMap = actual.stream()
+        .collect(Collectors.toMap(GanttColumnCount::getKey, GanttColumnCount::getGantt));
+
+    assertEquals(expectedMap, actualMap, "Gantt data content mismatch");
   }
 
   public List<StackedColumn> getDataStackedColumn(String colName, GroupFunction groupFunction, long begin, long end)

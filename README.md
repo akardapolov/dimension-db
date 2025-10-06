@@ -39,7 +39,7 @@ Hybrid time-series and block-column storage database engine written in Java
         - [Table column storage parameters - CSType class](#table-column-storage-parameters---cstype-class)
           - [Data storage type - enum SType](#data-storage-type---enum-stype)
           - [Java data storage type - enum CType](#java-data-storage-type---enum-ctype)
-          - [JDBC/CSV data storage type - enum DataType](#jdbccsv-data-storage-type---enum-datatype)
+          - [JDBC data storage type - enum DataType](#jdbc-data-storage-type---enum-datatype)
       - [Input parameters](#input-parameters)
         - [DB settings](#db-settings---dbconfig-class)
         - [SProfile table settings](#sprofile-table-settings)
@@ -371,8 +371,6 @@ flowchart TD
   DStore_Write_Interface --> |Direct Insert| LocalBerkleyDB[(Local Berkley DB)]
   DStore_Write_Interface --> |Fetch Data| ExternalDB_Write[(External DBs JDBC)]
   ExternalDB_Write --> LocalBerkleyDB
-  DStore_Write_Interface --> |CSV Data| CSV_Source[CSV Files]
-  CSV_Source --> LocalBerkleyDB
 
   DStore_Read_Interface --> |Local Read| LocalBerkleyDB
   DStore_Read_Interface --> |External Read| ExternalDB_Read[(External DBs JDBC)]
@@ -454,7 +452,6 @@ Notes:
   - **Direct** - inserting data into a local database using an intermediate Java table-type data structure.
   - **JDBC** — insert data into a local database using data received from an external data source via JDBC, which allows integration with other systems that can work with JDBC.
   - **JDBC Batch** — batch loading into a local database using data received from an external data source via JDBC, minimizing the number of transactions for large-scale insertion.
-  - **CSV Batch** — batch loading from CSV files, for transferring large amounts of data from files to a local database (experimental).
 
 - **Reading data**. The process of extracting data from **Dimension DB** uses APIs, each of which is optimized for the corresponding types of queries:
 
@@ -463,7 +460,7 @@ Notes:
   - **Raw** — extracting source data in tabular format to view detailed information on the entire array of collected data.
   - **BatchResultSet** — extracting source data in tabular format with row-by-row access to get only part of the rows from the result set in the DB.
 
-- **Loading metadata**. To work with external data sources, you need to perform queries to sources via JDBC, CSV files and Java table structures. To store information on tables and data types used for local storage and access to external data sources via JDBC, an API is used to load and view this information in a local Dimension DB metadata storage file.
+- **Loading metadata**. To work with external data sources, you need to perform queries to sources via JDBC or Java table structures. To store information on tables and data types used for local storage and access to external data sources via JDBC, an API is used to load and view this information in a local Dimension DB metadata storage file.
 
 The APIs for writing data only work with the local Berkley DB key-value data storage. API methods for reading data can work with both local Berkley DB storage and external data sources via JDBC using automatic generation of SQL queries.
 
@@ -477,7 +474,6 @@ Table 5. Supported databases for working with API in Dimension DB
 | 4 | Read                     | PostgreSQL           | relational    |
 | 5 | Read                     | Microsoft SQL Server | relational    |
 | 6 | Read                     | MySQL                | relational    |
-| 7 | Read                     | CSV files            | file          |
 
 Before you start writing data, you need to set storage parameters and metadata for tables and columns in the **SProfile** object.
 
@@ -492,6 +488,7 @@ The database table configuration allows you to switch between global and local i
 <details>
   <summary>Mermaid sequence diagram</summary>
 
+
 ```mermaid
 sequenceDiagram
   participant Client
@@ -500,7 +497,6 @@ sequenceDiagram
   participant MetadataAPI as Metadata API
   participant LocalDB as Local Berkley DB Storage
   participant ExternalDB as External DBs via JDBC
-  participant CSV as CSV Files
 
   Client->>DStore_Write: Write Request
   DStore_Write->>MetadataAPI: Fetch Metadata
@@ -511,9 +507,6 @@ sequenceDiagram
     DStore_Write->>ExternalDB: Fetch Data
     ExternalDB->>DStore_Write: Return Data
     DStore_Write->>LocalDB: Insert from ExternalDB
-    DStore_Write->>CSV: Fetch CSV Data
-    CSV->>DStore_Write: Return CSV Data
-    DStore_Write->>LocalDB: Insert from CSV
   end
 
   Client->>DStore_Read: Read Request
@@ -548,27 +541,25 @@ Table 6. List of APIs for working with the Dimension DB database of the DStore i
 | 2  | loadDirectTableMetadata | Metadata | Load metadata from SProfile                  | SProfile sProfile                                                                                                                 | TProfile                  |
 | 3  | loadJdbcTableMetadata   | Metadata | Load metadata via JDBC connection with query | Connection connection, String query, SProfile sProfile                                                                            | TProfile                  |
 | 4  | loadJdbcTableMetadata   | Metadata | Load metadata via JDBC (schema and table)    | Connection connection, String sqlSchemaName, String sqlTableName, SProfile sProfile                                               | TProfile                  |
-| 5  | loadCsvTableMetadata    | Metadata | Load metadata from CSV file                  | String fileName, String csvSplitBy, SProfile sProfile                                                                             | TProfile                  |
-| 6  | setTimestampColumn      | Metadata | Set timestamp column                         | String tableName, String timestampColumnName                                                                                      | void                      |
-| 7  | putDataDirect           | Write    | Save data using Java structure               | String tableName, List<List<Object>> data                                                                                         | void                      |
-| 8  | putDataJdbc             | Write    | Save data from JDBC ResultSet                | String tableName, ResultSet resultSet                                                                                             | long (last row timestamp) |
-| 9  | putDataJdbcBatch        | Write    | Batch save from JDBC ResultSet               | String tableName, ResultSet resultSet, Integer batchSize                                                                          | void                      |
-| 10 | putDataCsvBatch         | Write    | Batch save from CSV file                     | String tableName, String fileName, String csvSplitBy, Integer batchSize                                                           | void                      |
-| 11 | getBlockKeyTailList     | Read     | Get blocks with keys and ranges              | String tableName, long begin, long end                                                                                            | List<BlockKeyTail>        |
-| 12 | getStacked              | Read     | Get aggregated data                          | String tableName, CProfile cProfile, GroupFunction groupFunction, CompositeFilter compositeFilter, long begin, long end           | List<StackedColumn>       |
-| 13 | getGanttCount           | Read     | Two-level COUNT grouping                     | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, long begin, long end                | List<GanttColumnCount>    |
-| 14 | getGanttCount           | Read     | Two-level COUNT grouping (multithreaded)     | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, int batchSize, long begin, long end | List<GanttColumnCount>    |
-| 15 | getGanttSum             | Read     | Two-level SUM grouping                       | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, long begin, long end                | List<GanttColumnSum>      |
-| 16 | getDistinct             | Read     | Get distinct values                          | String tableName, CProfile cProfile, OrderBy orderBy, CompositeFilter compositeFilter, int limit, long begin, long end            | List<String>              |
-| 17 | getRawDataAll           | Read     | Get raw data (all columns, no filter)        | String tableName, long begin, long end                                                                                            | List<List<Object>>        |
-| 18 | getRawDataAll           | Read     | Get raw data (all columns, with filter)      | String tableName, CProfile cProfileFilter, String filter, long begin, long end                                                    | List<List<Object>>        |
-| 19 | getRawDataByColumn      | Read     | Get raw data for specific column             | String tableName, CProfile cProfile, long begin, long end                                                                         | List<List<Object>>        |
-| 20 | getBatchResultSet       | Read     | Batch read (regular tables)                  | String tableName, int fetchSize                                                                                                   | BatchResultSet            |
-| 21 | getBatchResultSet       | Read     | Batch read (time-series tables)              | String tableName, long begin, long end, int fetchSize                                                                             | BatchResultSet            |
-| 22 | getFirst                | Metadata | Get first timestamp                          | String tableName, long begin, long end                                                                                            | long                      |
-| 23 | getLast                 | Metadata | Get last timestamp                           | String tableName, long begin, long end                                                                                            | long                      |
-| 24 | syncBackendDb           | Backend  | Sync Berkley DB to disk                      | -                                                                                                                                 | void                      |
-| 25 | closeBackendDb          | Backend  | Close Berkley DB                             | -                                                                                                                                 | void                      |
+| 5  | setTimestampColumn      | Metadata | Set timestamp column                         | String tableName, String timestampColumnName                                                                                      | void                      |
+| 6  | putDataDirect           | Write    | Save data using Java structure               | String tableName, List<List<Object>> data                                                                                         | void                      |
+| 7  | putDataJdbc             | Write    | Save data from JDBC ResultSet                | String tableName, ResultSet resultSet                                                                                             | long (last row timestamp) |
+| 8  | putDataJdbcBatch        | Write    | Batch save from JDBC ResultSet               | String tableName, ResultSet resultSet, Integer batchSize                                                                          | void                      |
+| 9  | getBlockKeyTailList     | Read     | Get blocks with keys and ranges              | String tableName, long begin, long end                                                                                            | List<BlockKeyTail>        |
+| 10 | getStacked              | Read     | Get aggregated data                          | String tableName, CProfile cProfile, GroupFunction groupFunction, CompositeFilter compositeFilter, long begin, long end           | List<StackedColumn>       |
+| 11 | getGanttCount           | Read     | Two-level COUNT grouping                     | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, long begin, long end                | List<GanttColumnCount>    |
+| 12 | getGanttCount           | Read     | Two-level COUNT grouping (multithreaded)     | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, int batchSize, long begin, long end | List<GanttColumnCount>    |
+| 13 | getGanttSum             | Read     | Two-level SUM grouping                       | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, long begin, long end                | List<GanttColumnSum>      |
+| 14 | getDistinct             | Read     | Get distinct values                          | String tableName, CProfile cProfile, OrderBy orderBy, CompositeFilter compositeFilter, int limit, long begin, long end            | List<String>              |
+| 15 | getRawDataAll           | Read     | Get raw data (all columns, no filter)        | String tableName, long begin, long end                                                                                            | List<List<Object>>        |
+| 16 | getRawDataAll           | Read     | Get raw data (all columns, with filter)      | String tableName, CProfile cProfileFilter, String filter, long begin, long end                                                    | List<List<Object>>        |
+| 17 | getRawDataByColumn      | Read     | Get raw data for specific column             | String tableName, CProfile cProfile, long begin, long end                                                                         | List<List<Object>>        |
+| 18 | getBatchResultSet       | Read     | Batch read (regular tables)                  | String tableName, int fetchSize                                                                                                   | BatchResultSet            |
+| 19 | getBatchResultSet       | Read     | Batch read (time-series tables)              | String tableName, long begin, long end, int fetchSize                                                                             | BatchResultSet            |
+| 20 | getFirst                | Metadata | Get first timestamp                          | String tableName, long begin, long end                                                                                            | long                      |
+| 21 | getLast                 | Metadata | Get last timestamp                           | String tableName, long begin, long end                                                                                            | long                      |
+| 22 | syncBackendDb           | Backend  | Sync Berkley DB to disk                      | -                                                                                                                                 | void                      |
+| 23 | closeBackendDb          | Backend  | Close Berkley DB                             | -                                                                                                                                 | void                      |
 
 [Return to Contents](#contents)
 
@@ -649,12 +640,12 @@ Table 12. Enum GroupFunction for passing the grouping function when calling Stac
 
 Table 13. CSType class for storing storage parameters and data types of table columns
 
-| Property name | Type     | Default value | Description                                                                                                 |
-|---------------|----------|---------------|-------------------------------------------------------------------------------------------------------------|
-| isTimeStamp   | boolean  | false         | Flag indicating the column that stores the timestamp                                                        |
-| sType         | SType    | null          | Data storage type in the table (RAW, HISTOGRAM, ENUM)                                                       |
-| cType         | CType    | null          | Java data type used to store data in Berkley DB (Int, Long, Double, String ... etc.)                        |
-| dType         | DataType | null          | JDBC/CSV data type used to convert data to Berkley DB Java type (INTEGER, DATE, DATETIME, VARCHAR ... etc.) |
+| Property name | Type     | Default value | Description                                                                                             |
+|---------------|----------|---------------|---------------------------------------------------------------------------------------------------------|
+| isTimeStamp   | boolean  | false         | Flag indicating the column that stores the timestamp                                                    |
+| sType         | SType    | null          | Data storage type in the table (RAW, HISTOGRAM, ENUM)                                                   |
+| cType         | CType    | null          | Java data type used to store data in Berkley DB (Int, Long, Double, String ... etc.)                    |
+| dType         | DataType | null          | JDBC data type used to convert data to Berkley DB Java type (INTEGER, DATE, DATETIME, VARCHAR ... etc.) |
 
 [Return to Contents](#contents)
 
@@ -685,9 +676,9 @@ Table 15. CType class for storing the Java data type used to store data in the B
 
 [Return to Contents](#contents)
 
-###### JDBC/CSV Data Storage Type - enum DataType
+###### JDBC Data Storage Type - enum DataType
 
-Table 16. DataType class for storing JDBC/CSV data types, which is used to convert data to Java storage format in Berkley DB database of Dimension DB database table column
+Table 16. DataType class for storing JDBC data types, which is used to convert data to Java storage format in Berkley DB database of Dimension DB database table column
 
 | Property name | Type | Default value | Description                 |
 |---------------|------|---------------|-----------------------------|
@@ -812,31 +803,29 @@ Table 23. Use cases
 | 2  | loadDirectTableMetadata | Metadata | Load metadata from SProfile                  | [loadDirectTableMetadata](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)          |
 | 3  | loadJdbcTableMetadata   | Metadata | Load metadata via JDBC connection with query | [loadJdbcTableMetadata](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
 | 4  | loadJdbcTableMetadata   | Metadata | Load metadata via JDBC (schema and table)    |                                                                                              |
-| 5  | loadCsvTableMetadata    | Metadata | Load metadata from CSV file                  | [loadCsvTableMetadata](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)             |
-| 6  | setTimestampColumn      | Metadata | Set timestamp column                         | [setTimestampColumn](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)               |
-| 7  | putDataDirect           | Write    | Save data using Java structure               | [putDataDirect](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                    |
-| 8  | putDataJdbc             | Write    | Save data from JDBC ResultSet                | [putDataJdbc](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
-| 9  | putDataJdbcBatch        | Write    | Batch save from JDBC ResultSet               | [putDataJdbcBatch](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                 |
-| 10 | putDataCsvBatch         | Write    | Batch save from CSV file                     | [getBatchResultSetRegularTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)    |
-| 11 | getBlockKeyTailList     | Read     | Get blocks with keys and ranges              | [getBlockKeyTailList](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
-| 12 | getStacked              | Read     | Get aggregated data (COUNT/SUM/AVG)          | [getStacked](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                       |
-| 13 | getStacked              | Read     | Get aggregated data with filter              | [getStackedCountFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
-| 14 | getGantt                | Read     | Two-level COUNT grouping (basic)             | [getGantt](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
-| 15 | getGantt                | Read     | Two-level COUNT grouping (multithreaded)     | [getGantt](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
-| 16 | getGantt                | Read     | Two-level COUNT grouping with filter         | [getGanttFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                   |
-| 17 | getGanttSum             | Read     | Two-level SUM grouping (basic)               | [getGanttSum](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
-| 18 | getGanttSum             | Read     | Two-level SUM grouping with filter           | [getGanttSumFiltered](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
-| 19 | getDistinct             | Read     | Get distinct values (basic)                  | [getDistinct](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
-| 20 | getDistinct             | Read     | Get distinct values with filter              | [getDistinctWithFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
-| 21 | getRawDataAll           | Read     | Get raw data (all columns, no filter)        | [getRawDataAll](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                    |
-| 22 | getRawDataAll           | Read     | Get raw data (all columns, with filter)      | [getRawDataAllFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
-| 23 | getRawDataByColumn      | Read     | Get raw data for specific column             | [getRawDataByColumn](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)               |
-| 24 | getBatchResultSet       | Read     | Batch read (regular tables)                  | [getBatchResultSetRegularTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)    |
-| 25 | getBatchResultSet       | Read     | Batch read (time-series tables)              | [getBatchResultSetTimeSeriesTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java) |
-| 26 | getFirst                | Metadata | Get first timestamp                          | [getFirst](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
-| 27 | getLast                 | Metadata | Get last timestamp                           | [getLast](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                          |
-| 28 | syncBackendDb           | Backend  | Sync Berkley DB to disk                      |                                                                                              |
-| 29 | closeBackendDb          | Backend  | Close Berkley DB                             |                                                                                              |
+| 5  | setTimestampColumn      | Metadata | Set timestamp column                         | [setTimestampColumn](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)               |
+| 6  | putDataDirect           | Write    | Save data using Java structure               | [putDataDirect](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                    |
+| 7  | putDataJdbc             | Write    | Save data from JDBC ResultSet                | [putDataJdbc](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
+| 8  | putDataJdbcBatch        | Write    | Batch save from JDBC ResultSet               | [putDataJdbcBatch](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                 |
+| 9  | getBlockKeyTailList     | Read     | Get blocks with keys and ranges              | [getBlockKeyTailList](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
+| 10 | getStacked              | Read     | Get aggregated data (COUNT/SUM/AVG)          | [getStacked](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                       |
+| 11 | getStacked              | Read     | Get aggregated data with filter              | [getStackedCountFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
+| 12 | getGantt                | Read     | Two-level COUNT grouping (basic)             | [getGantt](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
+| 13 | getGantt                | Read     | Two-level COUNT grouping (multithreaded)     | [getGantt](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
+| 14 | getGantt                | Read     | Two-level COUNT grouping with filter         | [getGanttFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                   |
+| 15 | getGanttSum             | Read     | Two-level SUM grouping (basic)               | [getGanttSum](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
+| 16 | getGanttSum             | Read     | Two-level SUM grouping with filter           | [getGanttSumFiltered](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
+| 17 | getDistinct             | Read     | Get distinct values (basic)                  | [getDistinct](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
+| 18 | getDistinct             | Read     | Get distinct values with filter              | [getDistinctWithFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
+| 19 | getRawDataAll           | Read     | Get raw data (all columns, no filter)        | [getRawDataAll](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                    |
+| 20 | getRawDataAll           | Read     | Get raw data (all columns, with filter)      | [getRawDataAllFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
+| 21 | getRawDataByColumn      | Read     | Get raw data for specific column             | [getRawDataByColumn](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)               |
+| 22 | getBatchResultSet       | Read     | Batch read (regular tables)                  | [getBatchResultSetRegularTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)    |
+| 23 | getBatchResultSet       | Read     | Batch read (time-series tables)              | [getBatchResultSetTimeSeriesTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java) |
+| 24 | getFirst                | Metadata | Get first timestamp                          | [getFirst](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
+| 25 | getLast                 | Metadata | Get last timestamp                           | [getLast](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                          |
+| 26 | syncBackendDb           | Backend  | Sync Berkley DB to disk                      |                                                                                              |
+| 27 | closeBackendDb          | Backend  | Close Berkley DB                             |                                                                                              |
 
 [Return to Contents](#contents)
 
@@ -883,38 +872,77 @@ Table 26. Load profiles
 
 | # | TType       | IType  | AType          | Compression | Load (min)    | Size (GB) |
 |--:|-------------|--------|----------------|-------------|---------------|-----------|
-| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 26 min 3 sec  | 9,175     |
-| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 22 min 42 sec | 11,801    |
-| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 21 min 46 sec | 11,968    |
-| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 22 min 59 sec | 11,924    |
+| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 27 min 55 sec | 9,164     |
+| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 21 min 48 sec | 12,287    |
+| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 21 min 58 sec | 12,180    |
+| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 21 min 39 sec | 11,604    |
 
-Table 27. Performance tests for gantt API
+Table 27. Performance tests for gantt API (count)
 
 | № | Test name        | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | PASS_ONCE <br/>Execution time <br/>(single/2-thread) (sec) | PASS_EACH <br/>Execution time <br/>(single/2-thread) (sec) |
 |---|------------------|----------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|
-| 1 | getGanttRawRaw   | 13,6 / 8,5                                               | 13,7 / 10,7                                              | 13,1 / 8,5                                                 | 14,4 / 8,8                                                 |
-| 2 | getGanttEnumEnum | 4,3 / 2,4                                                | 10,4 / 7,9                                               | 9,5 / 6,7                                                  | 10,1 / 7,2                                                 |
-| 3 | getGanttHistHist | 3,4 / 1,8                                                | 13,1 / 9,1                                               | 11,5 / 8,0                                                 | 12,2 / 9,2                                                 |
-| 4 | getGanttHistRaw  | 9,0 / 6,3                                                | 11,1 / 8,3                                               | 10,0 / 7,7                                                 | 10,9 / 7,4                                                 |
-| 5 | getGanttHistEnum | 3,5 / 1,9                                                | 13,4 / 8,4                                               | 11,6 / 8,1                                                 | 12,1 / 7,9                                                 |
-| 6 | getGanttEnumRaw  | 7,7 / 5,2                                                | 12,9 / 9,8                                               | 12,5 / 9,8                                                 | 13,5 / 9,9                                                 |
-| 7 | getGanttEnumHist | 3,6 / 1,9                                                | 14,1 / 10,4                                              | 14,2 / 10,3                                                | 14,0 / 11,2                                                |
-| 8 | getGanttRawHist  | 9,3 / 6,6                                                | 12,9 / 9,4                                               | 12,8 / 9,6                                                 | 13,1 / 9,4                                                 |
-| 9 | getGanttRawEnum  | 10,5 / 7,2                                               | 12,7 / 9,2                                               | 12,6 / 9,0                                                 | 13,4 / 8,9                                                 |
+| 1 | getGanttRawRaw   | 11,6 / 8,2                                               | 12,4 / 8,5                                               | 11,9 / 8,3                                                 | 11,8 / 8,4                                                 |
+| 2 | getGanttEnumEnum | 7,2 / 4,1                                                | 10,3 / 6,8                                               | 9,7 / 6,5                                                  | 9,5 / 6,7                                                  |
+| 3 | getGanttHistHist | 6,5 / 3,5                                                | 11,8 / 8,2                                               | 11,9 / 8,2                                                 | 11,7 / 8,1                                                 |
+| 4 | getGanttHistRaw  | 10,1 / 6,4                                               | 10,2 / 7,5                                               | 9,9 / 7,4                                                  | 10,1 / 7,7                                                 |
+| 5 | getGanttHistEnum | 6,9 / 3,6                                                | 11,5 / 8,1                                               | 11,2 / 8,0                                                 | 12,9 / 8,2                                                 |
+| 6 | getGanttEnumRaw  | 9,2 / 5,9                                                | 12,8 / 9,1                                               | 12,7 / 9,0                                                 | 13,0 / 9,2                                                 |
+| 7 | getGanttEnumHist | 5,8 / 3,4                                                | 13,9 / 9,9                                               | 13,6 / 9,6                                                 | 14,5 / 10,1                                                |
+| 8 | getGanttRawHist  | 8,9 / 6,0                                                | 12,8 / 9,3                                               | 12,6 / 9,2                                                 | 12,7 / 9,3                                                 |
+| 9 | getGanttRawEnum  | 8,4 / 5,9                                                | 12,6 / 9,3                                               | 13,6 / 9,7                                                 | 16,0 / 10,1                                                |
 
-Table 28. Queries Table
+Table 28. Performance tests for gantt API (sum)
 
-| № | Test name        | SQL query                                                                                                                                                                       |
-|---|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | getGanttRawRaw   | `SELECT pickup_cdeligibil, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, vendor_id;`                   |
-| 2 | getGanttHistRaw  | `SELECT trip_type, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, vendor_id;`                                   |
-| 3 | getGanttRawEnum  | `SELECT pickup_cdeligibil, cab_type, COUNT(cab_type) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, cab_type;`                      |
-| 4 | getGanttRawHist  | `SELECT pickup_cdeligibil, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, pickup_boroname;` |
-| 5 | getGanttEnumEnum | `SELECT dropoff_puma, dropoff_borocode, COUNT(dropoff_borocode) FROM datasets.trips_mergetree where toYear(pickup_date) = 2016 group by dropoff_puma, dropoff_borocode;`        |
-| 6 | getGanttEnumHist | `SELECT dropoff_boroname, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, pickup_boroname;`   |
-| 7 | getGanttEnumRaw  | `SELECT dropoff_boroname, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, vendor_id;`                     |
-| 8 | getGanttHistEnum | `SELECT trip_type, dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, dropoff_boroname;`              |
-| 9 | getGanttHistHist | `SELECT trip_type, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, pickup_boroname;`                 |
+| № | Test name                    | ON_LOAD <br/>Execution time | ON_LOAD <br/>Execution time | PASS_ONCE <br/>Execution time | PASS_EACH <br/>Execution time |
+|---|------------------------------|-----------------------------|-----------------------------|-------------------------------|-------------------------------|
+| 1 | getGanttSumHistRaw           | 5,5                         | 7,3                         | 7,4                           | 7,0                           |
+| 2 | getGanttSumEnumRaw           | 5,5                         | 9,7                         | 11,0                          | 10,1                          |
+| 3 | getGanttSumRawRaw            | 8,1                         | 8,6                         | 8,6                           | 8,8                           |
+| 4 | getGanttSumHistHist          | 3,6                         | 6,3                         | 5,7                           | 6,8                           |
+| 5 | getGanttSumEnumEnum          | 4,0                         | 9,7                         | 8,7                           | 14,2                          |
+| 6 | getGanttSumRawEnum           | 7,2                         | 7,6                         | 7,4                           | 8,7                           |
+| 7 | getGanttSumHistRawWithFilter | 5,5                         | 8,8                         | 8,8                           | 14,3                          |
+
+Table 29. Performance tests for stacked API
+
+| № | Test name       | ON_LOAD <br/>Execution time | ON_LOAD <br/>Execution time | PASS_ONCE <br/>Execution time | PASS_EACH <br/>Execution time |
+|---|-----------------|-----------------------------|-----------------------------|-------------------------------|-------------------------------|
+| 1 | stackedHist     | 3,9                         | 5,8                         | 5,4                           | 5,1                           |
+| 2 | stackedHistDate | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
+| 3 | stackedEnum     | 4,0                         | 8,6                         | 8,6                           | 9,8                           |
+| 4 | stackedEnumDate | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
+| 5 | stackedRaw      | 6,5                         | 6,7                         | 7,3                           | 6,6                           |
+| 6 | stackedRawDate  | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
+
+Table 30. Queries Table
+
+| №  | Test name             | SQL query                                                                                                                                                                       |
+|----|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|    | **Gantt API (Count)** |                                                                                                                                                                                 |
+| 1  | getGanttRawRaw        | `SELECT pickup_cdeligibil, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, vendor_id;`                   |
+| 2  | getGanttHistRaw       | `SELECT trip_type, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, vendor_id;`                                   |
+| 3  | getGanttRawEnum       | `SELECT pickup_cdeligibil, cab_type, COUNT(cab_type) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, cab_type;`                      |
+| 4  | getGanttRawHist       | `SELECT pickup_cdeligibil, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, pickup_boroname;` |
+| 5  | getGanttEnumEnum      | `SELECT dropoff_puma, dropoff_borocode, COUNT(dropoff_borocode) FROM datasets.trips_mergetree where toYear(pickup_date) = 2016 group by dropoff_puma, dropoff_borocode;`        |
+| 6  | getGanttEnumHist      | `SELECT dropoff_boroname, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, pickup_boroname;`   |
+| 7  | getGanttEnumRaw       | `SELECT dropoff_boroname, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, vendor_id;`                     |
+| 8  | getGanttHistEnum      | `SELECT trip_type, dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, dropoff_boroname;`              |
+| 9  | getGanttHistHist      | `SELECT trip_type, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, pickup_boroname;`                 |
+|    | **Gantt API (Sum)**   |                                                                                                                                                                                 |
+| 10 | getGanttSumHistRaw    | `SELECT trip_type, SUM(fare_amount) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type;`                                                         |
+| 11 | getGanttSumEnumRaw    | `SELECT pickup_boroname, SUM(trip_distance) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_boroname;`                                           |
+| 12 | getGanttSumRawRaw     | `SELECT vendor_id, SUM(total_amount) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY vendor_id;`                                                        |
+| 13 | getGanttSumHistHist   | `SELECT trip_type, SUM(passenger_count) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type;`                                                     |
+| 14 | getGanttSumEnumEnum   | `SELECT dropoff_boroname, SUM(dropoff_borocode) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname;`                                      |
+| 15 | getGanttSumRawEnum    | `SELECT pickup_cdeligibil, SUM(pickup_borocode) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil;`                                     |
+| 16 | getGanttSumWithFilter | `SELECT trip_type, SUM(fare_amount) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 AND trip_type IN (1, 2) GROUP BY trip_type;`                                 |
+|    | **Stacked API**       |                                                                                                                                                                                 |
+| 17 | stackedHist           | `SELECT trip_type, COUNT(trip_type) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type;`                                                         |
+| 18 | stackedHistDate       | `SELECT trip_type, COUNT(trip_type) FROM datasets.trips_mergetree WHERE toYYYYMMDD(pickup_datetime) = 20160101 GROUP BY trip_type;`                                             |
+| 19 | stackedEnum           | `SELECT dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname;`                                    |
+| 20 | stackedEnumDate       | `SELECT dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYYYYMMDD(pickup_datetime) = 20160101 GROUP BY dropoff_boroname;`                        |
+| 21 | stackedRaw            | `SELECT vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY vendor_id;`                                                         |
+| 22 | stackedRawDate        | `SELECT vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYYYYMMDD(pickup_datetime) = 20160101 GROUP BY vendor_id;`                                             |
 
 ## Download
 - Building and installing Dimension DB from source codes to a local Maven repository is described in the [Building the project](#building-the-project) section.

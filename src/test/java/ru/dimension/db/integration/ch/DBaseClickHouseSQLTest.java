@@ -345,9 +345,8 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
         float retrieved_ch_dt_real = resultSet.getFloat("ch_dt_real");
         Assertions.assertEquals(ch_dt_real, retrieved_ch_dt_real);
 
-        /* TODO Approve with CSV
         String retrieved_ch_dt_text = resultSet.getString("ch_dt_text");
-        Assertions.assertEquals(ch_dt_text, retrieved_ch_dt_text);*/
+        Assertions.assertEquals(ch_dt_text, retrieved_ch_dt_text);
 
         Timestamp retrieved_ch_dt_time = resultSet.getTimestamp("ch_dt_time");
         Assertions.assertEquals(Timestamp.valueOf(utcZoned.toLocalDateTime()), retrieved_ch_dt_time);
@@ -485,9 +484,8 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
     CProfile chDtChar = getCProfile(cProfiles, "ch_dt_char");
     assertEquals(ch_dt_char, getStackedColumnKey(tableName, chDtChar));
 
-    /* TODO Approve with CSV
     CProfile chDtClob = getCProfile(cProfiles, "ch_dt_clob");
-    assertEquals(ch_dt_clob, getStackedColumnKey(tableName, chDtClob));*/
+    assertEquals(ch_dt_clob, getStackedColumnKey(tableName, chDtClob));
 
     CProfile chDtDate = getCProfile(cProfiles, "ch_dt_date");
     LocalDate ch_dt_date_ld = Instant.ofEpochMilli(Long.parseLong(getStackedColumnKey(tableName, chDtDate))).atZone(ZoneId.systemDefault()).toLocalDate();
@@ -508,14 +506,13 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
     CProfile chDtReal = getCProfile(cProfiles, "ch_dt_real");
     assertEquals(ch_dt_real, Float.parseFloat(getStackedColumnKey(tableName, chDtReal)));
 
-    /* TODO Approve with CSV
     CProfile chDtText = getCProfile(cProfiles, "ch_dt_text");
-    assertEquals(ch_dt_text, getStackedColumnKey(tableName, chDtText));*/
+    assertEquals(ch_dt_text, getStackedColumnKey(tableName, chDtText));
 
     CProfile chDtTime = getCProfile(cProfiles, "ch_dt_time");
     Date dateTime = formatter.parse(getStackedColumnKey(tableName, chDtTime));
     LocalDateTime localDateTimeTime = new java.sql.Timestamp(dateTime.getTime()).toLocalDateTime();
-    assertEquals(utcDateTime, localDateTimeTime); // TODO Done
+    assertEquals(utcDateTime, localDateTimeTime);
 
     CProfile chDtUuid = getCProfile(cProfiles, "ch_dt_uuid");
     assertEquals(ch_dt_uuid.toString(), getStackedColumnKey(tableName, chDtUuid));
@@ -572,9 +569,8 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
     CProfile chDtNumeric = getCProfile(cProfiles, "ch_dt_numeric");
     assertEquals(ch_dt_numeric, new BigDecimal(getStackedColumnKey(tableName, chDtNumeric)).setScale(2, RoundingMode.HALF_UP));
 
-    /* TODO Approve with CSV
     CProfile chDtVarchar = getCProfile(cProfiles, "ch_dt_varchar");
-    assertEquals(ch_dt_varchar, getStackedColumnKey(tableName, chDtVarchar));*/
+    assertEquals(ch_dt_varchar, getStackedColumnKey(tableName, chDtVarchar));
 
     CProfile chDtBoolean = getCProfile(cProfiles, "ch_dt_boolean");
     assertEquals(ch_dt_boolean, Boolean.valueOf(getStackedColumnKey(tableName, chDtBoolean)));
@@ -618,138 +614,135 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
 
     /* Test GanttColumn API */
     List<GanttColumnCount> chDtDecInt = getGanttColumn(tableName, chDtDec, chDtInt);
-    assertEquals(ch_dt_dec, new BigDecimal(chDtDecInt.get(0).getKey()).setScale(2, RoundingMode.HALF_UP));
+    assertEquals(ch_dt_dec, new BigDecimal(chDtDecInt.getFirst().getKey()).setScale(2, RoundingMode.HALF_UP));
     assertEquals(ch_dt_int, Integer.valueOf(getGanttKey(chDtDecInt, String.valueOf(ch_dt_int))));
 
     List<GanttColumnCount> chDtIntByte = getGanttColumn(tableName, chDtInt, chDtByte);
-    assertEquals(ch_dt_int, Integer.valueOf(chDtIntByte.get(0).getKey()));
+    assertEquals(ch_dt_int, Integer.valueOf(chDtIntByte.getFirst().getKey()));
     assertEquals(ch_dt_byte, Byte.valueOf(getGanttKey(chDtIntByte, String.valueOf(ch_dt_byte))));
 
     List<GanttColumnCount> chDtByteBool = getGanttColumn(tableName, chDtByte, chDtBool);
-    assertEquals(ch_dt_byte, Byte.valueOf(chDtByteBool.get(0).getKey()));
+    assertEquals(ch_dt_byte, Byte.valueOf(chDtByteBool.getFirst().getKey()));
     assertEquals(ch_dt_bool, Boolean.valueOf(getGanttKey(chDtByteBool, String.valueOf(ch_dt_bool))));
 
     List<GanttColumnCount> chDtBoolChar = getGanttColumn(tableName, chDtBool, chDtChar);
-    assertEquals(ch_dt_bool, Boolean.valueOf(chDtBoolChar.get(0).getKey()));
+    assertEquals(ch_dt_bool, Boolean.valueOf(chDtBoolChar.getFirst().getKey()));
     assertEquals(ch_dt_char, getGanttKey(chDtBoolChar, ch_dt_char));
 
-    /* TODO Approve with CSV
-    List<GanttColumn> chDtCharClob = getGanttColumn(tableName, chDtChar, chDtClob); chDtClob
-    assertEquals(ch_dt_char, chDtCharClob.get(0).getKey());
+    List<GanttColumnCount> chDtCharClob = getGanttColumn(tableName, chDtChar, chDtClob);
+    assertEquals(ch_dt_char, chDtCharClob.getFirst().getKey());
     assertEquals(ch_dt_clob, getGanttKey(chDtCharClob, ch_dt_clob));
 
-    List<GanttColumn> chDtClobDate = getGanttColumn(tableName, chDtClob, chDtDate);
-    assertEquals(ch_dt_clob, chDtClobDate.get(0).getKey());
-    assertEquals(ch_dt_date, Instant.ofEpochMilli(Long.parseLong(getGanttKey(chDtClobDate, String.valueOf(Long.parseLong(getStackedColumnKey(tableName, chDtDate))))) * 1000).atZone(ZoneId.systemDefault()).toLocalDate());*/
+    List<GanttColumnCount> chDtDateClob = getGanttColumn(tableName, chDtDate, chDtClob);
+    assertEquals(ch_dt_date, Instant.ofEpochMilli(Long.parseLong(chDtDateClob.getFirst().getKey())).atZone(ZoneId.systemDefault()).toLocalDate());
+    assertEquals(ch_dt_clob, getGanttKey(chDtDateClob, ch_dt_clob));
 
     List<GanttColumnCount> chDtDateEnum8 = getGanttColumn(tableName, chDtDate, chDtEnum8);
-    assertEquals(ch_dt_date, Instant.ofEpochMilli(Long.parseLong(String.valueOf(Long.parseLong(chDtDateEnum8.get(0).getKey())))).atZone(ZoneId.systemDefault()).toLocalDate());
+    assertEquals(ch_dt_date, Instant.ofEpochMilli(Long.parseLong(String.valueOf(Long.parseLong(chDtDateEnum8.getFirst().getKey())))).atZone(ZoneId.systemDefault()).toLocalDate());
     assertEquals(ch_dt_enum8, getGanttKey(chDtDateEnum8, ch_dt_enum8));
 
     List<GanttColumnCount> chDtEnum8Enum16 = getGanttColumn(tableName, chDtEnum8, chDtEnum16);
-    assertEquals(ch_dt_enum8, chDtEnum8Enum16.get(0).getKey());
+    assertEquals(ch_dt_enum8, chDtEnum8Enum16.getFirst().getKey());
     assertEquals(ch_dt_enum16, getGanttKey(chDtEnum8Enum16, ch_dt_enum16));
 
     List<GanttColumnCount> chDtEnum16Int1 = getGanttColumn(tableName, chDtEnum16, chDtInt1);
-    assertEquals(ch_dt_enum16, chDtEnum16Int1.get(0).getKey());
+    assertEquals(ch_dt_enum16, chDtEnum16Int1.getFirst().getKey());
     assertEquals(ch_dt_int1, Byte.valueOf(getGanttKey(chDtEnum16Int1, String.valueOf(ch_dt_int1))));
 
     List<GanttColumnCount> chDtInt1Int8 = getGanttColumn(tableName, chDtInt1, chDtInt8);
-    assertEquals(ch_dt_int1, Byte.valueOf(chDtInt1Int8.get(0).getKey()));
+    assertEquals(ch_dt_int1, Byte.valueOf(chDtInt1Int8.getFirst().getKey()));
     assertEquals(ch_dt_int8, Byte.valueOf(getGanttKey(chDtInt1Int8, String.valueOf(ch_dt_int8))));
 
     List<GanttColumnCount> chDtInt8Real = getGanttColumn(tableName, chDtInt8, chDtReal);
-    assertEquals(ch_dt_int8, Byte.valueOf(chDtInt8Real.get(0).getKey()));
+    assertEquals(ch_dt_int8, Byte.valueOf(chDtInt8Real.getFirst().getKey()));
     assertEquals(ch_dt_real, Float.parseFloat(getGanttKey(chDtInt8Real, getStackedColumnKey(tableName, chDtReal))));
 
-    /* TODO Approve with CSV
-    List<GanttColumn> chDtRealText = getGanttColumn(tableName, chDtReal, chDtText);
-    assertEquals(ch_dt_real, Float.parseFloat(chDtRealText.get(0).getKey()));
-    assertEquals(ch_dt_text, getGanttKey(chDtRealText, ch_dt_text));*/
+    List<GanttColumnCount> chDtRealText = getGanttColumn(tableName, chDtReal, chDtText);
+    assertEquals(ch_dt_real, Float.parseFloat(chDtRealText.getFirst().getKey()));
+    assertEquals(ch_dt_text, getGanttKey(chDtRealText, ch_dt_text));
 
     List<GanttColumnCount> chDtTimeUuid = getGanttColumn(tableName, chDtTime, chDtUuid);
-    Date dateTimeGC = formatter.parse(chDtTimeUuid.get(0).getKey());
+    Date dateTimeGC = formatter.parse(chDtTimeUuid.getFirst().getKey());
     LocalDateTime localDateTimeTimeGC = new java.sql.Timestamp(dateTimeGC.getTime()).toLocalDateTime();
-    assertEquals(utcDateTime, localDateTimeTimeGC); // TODO Done
+    assertEquals(utcDateTime, localDateTimeTimeGC);
     assertEquals(ch_dt_uuid, UUID.fromString(getGanttKey(chDtTimeUuid, ch_dt_uuid.toString())));
 
     List<GanttColumnCount> chDtUint8Enum8_2 = getGanttColumn(tableName, chDtUint8, chDtEnum8_2);
-    assertEquals(ch_dt_uint8, Short.valueOf(chDtUint8Enum8_2.get(0).getKey()));
+    assertEquals(ch_dt_uint8, Short.valueOf(chDtUint8Enum8_2.getFirst().getKey()));
     assertEquals(ch_dt_enum8_2, getGanttKey(chDtUint8Enum8_2, ch_dt_enum8_2));
 
     List<GanttColumnCount> chDtInt16Int32 = getGanttColumn(tableName, chDtInt16, chDtInt32);
-    assertEquals(ch_dt_int16, Short.valueOf(chDtInt16Int32.get(0).getKey()));
+    assertEquals(ch_dt_int16, Short.valueOf(chDtInt16Int32.getFirst().getKey()));
     assertEquals(ch_dt_int32, Long.valueOf(getGanttKey(chDtInt16Int32, String.valueOf(ch_dt_int32))));
 
     List<GanttColumnCount> chDtInt32Int64 = getGanttColumn(tableName, chDtInt32, chDtINT64);
-    assertEquals(ch_dt_int32, Long.valueOf(chDtInt32Int64.get(0).getKey()));
+    assertEquals(ch_dt_int32, Long.valueOf(chDtInt32Int64.getFirst().getKey()));
     assertEquals(ch_dt_int64, Long.valueOf(getGanttKey(chDtInt32Int64, String.valueOf(ch_dt_int64))));
 
     List<GanttColumnCount> chDtDoubleDate32 = getGanttColumn(tableName, chDtDouble, chDtDate32);
-    assertEquals(ch_dt_double, Double.parseDouble(chDtDoubleDate32.get(0).getKey()));
+    assertEquals(ch_dt_double, Double.parseDouble(chDtDoubleDate32.getFirst().getKey()));
     LocalDate ch_dt_date_32GC = Instant.ofEpochMilli(Long.parseLong(getGanttKey(chDtDoubleDate32, getStackedColumnKey(tableName, chDtDate32)))).atZone(ZoneId.systemDefault()).toLocalDate();
     assertEquals(ch_dt_date32, ch_dt_date_32GC);
 
     List<GanttColumnCount> chDtEnum16_2Int128 = getGanttColumn(tableName, chDtEnum16_2, chDtInt128);
-    assertEquals(ch_dt_enum16_2, chDtEnum16_2Int128.get(0).getKey());
+    assertEquals(ch_dt_enum16_2, chDtEnum16_2Int128.getFirst().getKey());
     assertEquals(ch_dt_int128, getGanttKey(chDtEnum16_2Int128, ch_dt_int128));
 
     List<GanttColumnCount> chDtInt256Uint16 = getGanttColumn(tableName, chDtInt256, chDtUint16);
-    assertEquals(ch_dt_int256, chDtInt256Uint16.get(0).getKey());
+    assertEquals(ch_dt_int256, chDtInt256Uint16.getFirst().getKey());
     assertEquals(ch_dt_uint16, Integer.valueOf(getGanttKey(chDtInt256Uint16, String.valueOf(ch_dt_uint16))));
 
     List<GanttColumnCount> chDtUint32Decimal = getGanttColumn(tableName, chDtUint32, chDtDecimal);
-    assertEquals(ch_dt_uint32, Long.valueOf(chDtUint32Decimal.get(0).getKey()));
+    assertEquals(ch_dt_uint32, Long.valueOf(chDtUint32Decimal.getFirst().getKey()));
     assertEquals(ch_dt_decimal, new BigDecimal(getGanttKey(chDtUint32Decimal, ch_dt_decimal.toString())).setScale(2, RoundingMode.HALF_UP));
 
     List<GanttColumnCount> chDtFloat32Float64 = getGanttColumn(tableName, chDtFloat32, chDtFloat64);
-    assertEquals(ch_dt_float32, Float.parseFloat(chDtFloat32Float64.get(0).getKey()));
+    assertEquals(ch_dt_float32, Float.parseFloat(chDtFloat32Float64.getFirst().getKey()));
     assertEquals(String.format("%.2f", ch_dt_float64), String.format("%.2f", Double.parseDouble(getGanttKey(chDtFloat32Float64, getStackedColumnKey(tableName, chDtFloat64)))));
 
     List<GanttColumnCount> chDtIntegerNumeric = getGanttColumn(tableName, chDtInteger, chDtNumeric);
-    assertEquals(ch_dt_integer, Integer.valueOf(chDtIntegerNumeric.get(0).getKey()));
+    assertEquals(ch_dt_integer, Integer.valueOf(chDtIntegerNumeric.getFirst().getKey()));
     assertEquals(ch_dt_numeric, new BigDecimal(getGanttKey(chDtIntegerNumeric, ch_dt_numeric.toString())).setScale(2, RoundingMode.HALF_UP));
 
-    /* TODO Approve with CSV
-    List<GanttColumn> chDtVarcharBoolean = getGanttColumn(tableName, chDtVarchar, chDtBoolean);
-    assertEquals(ch_dt_varchar, chDtVarcharBoolean.get(0).getKey());
-    assertEquals(ch_dt_boolean, Boolean.valueOf(getGanttKey(chDtVarcharBoolean, String.valueOf(ch_dt_boolean))));*/
+    List<GanttColumnCount> chDtVarcharBoolean = getGanttColumn(tableName, chDtVarchar, chDtBoolean);
+    assertEquals(ch_dt_varchar, chDtVarcharBoolean.getFirst().getKey());
+    assertEquals(ch_dt_boolean, Boolean.valueOf(getGanttKey(chDtVarcharBoolean, String.valueOf(ch_dt_boolean))));
 
     List<GanttColumnCount> chDtDatetimeNvarchar = getGanttColumn(tableName, chDtDatetime, chDtNvarchar);
-    Date dateTimeVarcharGC = formatter.parse(chDtDatetimeNvarchar.get(0).getKey());
+    Date dateTimeVarcharGC = formatter.parse(chDtDatetimeNvarchar.getFirst().getKey());
     LocalDateTime localDateTimeTimeVarcharGC = new java.sql.Timestamp(dateTimeVarcharGC.getTime()).toLocalDateTime();
     assertEquals(ch_dt_datetime, localDateTimeTimeVarcharGC);
     assertEquals(ch_dt_nvarchar, getGanttKey(chDtDatetimeNvarchar, ch_dt_nvarchar));
 
     List<GanttColumnCount> chDtSmallintTimestamp = getGanttColumn(tableName, chDtSmallint, chDtFixedstring);
-    assertEquals(ch_dt_smallint, Short.valueOf(chDtSmallintTimestamp.get(0).getKey()));
+    assertEquals(ch_dt_smallint, Short.valueOf(chDtSmallintTimestamp.getFirst().getKey()));
     assertEquals(ch_dt_fixedstring, getGanttKey(chDtSmallintTimestamp, ch_dt_fixedstring).trim());
 
     List<GanttColumnCount> chDtFixedStringIpv4 = getGanttColumn(tableName, chDtFixedstring, chDtIpv4);
-    assertEquals(ch_dt_fixedstring, chDtFixedStringIpv4.get(0).getKey().trim());
+    assertEquals(ch_dt_fixedstring, chDtFixedStringIpv4.getFirst().getKey().trim());
     assertEquals(ch_dt_ipv4, getGanttKey(chDtFixedStringIpv4, ch_dt_ipv4).trim());
 
     List<GanttColumnCount> chDtIpv4tIpv6 = getGanttColumn(tableName, chDtIpv4, chDtIpv6);
-    assertEquals(ch_dt_ipv4, chDtIpv4tIpv6.get(0).getKey());
+    assertEquals(ch_dt_ipv4, chDtIpv4tIpv6.getFirst().getKey());
     assertEquals(InetAddress.getByName(ch_dt_ipv6).getHostAddress(), getGanttKey(chDtIpv4tIpv6, InetAddress.getByName(ch_dt_ipv6).getHostAddress()));
 
     List<GanttColumnCount> chDtIpv6NumberArray = getGanttColumn(tableName, chDtIpv6, chDtNumberArray);
-    assertEquals(InetAddress.getByName(ch_dt_ipv6).getHostAddress(), chDtIpv6NumberArray.get(0).getKey());
+    assertEquals(InetAddress.getByName(ch_dt_ipv6).getHostAddress(), chDtIpv6NumberArray.getFirst().getKey());
     //assertEquals(Arrays.toString(ch_dt_number_array), getGanttKey(chDtIpv6NumberArray, Arrays.toString(ch_dt_number_array)));
     //TODO Investigate it
 
     List<GanttColumnCount> chDtNumberStringArray = getGanttColumn(tableName, chDtNumberArray, chDtStringArray);
-    assertEquals(String.valueOf(123), chDtNumberStringArray.get(0).getKey());
+    assertEquals(String.valueOf(123), chDtNumberStringArray.getFirst().getKey());
     //assertEquals(Arrays.toString(ch_dt_string_array), getGanttKey(chDtNumberStringArray, Arrays.toString(ch_dt_string_array)));
     //TODO Investigate it
 
     List<GanttColumnCount> chDtStringArrayMap = getGanttColumn(tableName, chDtStringArray, chDtStringLongMap);
-    assertEquals(String.valueOf(1234), chDtStringArrayMap.get(0).getKey());
+    assertEquals(String.valueOf(1234), chDtStringArrayMap.getFirst().getKey());
     //assertEquals(String.valueOf(ch_dt_string_int_map), getGanttKey(chDtStringArrayMap, String.valueOf(ch_dt_string_int_map)));
     //TODO Investigate it
 
     List<GanttColumnCount> chDtStringMapArray = getGanttColumn(tableName, chDtStringLongMap, chDtStringArray);
-    assertEquals("KeyOne", chDtStringMapArray.get(0).getKey());
+    assertEquals("KeyOne", chDtStringMapArray.getFirst().getKey());
     //assertEquals(Arrays.toString(ch_dt_string_array), getGanttKey(chDtStringMapArray, Arrays.toString(ch_dt_string_array)));
     //TODO Investigate it
 
@@ -838,7 +831,7 @@ public class DBaseClickHouseSQLTest extends AbstractBackendSQLTest {
   }
 
   private String getGanttKey(List<GanttColumnCount> ganttColumnCountList, String filter) {
-    return ganttColumnCountList.get(0).getGantt()
+    return ganttColumnCountList.getFirst().getGantt()
         .entrySet()
         .stream()
         .filter(f -> f.getKey().trim().equalsIgnoreCase(filter))

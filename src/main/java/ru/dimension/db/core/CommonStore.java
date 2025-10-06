@@ -168,18 +168,6 @@ public abstract class CommonStore implements DStore {
   }
 
   @Override
-  public TProfile loadCsvTableMetadata(String fileName,
-                                       String csvSplitBy,
-                                       SProfile sProfile)
-      throws TableNameEmptyException {
-    checkAndInitializeMetaModel();
-    return loadTableMetadata(sProfile,
-                             () -> fetchMetadataFromCsv(fileName, csvSplitBy, sProfile),
-                             () -> {
-                             });
-  }
-
-  @Override
   public void setTimestampColumn(String tableName,
                                  String timestampColumnName)
       throws TableNameEmptyException {
@@ -404,30 +392,6 @@ public abstract class CommonStore implements DStore {
         .build();
   }
 
-  private void fetchMetadataFromCsv(String fileName,
-                                    String csvSplitBy,
-                                    SProfile sProfile) {
-    byte tableId = MetaModelHandler.getNextInternalTableId(metaModel);
-    String tableName = sProfile.getTableName();
-
-    try {
-      if (sProfile.getCsTypeMap().isEmpty()) {
-        MetadataHandler.loadMetadataFromCsv(fileName, csvSplitBy, sProfile);
-      }
-      List<CProfile> cProfileList = MetadataHandler.getCsvCProfileList(sProfile);
-
-      metaModel.getMetadata().put(tableName, new TableMetadata()
-          .setTableId(tableId)
-          .setTableType(sProfile.getTableType())
-          .setIndexType(sProfile.getIndexType())
-          .setBackendType(sProfile.getBackendType())
-          .setCompression(sProfile.getCompression())
-          .setCProfiles(cProfileList));
-    } catch (Exception e) {
-      log.catching(e);
-    }
-  }
-
   private void fillTProfileAndSaveMetaModel(String tableName,
                                             SProfile sProfile,
                                             TProfile tProfile) {
@@ -552,24 +516,6 @@ public abstract class CommonStore implements DStore {
     }
 
     this.storeService.putDataJdbcBatch(tableName, resultSet, batchSize);
-  }
-
-  @Override
-  public void putDataCsvBatch(String tableName,
-                              String fileName,
-                              String csvSplitBy,
-                              Integer batchSize) throws SqlColMetadataException {
-
-    if (this.metaModel.getMetadata().get(tableName) == null) {
-      throw new SqlColMetadataException("Empty sql column metadata for DBase instance..");
-    }
-
-    if (batchSize <= 0) {
-      log.warn("Batch size can not be less or equal 0. Set to the default value of 1");
-      batchSize = 1;
-    }
-
-    this.storeService.putDataCsvBatch(tableName, fileName, csvSplitBy, batchSize);
   }
 
   @Override

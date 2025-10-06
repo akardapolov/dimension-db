@@ -1,5 +1,8 @@
 package ru.dimension.db.service.impl;
 
+import static ru.dimension.db.util.MapArrayUtil.parseStringToTypedArray;
+import static ru.dimension.db.util.MapArrayUtil.parseStringToTypedMap;
+
 import com.sleepycat.persist.EntityCursor;
 import java.text.Collator;
 import java.time.LocalDateTime;
@@ -12,13 +15,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.core.metamodel.MetaModelApi;
@@ -38,14 +38,15 @@ import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.service.CommonServiceApi;
 import ru.dimension.db.service.GroupByService;
+import ru.dimension.db.service.mapping.Mapper;
 import ru.dimension.db.storage.Converter;
 import ru.dimension.db.storage.EnumDAO;
 import ru.dimension.db.storage.HistogramDAO;
 import ru.dimension.db.storage.RawDAO;
 import ru.dimension.db.storage.bdb.entity.Metadata;
 import ru.dimension.db.storage.bdb.entity.MetadataKey;
-import ru.dimension.db.storage.bdb.entity.column.EColumn;
-import ru.dimension.db.storage.helper.EnumHelper;
+import ru.dimension.db.storage.format.StorageContext;
+import ru.dimension.db.storage.format.StorageManager;
 
 @Log4j2
 public class GroupByServiceImpl extends CommonServiceApi implements GroupByService {
@@ -55,6 +56,8 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
   private final HistogramDAO histogramDAO;
   private final RawDAO rawDAO;
   private final EnumDAO enumDAO;
+
+  private final StorageManager storageManager;
 
   public GroupByServiceImpl(MetaModelApi metaModelApi,
                             Converter converter,
@@ -66,8 +69,8 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     this.histogramDAO = histogramDAO;
     this.rawDAO = rawDAO;
     this.enumDAO = enumDAO;
- }
-
+    this.storageManager = new StorageManager();
+  }
 
   @Override
   public List<StackedColumn> getStacked(String tableName,
@@ -86,239 +89,135 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
       throw new SqlColMetadataException("Not supported for timestamp column..");
     }
 
-    if (GroupFunction.COUNT.equals(groupFunction)) {
-      return this.getListStackedColumnCountWithCompositeFilter(tableName, tsProfile, cProfile, compositeFilter, begin, end);
-    } else if (GroupFunction.SUM.equals(groupFunction)) {
-      return this.getListStackedColumnSumWithCompositeFilter(tableName, tsProfile, cProfile, compositeFilter, begin, end);
-    } else if (GroupFunction.AVG.equals(groupFunction)) {
-      return this.getListStackedColumnAvgWithCompositeFilter(tableName, tsProfile, cProfile, compositeFilter, begin, end);
-    } else {
-      throw new RuntimeException("Group function not supported: " + groupFunction);
-    }
-  }
-
-  private List<StackedColumn> getListStackedColumnCountWithCompositeFilter(String tableName,
-                                                                           CProfile tsProfile,
-                                                                           CProfile cProfile,
-                                                                           CompositeFilter compositeFilter,
-                                                                           long begin,
-                                                                           long end) {
-    BType bType = metaModelApi.getBackendType(tableName);
-
-    if (!BType.BERKLEYDB.equals(bType)) {
-      return rawDAO.getStacked(tableName, tsProfile, cProfile, GroupFunction.COUNT, compositeFilter, begin, end);
-    }
-
-    byte tableId = metaModelApi.getTableId(tableName);
-    List<StackedColumn> list = new ArrayList<>();
-
-    long previousBlockId = this.rawDAO.getPreviousBlockId(tableId, begin);
-    if (previousBlockId != begin && previousBlockId != 0) {
-      processBlockWithCompositeFilter(tableId, tsProfile, cProfile, compositeFilter, previousBlockId, begin, end, list);
-    }
-
-    this.rawDAO.getListBlockIds(tableId, begin, end).forEach(blockId ->
-                                                                 processBlockWithCompositeFilter(tableId, tsProfile, cProfile, compositeFilter, blockId, begin, end, list)
-    );
-
-    if (DataType.MAP.equals(cProfile.getCsType().getDType())) {
-      return handleMap(list);
-    } else if (DataType.ARRAY.equals(cProfile.getCsType().getDType())) {
-      return handleArray(list);
-    }
-
-    return list;
-  }
-
-  private List<StackedColumn> getListStackedColumnSumWithCompositeFilter(String tableName,
-                                                                         CProfile tsProfile,
-                                                                         CProfile cProfile,
-                                                                         CompositeFilter compositeFilter,
-                                                                         long begin,
-                                                                         long end) {
-    BType bType = metaModelApi.getBackendType(tableName);
-
-    if (!BType.BERKLEYDB.equals(bType)) {
-      return rawDAO.getStacked(tableName, tsProfile, cProfile, GroupFunction.SUM, compositeFilter, begin, end);
-    }
-
-    byte tableId = metaModelApi.getTableId(tableName);
-
-    StackedColumn stackedColumn = StackedColumn.builder().key(begin).tail(end).build();
-    stackedColumn.setKeySum(new HashMap<>());
-
-    List<Object> columnData = getColumnDataWithCompositeFilter(tableId, tsProfile, cProfile, compositeFilter, begin, end);
-
-    double sum = columnData.stream()
-        .filter(item -> item != null && !((String) item).isEmpty())
-        .mapToDouble(item -> Double.parseDouble((String) item))
-        .sum();
-
-    stackedColumn.getKeySum().put(cProfile.getColName(), sum);
-
-    return List.of(stackedColumn);
-  }
-
-  private List<StackedColumn> getListStackedColumnAvgWithCompositeFilter(String tableName,
-                                                                         CProfile tsProfile,
-                                                                         CProfile cProfile,
-                                                                         CompositeFilter compositeFilter,
-                                                                         long begin,
-                                                                         long end) {
-    BType bType = metaModelApi.getBackendType(tableName);
-
-    if (!BType.BERKLEYDB.equals(bType)) {
-      return rawDAO.getStacked(tableName, tsProfile, cProfile, GroupFunction.AVG, compositeFilter, begin, end);
-    }
-
-    byte tableId = metaModelApi.getTableId(tableName);
-
-    StackedColumn stackedColumn = StackedColumn.builder().key(begin).tail(end).build();
-    stackedColumn.setKeyAvg(new HashMap<>());
-
-    List<Object> columnData = getColumnDataWithCompositeFilter(tableId, tsProfile, cProfile, compositeFilter, begin, end);
-
-    OptionalDouble average = columnData.stream()
-        .filter(item -> item != null && !((String) item).isEmpty())
-        .mapToDouble(item -> Double.parseDouble((String) item))
-        .average();
-
-    stackedColumn.getKeyAvg().put(cProfile.getColName(), average.orElse(0.0));
-
-    return List.of(stackedColumn);
-  }
-
-  private List<Object> getColumnDataWithCompositeFilter(byte tableId,
-                                                        CProfile tsProfile,
-                                                        CProfile cProfile,
-                                                        CompositeFilter compositeFilter,
-                                                        long begin,
-                                                        long end) {
-    List<Object> columnData = new ArrayList<>();
-
-    long previousBlockId = this.rawDAO.getPreviousBlockId(tableId, begin);
-    if (previousBlockId != begin && previousBlockId != 0) {
-      this.computeFilteredRawDataWithCompositeFilter(tableId, tsProfile, cProfile, compositeFilter, previousBlockId, begin, end, columnData);
-    }
-
-    this.rawDAO.getListBlockIds(tableId, begin, end)
-        .forEach(blockId ->
-                     this.computeFilteredRawDataWithCompositeFilter(tableId, tsProfile, cProfile, compositeFilter, blockId, begin, end, columnData));
-
-    return columnData;
-  }
-
-  private void computeFilteredRawDataWithCompositeFilter(byte tableId,
-                                                         CProfile tsProfile,
-                                                         CProfile cProfile,
-                                                         CompositeFilter compositeFilter,
-                                                         long blockId,
-                                                         long begin,
-                                                         long end,
-                                                         List<Object> columnData) {
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsProfile.getColId());
-
-    // Get target column values
-    String[] targetColumnValues = getStringArrayValues(rawDAO, enumDAO, histogramDAO, converter, tableId, cProfile, blockId, timestamps);
-
-    // Get values for filter conditions
-    Map<CProfile, String[]> filterValuesMap = new HashMap<>();
-    if (compositeFilter != null) {
-      for (FilterCondition condition : compositeFilter.getConditions()) {
-        String[] conditionValues = getStringArrayValues(rawDAO, enumDAO, histogramDAO, converter,
-                                                        tableId, condition.getCProfile(), blockId, timestamps);
-        filterValuesMap.put(condition.getCProfile(), conditionValues);
+    if (groupFunction == GroupFunction.SUM || groupFunction == GroupFunction.AVG) {
+      CType cType = cProfile.getCsType().getCType();
+      if (!(cType == CType.INT || cType == CType.LONG || cType == CType.FLOAT || cType == CType.DOUBLE)) {
+        throw new RuntimeException("Group function " + groupFunction + " not supported for non-numeric column: " + cProfile.getColName());
       }
     }
 
-    for (int i = 0; i < timestamps.length; i++) {
-      if (timestamps[i] >= begin && timestamps[i] <= end) {
-        boolean shouldInclude = true;
+    BType bType = metaModelApi.getBackendType(tableName);
+    if (!BType.BERKLEYDB.equals(bType)) {
+      return rawDAO.getStacked(tableName, tsProfile, cProfile, groupFunction, compositeFilter, begin, end);
+    }
 
-        if (compositeFilter != null) {
-          // Build values array in correct order for filter conditions - FIXED ORDER
-          String[] filterValues = new String[compositeFilter.getConditions().size()];
-          int idx = 0;
-          for (FilterCondition condition : compositeFilter.getConditions()) {
-            filterValues[idx++] = filterValuesMap.get(condition.getCProfile())[i];
+    byte tableId = metaModelApi.getTableId(tableName);
+    int tsColId = tsProfile.getColId();
+
+    long previousBlockId = this.rawDAO.getPreviousBlockId(tableId, begin);
+    Map.Entry<MetadataKey, MetadataKey> keyEntry = getMetadataKeyPair(tableId, begin, end, previousBlockId);
+
+    List<StackedColumn> result = new ArrayList<>();
+
+    boolean aggregateAsSingle = (groupFunction == GroupFunction.SUM || groupFunction == GroupFunction.AVG);
+    double totalSum = 0.0;
+    int totalCount = 0;
+    boolean anyAccepted = false;
+
+    try (EntityCursor<Metadata> cursor = rawDAO.getMetadataEntityCursor(keyEntry.getKey(), keyEntry.getValue())) {
+      Metadata columnKey;
+
+      while ((columnKey = cursor.next()) != null) {
+        long blockId = columnKey.getMetadataKey().getBlockId();
+        long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
+
+        StorageContext context = StorageContext.builder()
+            .tableId(tableId)
+            .blockId(blockId)
+            .timestamps(timestamps)
+            .rawDAO(rawDAO)
+            .enumDAO(enumDAO)
+            .histogramDAO(histogramDAO)
+            .converter(converter)
+            .build();
+
+        SType targetSType = getSType(cProfile.getColId(), columnKey);
+
+        Map<FilterCondition, String[]> filterCache = buildFilterCacheWithFormats(compositeFilter, context, columnKey);
+        BitSet acceptedRows = acceptedRows(timestamps, begin, end, compositeFilter, filterCache);
+
+        if (acceptedRows.isEmpty()) {
+          continue;
+        }
+
+        switch (groupFunction) {
+          case COUNT: {
+            processStackedCount(context, cProfile, targetSType, acceptedRows, blockId, timestamps, result, compositeFilter);
+            break;
           }
-          shouldInclude = compositeFilter.test(filterValues);
-        }
-
-        if (shouldInclude) {
-          columnData.add(targetColumnValues[i]);
-        }
-      }
-    }
-  }
-
-  private void processBlockWithCompositeFilter(byte tableId,
-                                               CProfile tsProfile,
-                                               CProfile cProfile,
-                                               CompositeFilter compositeFilter,
-                                               long blockId,
-                                               long begin,
-                                               long end,
-                                               List<StackedColumn> list) {
-    try {
-      long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsProfile.getColId());
-
-      // Get the target column value
-      String[] targetColumnValues = getStringArrayValues(
-          rawDAO, enumDAO, histogramDAO, converter,
-          tableId, cProfile, blockId, timestamps
-      );
-
-      // Only get filter values if we have a composite filter
-      Map<CProfile, String[]> filterColumnValuesMap = new HashMap<>();
-      if (compositeFilter != null) {
-        for (FilterCondition condition : compositeFilter.getConditions()) {
-          String[] conditionValues = getStringArrayValues(
-              rawDAO, enumDAO, histogramDAO, converter,
-              tableId, condition.getCProfile(), blockId, timestamps
-          );
-          filterColumnValuesMap.put(condition.getCProfile(), conditionValues);
-        }
-      }
-
-      Map<String, Integer> valueCounts = new LinkedHashMap<>();
-      long lastTimestamp = timestamps.length > 0 ? timestamps[timestamps.length - 1] : 0;
-
-      for (int i = 0; i < timestamps.length; i++) {
-        long timestamp = timestamps[i];
-
-        if (timestamp >= begin && timestamp <= end) {
-          boolean includeRow = true;
-
-          // Apply composite filter if present
-          if (compositeFilter != null) {
-            // Prepare values array for composite filter evaluation - FIXED ORDER
-            String[] valuesForFilter = new String[compositeFilter.getConditions().size()];
-            int index = 0;
-            for (FilterCondition condition : compositeFilter.getConditions()) {
-              valuesForFilter[index++] = filterColumnValuesMap.get(condition.getCProfile())[i];
+          case SUM:
+          case AVG: {
+            try {
+              double[] targetValues = storageManager.readDoubleValues(context, cProfile, targetSType);
+              for (int i = acceptedRows.nextSetBit(0); i >= 0 && i < targetValues.length; i = acceptedRows.nextSetBit(i + 1)) {
+                totalSum += targetValues[i];
+                totalCount++;
+              }
+              anyAccepted = true;
+            } catch (Exception e) {
+              log.error("Failed to fetch numeric values for '{}' using SType '{}': {}",
+                        cProfile.getColName(), targetSType, e.toString(), e);
+              throw new RuntimeException("Failed to compute " + groupFunction + " for " + cProfile.getColName(), e);
             }
-
-            includeRow = compositeFilter.test(valuesForFilter);
+            break;
           }
-
-          if (includeRow) {
-            String value = targetColumnValues[i] != null ? targetColumnValues[i] : "";
-            valueCounts.compute(value, (k, count) -> count == null ? 1 : count + 1);
-          }
+          default:
+            throw new RuntimeException("Group function not supported: " + groupFunction);
         }
+      }
+    } catch (RuntimeException re) {
+      throw re;
+    } catch (Exception e) {
+      log.error("Error processing stacked data: ", e);
+    }
+
+    if (aggregateAsSingle && anyAccepted) {
+      StackedColumn column = StackedColumn.builder()
+          .key(begin)
+          .tail(end)
+          .build();
+      if (groupFunction == GroupFunction.SUM) {
+        column.setKeySum(new HashMap<>());
+        column.getKeySum().put(cProfile.getColName(), totalSum);
+      } else {
+        double average = (totalCount > 0) ? (totalSum / totalCount) : 0.0;
+        column.setKeyAvg(new HashMap<>());
+        column.getKeyAvg().put(cProfile.getColName(), average);
+      }
+      result.add(column);
+    }
+
+    return result;
+  }
+
+  private void processStackedCount(StorageContext context,
+                                   CProfile cProfile,
+                                   SType sType,
+                                   BitSet acceptedRows,
+                                   long blockId,
+                                   long[] timestamps,
+                                   List<StackedColumn> result,
+                                   CompositeFilter compositeFilter) {
+    try {
+      String[] targetValues = storageManager.readStringValues(context, cProfile, sType);
+      Map<String, Integer> valueCounts = new LinkedHashMap<>();
+
+      for (int i = acceptedRows.nextSetBit(0); i >= 0 && i < targetValues.length; i = acceptedRows.nextSetBit(i + 1)) {
+        String value = targetValues[i] != null ? targetValues[i] : "";
+        processValueByDataType(value, valueCounts, cProfile, compositeFilter);
       }
 
       if (!valueCounts.isEmpty()) {
+        long lastTimestamp = timestamps.length > 0 ? timestamps[timestamps.length - 1] : blockId;
         StackedColumn column = StackedColumn.builder()
             .key(blockId)
             .tail(lastTimestamp)
             .keyCount(valueCounts)
             .build();
-        list.add(column);
+        result.add(column);
       }
     } catch (Exception e) {
-      log.error("Error processing block {}: {}", blockId, e.getMessage(), e);
+      log.error("Failed to process stacked count for column '{}': {}", cProfile.getColName(), e.toString(), e);
     }
   }
 
@@ -346,8 +245,6 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                                               long end) {
     byte tableId = metaModelApi.getTableId(tableName);
     int tsColId = metaModelApi.getTimestampCProfile(tableName).getColId();
-    int firstColId = firstGrpBy.getColId();
-    int secondColId = secondGrpBy.getColId();
 
     long previousBlockId = this.rawDAO.getPreviousBlockId(tableId, begin);
     Map.Entry<MetadataKey, MetadataKey> keyEntry = getMetadataKeyPair(tableId, begin, end, previousBlockId);
@@ -359,77 +256,32 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
 
       while ((columnKey = cursor.next()) != null) {
         long blockId = columnKey.getMetadataKey().getBlockId();
+        long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
 
-        SType firstSType = getSType(firstColId, columnKey);
-        SType secondSType = getSType(secondColId, columnKey);
+        StorageContext context = StorageContext.builder()
+            .tableId(tableId)
+            .blockId(blockId)
+            .timestamps(timestamps)
+            .rawDAO(rawDAO)
+            .enumDAO(enumDAO)
+            .histogramDAO(histogramDAO)
+            .converter(converter)
+            .build();
 
-        if (checkSTypeILocal(firstSType, secondSType, SType.HISTOGRAM, SType.HISTOGRAM)) {
-          Map<Integer, Map<Integer, Integer>> map = new HashMap<>();
-          this.computeHistHist(tableId, blockId, firstGrpBy, secondGrpBy, tsColId, begin, end, compositeFilter, map);
+        SType firstSType = getSType(firstGrpBy.getColId(), columnKey);
+        SType secondSType = getSType(secondGrpBy.getColId(), columnKey);
 
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal,
-                                                                                converter.convertIntToRaw(key, firstGrpBy),
-                                                                                converter.convertIntToRaw(kVal, secondGrpBy), vVal)));
+        Map<FilterCondition, String[]> cache = buildFilterCacheWithFormats(compositeFilter, context, columnKey);
+        BitSet acceptedRows = acceptedRows(timestamps, begin, end, compositeFilter, cache);
 
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.ENUM, SType.ENUM)) {
-          Map<Integer, Map<Integer, Integer>> map = new HashMap<>();
-          this.computeEnumEnum(tableId, tsColId, blockId, firstGrpBy, secondGrpBy, begin, end, compositeFilter, map);
-
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal,
-                                                                                converter.convertIntToRaw(key, firstGrpBy),
-                                                                                converter.convertIntToRaw(kVal, secondGrpBy), vVal)));
-
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.RAW, SType.RAW)) {
-          Map<String, Map<String, Integer>> map = new HashMap<>();
-          this.computeRawRaw(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, map);
-
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal, key, kVal, vVal)));
-
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.HISTOGRAM, SType.ENUM)) {
-          Map<Integer, Map<Integer, Integer>> map = new HashMap<>();
-          this.computeHistEnum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, map);
-
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal,
-                                                                                converter.convertIntToRaw(key, firstGrpBy),
-                                                                                converter.convertIntToRaw(kVal, secondGrpBy), vVal)));
-
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.ENUM, SType.HISTOGRAM)) {
-          Map<Integer, Map<Integer, Integer>> map = new HashMap<>();
-          this.computeEnumHist(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, map);
-
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal,
-                                                                                converter.convertIntToRaw(key, firstGrpBy),
-                                                                                converter.convertIntToRaw(kVal, secondGrpBy), vVal)));
-
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.HISTOGRAM, SType.RAW)) {
-          Map<Integer, Map<String, Integer>> map = new HashMap<>();
-          this.computeHistRaw(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, map);
-
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal,
-                                                                                converter.convertIntToRaw(key, firstGrpBy), kVal, vVal)));
-
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.RAW, SType.HISTOGRAM)) {
-          Map<String, Map<Integer, Integer>> map = new HashMap<>();
-          this.computeRawHist(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, map);
-
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal,
-                                                                                key, converter.convertIntToRaw(kVal, secondGrpBy), vVal)));
-
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.ENUM, SType.RAW)) {
-          Map<Integer, Map<String, Integer>> map = new HashMap<>();
-          this.computeEnumRaw(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, map);
-
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal,
-                                                                                converter.convertIntToRaw(key, firstGrpBy), kVal, vVal)));
-
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.RAW, SType.ENUM)) {
-          Map<String, Map<Integer, Integer>> map = new HashMap<>();
-          this.computeRawEnum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, map);
-
-          map.forEach((key, value) -> value.forEach((kVal, vVal) -> setMapValue(mapFinal,
-                                                                                key, converter.convertIntToRaw(kVal, secondGrpBy), vVal)));
-
+        if (acceptedRows.isEmpty()) {
+          continue;
         }
+
+        processDualColumnsWithFilter(context,
+                                     firstGrpBy, secondGrpBy,
+                                     firstSType, secondSType,
+                                     acceptedRows, mapFinal);
       }
 
     } catch (Exception e) {
@@ -437,408 +289,82 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     }
 
     if (DataType.ARRAY.equals(firstGrpBy.getCsType().getDType()) || DataType.ARRAY.equals(secondGrpBy.getCsType().getDType())) {
-      Map<String, Map<String, Integer>> map = handleArray(firstGrpBy, secondGrpBy, mapFinal);
+      Map<String, Map<String, Integer>> map = handleArray(firstGrpBy, secondGrpBy, mapFinal, compositeFilter);
       mapFinal.clear();
       mapFinal.putAll(map);
     }
 
     if (DataType.MAP.equals(firstGrpBy.getCsType().getDType()) || DataType.MAP.equals(secondGrpBy.getCsType().getDType())) {
-      return handleMap(firstGrpBy, secondGrpBy, mapFinal);
+      return handleMap(firstGrpBy, secondGrpBy, mapFinal, compositeFilter);
     }
 
     List<GanttColumnCount> list = new ArrayList<>();
-
     mapFinal.forEach((key, value) -> list.add(GanttColumnCount.builder().key(key).gantt(value).build()));
-
     return list;
   }
 
-  private void computeEnumEnum(byte tableId,
-                               int tsColId,
-                               long blockId,
-                               CProfile firstGrpBy,
-                               CProfile secondGrpBy,
-                               long begin,
-                               long end,
-                               CompositeFilter compositeFilter,
-                               Map<Integer, Map<Integer, Integer>> map) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
+  private void processDualColumnsWithFilter(StorageContext context,
+                                            CProfile firstGrpBy,
+                                            CProfile secondGrpBy,
+                                            SType firstSType,
+                                            SType secondSType,
+                                            BitSet acceptedRows,
+                                            Map<String, Map<String, Integer>> resultMap) {
+    boolean firstCoded = (firstSType == SType.ENUM || firstSType == SType.HISTOGRAM);
+    boolean secondCoded = (secondSType == SType.ENUM || secondSType == SType.HISTOGRAM);
 
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
+    String[] firstStr = null;
+    String[] secondStr = null;
+    int[] firstInt = null;
+    int[] secondInt = null;
 
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    Map.Entry<int[], byte[]> listFirst = computeEnumEnumBlock(tableId, firstGrpBy, timestamp, blockId, acc);
-    Map.Entry<int[], byte[]> listSecond = computeEnumEnumBlock(tableId, secondGrpBy, timestamp, blockId, acc);
-
-    if (listFirst.getValue().length > 0 && listSecond.getValue().length > 0) {
-      for (int i = 0; i < timestamp.length; i++) {
-        if (timestamp[i] >= begin && timestamp[i] <= end && acc.get(i)) {
-          int intToRawFirst = EnumHelper.getIndexValue(listFirst.getKey(), listFirst.getValue()[i]);
-          int intToRawSecond = EnumHelper.getIndexValue(listSecond.getKey(), listSecond.getValue()[i]);
-          setMapValueEnumBlock(map, intToRawFirst, intToRawSecond, 1);
-        }
+    try {
+      if (firstCoded) {
+        firstInt = storageManager.readIntValues(context, firstGrpBy, firstSType);
+      } else {
+        firstStr = storageManager.readStringValues(context, firstGrpBy, firstSType);
       }
-    }
-  }
-
-  private void computeRawRaw(byte tableId,
-                             CProfile firstGrpBy,
-                             CProfile secondGrpBy,
-                             int tsColId,
-                             long blockId,
-                             long begin,
-                             long end,
-                             CompositeFilter compositeFilter,
-                             Map<String, Map<String, Integer>> map) {
-
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
-    String[] first = getStringArrayValuesRaw(rawDAO, tableId, blockId, firstGrpBy);
-    String[] second = getStringArrayValuesRaw(rawDAO, tableId, blockId, secondGrpBy);
-
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamps);
-    BitSet acc = acceptedRows(timestamps, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
+    } catch (Exception e) {
+      log.error("Failed to fetch first column '{}' using SType '{}': {}",
+                firstGrpBy.getColName(), firstSType, e.toString(), e);
       return;
     }
 
-    if (first.length != 0 && second.length != 0) {
-      acc.stream().forEach(i -> setMapValue(map, first[i], second[i], 1));
-    }
-  }
-
-  private void computeHistEnum(byte tableId,
-                               CProfile firstGrpBy,
-                               CProfile secondGrpBy,
-                               int tsColId,
-                               long blockId,
-                               long begin,
-                               long end,
-                               CompositeFilter compositeFilter,
-                               Map<Integer, Map<Integer, Integer>> map) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    int[][] histograms = histogramDAO.get(tableId, blockId, firstGrpBy.getColId());
-    int[] unpackedHistogram = getHistogramUnPack(timestamp, histograms);
-
-    Map.Entry<int[], byte[]> enumData = computeEnumEnumBlock(tableId, secondGrpBy, timestamp, blockId, acc);
-
-    if (unpackedHistogram.length > 0 && enumData.getValue().length > 0) {
-      for (int i = 0; i < timestamp.length; i++) {
-        if (acc.get(i)) {
-          int histValue = unpackedHistogram[i];
-          int enumValue = EnumHelper.getIndexValue(enumData.getKey(), enumData.getValue()[i]);
-          setMapValue(map, histValue, enumValue, 1);
-        }
+    try {
+      if (secondCoded) {
+        secondInt = storageManager.readIntValues(context, secondGrpBy, secondSType);
+      } else {
+        secondStr = storageManager.readStringValues(context, secondGrpBy, secondSType);
       }
-    }
-  }
-
-  private void computeEnumHist(byte tableId,
-                               CProfile firstGrpBy,
-                               CProfile secondGrpBy,
-                               int tsColId,
-                               long blockId,
-                               long begin,
-                               long end,
-                               CompositeFilter compositeFilter,
-                               Map<Integer, Map<Integer, Integer>> map) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
+    } catch (Exception e) {
+      log.error("Failed to fetch second column '{}' using SType '{}': {}",
+                secondGrpBy.getColName(), secondSType, e.toString(), e);
       return;
     }
 
-    Map.Entry<int[], byte[]> enumData = computeEnumEnumBlock(tableId, firstGrpBy, timestamp, blockId, acc);
+    int n = context.getTimestamps().length;
+    int l1 = firstCoded ? (firstInt != null ? firstInt.length : 0) : (firstStr != null ? firstStr.length : 0);
+    int l2 = secondCoded ? (secondInt != null ? secondInt.length : 0) : (secondStr != null ? secondStr.length : 0);
+    int limit = Math.min(n, Math.min(l1, l2));
+    if (limit == 0) return;
 
-    int[][] histograms = histogramDAO.get(tableId, blockId, secondGrpBy.getColId());
-    int[] unpackedHistogram = getHistogramUnPack(timestamp, histograms);
+    Map<Integer, String> firstCodeToString = firstCoded ? new HashMap<>() : null;
+    Map<Integer, String> secondCodeToString = secondCoded ? new HashMap<>() : null;
 
-    if (enumData.getValue().length > 0 && unpackedHistogram.length > 0) {
-      for (int i = 0; i < timestamp.length; i++) {
-        if (acc.get(i)) {
-          int enumValue = EnumHelper.getIndexValue(enumData.getKey(), enumData.getValue()[i]);
-          int histValue = unpackedHistogram[i];
-          setMapValue(map, enumValue, histValue, 1);
-        }
-      }
+    for (int i = acceptedRows.nextSetBit(0); i >= 0 && i < limit; i = acceptedRows.nextSetBit(i + 1)) {
+      String v1 = firstCoded
+          ? firstCodeToString.computeIfAbsent(firstInt[i], k -> context.getConverter().convertIntToRaw(k, firstGrpBy))
+          : safe(firstStr[i]);
+
+      String v2 = secondCoded
+          ? secondCodeToString.computeIfAbsent(secondInt[i], k -> context.getConverter().convertIntToRaw(k, secondGrpBy))
+          : safe(secondStr[i]);
+
+      setMapValue(resultMap, v1, v2, 1);
     }
   }
 
-  private void computeHistHist(byte tableId,
-                               long blockId,
-                               CProfile firstGrpBy,
-                               CProfile secondGrpBy,
-                               int tsColId,
-                               long begin,
-                               long end,
-                               CompositeFilter compositeFilter,
-                               Map<Integer, Map<Integer, Integer>> map) {
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
-
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamps);
-    BitSet acc = acceptedRows(timestamps, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    int[][] firstHist = histogramDAO.get(tableId, blockId, firstGrpBy.getColId());
-    int[][] secondHist = histogramDAO.get(tableId, blockId, secondGrpBy.getColId());
-
-    if (firstHist[0].length == 0 || secondHist[0].length == 0) {
-      return;
-    }
-
-    int[] firstUnpacked = getHistogramUnPack(timestamps, firstHist);
-    int[] secondUnpacked = getHistogramUnPack(timestamps, secondHist);
-
-    for (int i = 0; i < timestamps.length; i++) {
-      if (acc.get(i)) {
-        int valueFirst = firstUnpacked[i];
-        int valueSecond = secondUnpacked[i];
-        setMapValue(map, valueFirst, valueSecond, 1);
-      }
-    }
-  }
-
-  private void computeHistRaw(byte tableId,
-                              CProfile firstGrpBy,
-                              CProfile secondGrpBy,
-                              int tsColId,
-                              long blockId,
-                              long begin,
-                              long end,
-                              CompositeFilter compositeFilter,
-                              Map<Integer, Map<String, Integer>> map) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    List<Integer> listFirst = computeHistogramBlock(tableId, firstGrpBy, timestamp, blockId, acc);
-    List<String> listSecond = computeRawBlock(tableId, secondGrpBy, timestamp, blockId, acc);
-
-    if (!listFirst.isEmpty() && !listSecond.isEmpty()) {
-      setMapValueCommon(map, listFirst, listSecond, 1);
-    }
-  }
-
-  private void computeRawHist(byte tableId,
-                              CProfile firstGrpBy,
-                              CProfile secondGrpBy,
-                              int tsColId,
-                              long blockId,
-                              long begin,
-                              long end,
-                              CompositeFilter compositeFilter,
-                              Map<String, Map<Integer, Integer>> map) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    List<String> listFirst = computeRawBlock(tableId, firstGrpBy, timestamp, blockId, acc);
-    List<Integer> listSecond = computeHistogramBlock(tableId, secondGrpBy, timestamp, blockId, acc);
-
-    if (!listFirst.isEmpty() && !listSecond.isEmpty()) {
-      setMapValueCommon(map, listFirst, listSecond, 1);
-    }
-  }
-
-  private void computeEnumRaw(byte tableId,
-                              CProfile firstGrpBy,
-                              CProfile secondGrpBy,
-                              int tsColId,
-                              long blockId,
-                              long begin,
-                              long end,
-                              CompositeFilter compositeFilter,
-                              Map<Integer, Map<String, Integer>> map) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    String[] secondColumnValues = getStringArrayValuesRaw(rawDAO, tableId, blockId, secondGrpBy);
-
-    Map.Entry<int[], byte[]> listFirst = computeEnumEnumBlock(tableId, firstGrpBy, timestamp, blockId, acc);
-
-    if (listFirst.getValue().length > 0 && secondColumnValues.length > 0) {
-      for (int i = 0; i < timestamp.length; i++) {
-        if (acc.get(i)) {
-          int intToRawFirst = EnumHelper.getIndexValue(listFirst.getKey(), listFirst.getValue()[i]);
-          String rawValue = secondColumnValues[i];
-          setMapValueRawEnumBlock(map, intToRawFirst, rawValue, 1);
-        }
-      }
-    }
-  }
-
-  private void computeRawEnum(byte tableId,
-                              CProfile firstGrpBy,
-                              CProfile secondGrpBy,
-                              int tsColId,
-                              long blockId,
-                              long begin,
-                              long end,
-                              CompositeFilter compositeFilter,
-                              Map<String, Map<Integer, Integer>> map) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    List<String> listFirst = computeRawBlock(tableId, firstGrpBy, timestamp, blockId, acc);
-    Map.Entry<int[], byte[]> listSecond = computeEnumBlock(tableId, secondGrpBy, timestamp, blockId, acc);
-
-    setMapValueRawEnumBlock(map, listFirst, listSecond, 1);
-  }
-
-
-  private List<Integer> computeHistogramBlock(byte tableId,
-                                              CProfile cProfile,
-                                              long[] timestamp,
-                                              long blockId,
-                                              BitSet accepted) {
-    List<Integer> list = new ArrayList<>();
-    int[][] h = histogramDAO.get(tableId, blockId, cProfile.getColId());
-    for (int i = 0; i < h[0].length; i++) {
-      int fNextIndex = getNextIndex(i, h, timestamp);
-      int startIndex = (i == 0) ? 0
-          : fNextIndex - (fNextIndex - getNextIndex(i - 1, h, timestamp)) + 1;
-      for (int k = startIndex; k <= fNextIndex; k++) {
-        if (accepted.get(k)) list.add(h[1][i]);
-      }
-    }
-    return list;
-  }
-
-  private Map.Entry<int[], byte[]> computeEnumBlock(byte tableId,
-                                                    CProfile cProfile,
-                                                    long[] timestamp,
-                                                    long blockId,
-                                                    BitSet accepted) {
-    byte[] eBytes = new byte[timestamp.length];
-    EColumn eColumn = enumDAO.getEColumnValues(tableId, blockId, cProfile.getColId());
-    IntStream.range(0, timestamp.length)
-        .filter(accepted::get)
-        .forEach(iR -> eBytes[iR] = eColumn.getDataByte()[iR]);
-
-    int count = (int) IntStream.range(0, timestamp.length)
-        .filter(accepted::get)
-        .count();
-
-    byte[] filtered = new byte[count];
-    int index = 0;
-    for (int i = 0; i < timestamp.length; i++) {
-      if (accepted.get(i)) {
-        filtered[index++] = eBytes[i];
-      }
-    }
-
-    return Map.entry(eColumn.getValues(), filtered);
-  }
-
-  private Map.Entry<int[], byte[]> computeEnumEnumBlock(byte tableId,
-                                                        CProfile cProfile,
-                                                        long[] timestamp,
-                                                        long blockId,
-                                                        BitSet accepted) {
-    EColumn eColumn = enumDAO.getEColumnValues(tableId, blockId, cProfile.getColId());
-    byte[] eBytes = new byte[timestamp.length];
-    IntStream.range(0, timestamp.length)
-        .filter(accepted::get)
-        .forEach(iR -> eBytes[iR] = eColumn.getDataByte()[iR]);
-    return Map.entry(eColumn.getValues(), eBytes);
-  }
-
-  private List<String> computeRawBlock(byte tableId,
-                                       CProfile cProfile,
-                                       long[] timestamp,
-                                       long blockId,
-                                       BitSet accepted) {
-    List<String> columnData = new ArrayList<>();
-    String[] columValues = getStringArrayValuesRaw(rawDAO, tableId, blockId, cProfile);
-    IntStream.range(0, timestamp.length)
-        .filter(accepted::get)
-        .forEach(i -> columnData.add(columValues[i]));
-    return columnData;
-  }
-
-  private <T, V> void setMapValueCommon(Map<T, Map<V, Integer>> map,
-                                        List<T> listFirst,
-                                        List<V> listSecond,
-                                        int sum) {
-    for (int i = 0; i < listFirst.size(); i++) {
-      setMapValue(map, listFirst.get(i), listSecond.get(i), sum);
-    }
-  }
-
-  private void setMapValueRawEnumBlock(Map<String, Map<Integer, Integer>> map,
-                                       List<String> listFirst,
-                                       Map.Entry<int[], byte[]> entrySecond,
-                                       int sum) {
-    for (int i = 0; i < listFirst.size(); i++) {
-      byte enumByte = entrySecond.getValue()[i];        // now filtered
-      int intToRaw = EnumHelper.getIndexValue(entrySecond.getKey(), enumByte);
-      setMapValueRawEnumBlock(map, listFirst.get(i), intToRaw, sum);
-    }
-  }
-
-  protected void setMapValueEnumBlock(Map<Integer, Map<Integer, Integer>> map,
-                                      Integer vFirst,
-                                      int vSecond,
-                                      int sum) {
-    Map<Integer, Integer> innerMap = map.computeIfAbsent(vFirst, k -> new HashMap<>());
-    innerMap.merge(vSecond, sum, Integer::sum);
-  }
-
-  protected void setMapValueRawEnumBlock(Map<String, Map<Integer, Integer>> map,
-                                         String vFirst,
-                                         int vSecond,
-                                         int sum) {
-    Map<Integer, Integer> innerMap = map.computeIfAbsent(vFirst, k -> new HashMap<>());
-    innerMap.merge(vSecond, sum, Integer::sum);
-  }
-
-  protected void setMapValueRawEnumBlock(Map<Integer, Map<String, Integer>> map,
-                                         int vFirst,
-                                         String vSecond,
-                                         int sum) {
-    Map<String, Integer> innerMap = map.computeIfAbsent(vFirst, k -> new HashMap<>());
-    innerMap.merge(vSecond, sum, Integer::sum);
-  }
+  private static String safe(String s) { return s == null ? "" : s; }
 
   @Override
   public List<GanttColumnCount> getGanttCount(String tableName,
@@ -892,6 +418,7 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     return mergeGanttColumnsByKey(tasks);
   }
 
+
   @Override
   public List<GanttColumnSum> getGanttSum(String tableName,
                                           CProfile firstGrpBy,
@@ -899,6 +426,12 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                           CompositeFilter compositeFilter,
                                           long begin,
                                           long end) throws SqlColMetadataException {
+
+    if (CType.STRING.equals(secondGrpBy.getCsType().getCType())) {
+      log.warn("Not supported for String data type for second group by column");
+      return Collections.emptyList();
+    }
+
     BType bType = metaModelApi.getBackendType(tableName);
 
     if (!BType.BERKLEYDB.equals(bType)) {
@@ -917,8 +450,6 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                                     long end) {
     byte tableId = metaModelApi.getTableId(tableName);
     int tsColId = metaModelApi.getTimestampCProfile(tableName).getColId();
-    int firstColId = firstGrpBy.getColId();
-    int secondColId = secondGrpBy.getColId();
 
     long previousBlockId = this.rawDAO.getPreviousBlockId(tableId, begin);
     Map.Entry<MetadataKey, MetadataKey> keyEntry = getMetadataKeyPair(tableId, begin, end, previousBlockId);
@@ -930,342 +461,143 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
 
       while ((columnKey = cursor.next()) != null) {
         long blockId = columnKey.getMetadataKey().getBlockId();
+        long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
 
-        SType firstSType = getSType(firstColId, columnKey);
-        SType secondSType = getSType(secondColId, columnKey);
+        StorageContext context = StorageContext.builder()
+            .tableId(tableId)
+            .blockId(blockId)
+            .timestamps(timestamps)
+            .rawDAO(rawDAO)
+            .enumDAO(enumDAO)
+            .histogramDAO(histogramDAO)
+            .converter(converter)
+            .build();
 
-        if (checkSTypeILocal(firstSType, secondSType, SType.HISTOGRAM, SType.HISTOGRAM)) {
-          computeHistHistSum(tableId, blockId, firstGrpBy, secondGrpBy, tsColId, begin, end, compositeFilter, resultMap);
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.ENUM, SType.ENUM)) {
-          computeEnumEnumSum(tableId, tsColId, blockId, firstGrpBy, secondGrpBy, begin, end, compositeFilter, resultMap);
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.RAW, SType.RAW)) {
-          computeRawRawSum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, resultMap);
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.HISTOGRAM, SType.ENUM)) {
-          computeHistEnumSum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, resultMap);
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.ENUM, SType.HISTOGRAM)) {
-          computeEnumHistSum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, resultMap);
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.HISTOGRAM, SType.RAW)) {
-          computeHistRawSum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, resultMap);
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.RAW, SType.HISTOGRAM)) {
-          computeRawHistSum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, resultMap);
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.ENUM, SType.RAW)) {
-          computeEnumRawSum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, resultMap);
-        } else if (checkSTypeILocal(firstSType, secondSType, SType.RAW, SType.ENUM)) {
-          computeRawEnumSum(tableId, firstGrpBy, secondGrpBy, tsColId, blockId, begin, end, compositeFilter, resultMap);
+        SType firstSType = getSType(firstGrpBy.getColId(), columnKey);
+        SType secondSType = getSType(secondGrpBy.getColId(), columnKey);
+
+        Map<FilterCondition, String[]> filterCache = buildFilterCacheWithFormats(compositeFilter, context, columnKey);
+        BitSet accepted = acceptedRows(timestamps, begin, end, compositeFilter, filterCache);
+        if (accepted.isEmpty()) continue;
+
+        boolean firstCoded = (firstSType == SType.ENUM || firstSType == SType.HISTOGRAM);
+
+        String[] firstStr = null;
+        int[] firstInt = null;
+        try {
+          if (firstCoded) {
+            firstInt = storageManager.readIntValues(context, firstGrpBy, firstSType);
+          } else {
+            firstStr = storageManager.readStringValues(context, firstGrpBy, firstSType);
+          }
+        } catch (Exception e) {
+          log.error("Failed to fetch first column '{}' using SType '{}': {}",
+                    firstGrpBy.getColName(), firstSType, e.toString(), e);
+          continue;
+        }
+
+        double[] secondValues;
+        try {
+          secondValues = storageManager.readDoubleValues(context, secondGrpBy, secondSType);
+        } catch (Exception e) {
+          log.error("Failed to fetch second column '{}' as doubles using SType '{}': {}",
+                    secondGrpBy.getColName(), secondSType, e.toString(), e);
+          continue;
+        }
+
+        int n = timestamps.length;
+        int l1 = firstCoded ? (firstInt != null ? firstInt.length : 0) : (firstStr != null ? firstStr.length : 0);
+        int l2 = (secondValues != null ? secondValues.length : 0);
+        int limit = Math.min(n, Math.min(l1, l2));
+        if (limit == 0) continue;
+
+        Map<Integer, String> firstCodeToString = firstCoded ? new HashMap<>() : null;
+
+        for (int i = accepted.nextSetBit(0); i >= 0 && i < limit; i = accepted.nextSetBit(i + 1)) {
+          String groupKey = firstCoded
+              ? firstCodeToString.computeIfAbsent(firstInt[i], k -> converter.convertIntToRaw(k, firstGrpBy))
+              : safe(firstStr[i]);
+
+          resultMap.merge(groupKey, secondValues[i], Double::sum);
         }
       }
     } catch (Exception e) {
-      log.error("Error processing gantt sum data", e);
+      log.error("Error processing gantt sum data (refactored): ", e);
     }
 
-    return resultMap.entrySet().stream()
-        .map(entry -> new GanttColumnSum(entry.getKey(), entry.getValue()))
-        .collect(Collectors.toList());
+    Map<String, Double> processedMap = new HashMap<>();
+    if (DataType.MAP.equals(firstGrpBy.getCsType().getDType())) {
+      handleMapGanttSum(resultMap, processedMap, firstGrpBy, compositeFilter);
+      resultMap = processedMap;
+    }
+    if (DataType.ARRAY.equals(firstGrpBy.getCsType().getDType())) {
+      handleArrayGanttSum(resultMap, processedMap, firstGrpBy, compositeFilter);
+      resultMap = processedMap;
+    }
+
+    List<GanttColumnSum> list = new ArrayList<>();
+    resultMap.forEach((k, v) -> list.add(new GanttColumnSum(k, v)));
+    return list;
   }
 
-  private void computeEnumEnumSum(byte tableId,
-                                  int tsColId,
-                                  long blockId,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  long begin,
-                                  long end,
-                                  CompositeFilter compositeFilter,
-                                  Map<String, Double> resultMap) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
+  private void handleMapGanttSum(Map<String, Double> inputMap,
+                                 Map<String, Double> outputMap,
+                                 CProfile cProfile,
+                                 CompositeFilter compositeFilter) {
+    Set<String> filterKeys = getFilterDataForProfile(cProfile, compositeFilter);
 
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch both enum columns once
-    EColumn firstCol = enumDAO.getEColumnValues(tableId, blockId, firstGrpBy.getColId());
-    EColumn secondCol = enumDAO.getEColumnValues(tableId, blockId, secondGrpBy.getColId());
-
-    int[] firstDict = firstCol.getValues();
-    int[] secondDict = secondCol.getValues();
-    byte[] firstBytes = firstCol.getDataByte();
-    byte[] secondBytes = secondCol.getDataByte();
-
-    // Pre-compute conversions to avoid repeated method calls
-    Map<Integer, String> firstValueCache = new HashMap<>();
-    Map<Integer, Double> secondValueCache = new HashMap<>();
-
-    // Single pass over accepted rows only
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      // First column - group key
-      byte firstByte = firstBytes[i];
-      int firstIntValue = EnumHelper.getIndexValue(firstDict, firstByte);
-      String groupKey = firstValueCache.computeIfAbsent(firstIntValue,
-                                                        k -> converter.convertIntToRaw(k, firstGrpBy));
-
-      // Second column - sum value
-      byte secondByte = secondBytes[i];
-      int secondIntValue = EnumHelper.getIndexValue(secondDict, secondByte);
-      double value = secondValueCache.computeIfAbsent(secondIntValue,
-                                                      k -> converter.convertIntFromDoubleLong(k, secondGrpBy));
-
-      resultMap.merge(groupKey, value, Double::sum);
+    for (Map.Entry<String, Double> entry : inputMap.entrySet()) {
+      try {
+        Map<String, Long> parsedMap = parseStringToTypedMap(entry.getKey(), String::new, Long::parseLong, "=");
+        if (parsedMap.isEmpty()) {
+          outputMap.merge(Mapper.STRING_NULL, entry.getValue(), Double::sum);
+        } else {
+          for (Map.Entry<String, Long> mapEntry : parsedMap.entrySet()) {
+            String mapKey = mapEntry.getKey();
+            if (filterKeys == null || filterKeys.contains(mapKey)) {
+              double multiplier = mapEntry.getValue() != null ? mapEntry.getValue().doubleValue() : 1.0;
+              double weightedSum = entry.getValue() * multiplier;
+              outputMap.merge(mapKey, weightedSum, Double::sum);
+            }
+          }
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse map for gantt sum: '{}' for column {}", entry.getKey(), cProfile.getColName(), e);
+        if (filterKeys == null) {
+          outputMap.merge(entry.getKey(), entry.getValue(), Double::sum);
+        }
+      }
     }
   }
 
-  private void computeHistEnumSum(byte tableId,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  int tsColId,
-                                  long blockId,
-                                  long begin,
-                                  long end,
-                                  CompositeFilter compositeFilter,
-                                  Map<String, Double> resultMap) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
+  private void handleArrayGanttSum(Map<String, Double> inputMap,
+                                   Map<String, Double> outputMap,
+                                   CProfile cProfile,
+                                   CompositeFilter compositeFilter) {
+    Set<String> filterElements = getFilterDataForProfile(cProfile, compositeFilter);
 
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch data
-    int[][] histograms = histogramDAO.get(tableId, blockId, firstGrpBy.getColId());
-    int[] unpackedHistogram = getHistogramUnPack(timestamp, histograms);
-    double[] secondColumnValues = getDoubleArrayValues(rawDAO, enumDAO, histogramDAO, converter,
-                                                       tableId, secondGrpBy, blockId, timestamp);
-
-    // Pre-compute conversions
-    Map<Integer, String> firstValueCache = new HashMap<>();
-
-    // Single pass over accepted rows
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      String groupKey = firstValueCache.computeIfAbsent(unpackedHistogram[i],
-                                                        k -> converter.convertIntToRaw(k, firstGrpBy));
-      double value = secondColumnValues[i];
-      resultMap.merge(groupKey, value, Double::sum);
-    }
-  }
-
-  private void computeRawRawSum(byte tableId,
-                                CProfile firstGrpBy,
-                                CProfile secondGrpBy,
-                                int tsColId,
-                                long blockId,
-                                long begin,
-                                long end,
-                                CompositeFilter compositeFilter,
-                                Map<String, Double> resultMap) {
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamps);
-    BitSet acc = acceptedRows(timestamps, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch data
-    String[] firstColumnValues = getStringArrayValuesRaw(rawDAO, tableId, blockId, firstGrpBy);
-    double[] secondColumnValues = getDoubleArrayValuesRaw(rawDAO, tableId, blockId, secondGrpBy);
-
-    // Single pass over accepted rows
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      resultMap.merge(firstColumnValues[i], secondColumnValues[i], Double::sum);
-    }
-  }
-
-  private void computeHistHistSum(byte tableId,
-                                  long blockId,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  int tsColId,
-                                  long begin,
-                                  long end,
-                                  CompositeFilter compositeFilter,
-                                  Map<String, Double> resultMap) {
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamps);
-    BitSet acc = acceptedRows(timestamps, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch data
-    int[][] firstHist = histogramDAO.get(tableId, blockId, firstGrpBy.getColId());
-    int[] firstUnpacked = getHistogramUnPack(timestamps, firstHist);
-    double[] secondColumnValues = getDoubleArrayValues(rawDAO, enumDAO, histogramDAO, converter,
-                                                       tableId, secondGrpBy, blockId, timestamps);
-
-    // Pre-compute conversions
-    Map<Integer, String> firstValueCache = new HashMap<>();
-
-    // Single pass over accepted rows
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      String groupKey = firstValueCache.computeIfAbsent(firstUnpacked[i],
-                                                        k -> converter.convertIntToRaw(k, firstGrpBy));
-      double value = secondColumnValues[i];
-      resultMap.merge(groupKey, value, Double::sum);
-    }
-  }
-
-  private void computeEnumHistSum(byte tableId,
-                                  CProfile firstGrpBy,
-                                  CProfile secondGrpBy,
-                                  int tsColId,
-                                  long blockId,
-                                  long begin,
-                                  long end,
-                                  CompositeFilter compositeFilter,
-                                  Map<String, Double> resultMap) {
-    long[] timestamp = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamp);
-    BitSet acc = acceptedRows(timestamp, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch data
-    EColumn firstCol = enumDAO.getEColumnValues(tableId, blockId, firstGrpBy.getColId());
-    int[] firstDict = firstCol.getValues();
-    byte[] firstBytes = firstCol.getDataByte();
-    double[] secondColumnValues = getDoubleArrayValues(rawDAO, enumDAO, histogramDAO, converter,
-                                                       tableId, secondGrpBy, blockId, timestamp);
-
-    // Pre-compute conversions
-    Map<Integer, String> firstValueCache = new HashMap<>();
-
-    // Single pass over accepted rows
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      int firstIntValue = EnumHelper.getIndexValue(firstDict, firstBytes[i]);
-      String groupKey = firstValueCache.computeIfAbsent(firstIntValue,
-                                                        k -> converter.convertIntToRaw(k, firstGrpBy));
-      double value = secondColumnValues[i];
-      resultMap.merge(groupKey, value, Double::sum);
-    }
-  }
-
-  private void computeHistRawSum(byte tableId,
-                                 CProfile firstGrpBy,
-                                 CProfile secondGrpBy,
-                                 int tsColId,
-                                 long blockId,
-                                 long begin,
-                                 long end,
-                                 CompositeFilter compositeFilter,
-                                 Map<String, Double> resultMap) {
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamps);
-    BitSet acc = acceptedRows(timestamps, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch data
-    int[][] histograms = histogramDAO.get(tableId, blockId, firstGrpBy.getColId());
-    int[] unpackedHistogram = getHistogramUnPack(timestamps, histograms);
-    double[] secondColumnValues = getDoubleArrayValuesRaw(rawDAO, tableId, blockId, secondGrpBy);
-
-    // Pre-compute conversions
-    Map<Integer, String> firstValueCache = new HashMap<>();
-
-    // Single pass over accepted rows
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      String groupKey = firstValueCache.computeIfAbsent(unpackedHistogram[i],
-                                                        k -> converter.convertIntToRaw(k, firstGrpBy));
-      resultMap.merge(groupKey, secondColumnValues[i], Double::sum);
-    }
-  }
-
-  private void computeRawHistSum(byte tableId,
-                                 CProfile firstGrpBy,
-                                 CProfile secondGrpBy,
-                                 int tsColId,
-                                 long blockId,
-                                 long begin,
-                                 long end,
-                                 CompositeFilter compositeFilter,
-                                 Map<String, Double> resultMap) {
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamps);
-    BitSet acc = acceptedRows(timestamps, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch data
-    String[] firstColumnValues = getStringArrayValuesRaw(rawDAO, tableId, blockId, firstGrpBy);
-    double[] secondColumnValues = getDoubleArrayValues(rawDAO, enumDAO, histogramDAO, converter,
-                                                       tableId, secondGrpBy, blockId, timestamps);
-
-    // Single pass over accepted rows
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      resultMap.merge(firstColumnValues[i], secondColumnValues[i], Double::sum);
-    }
-  }
-
-  private void computeEnumRawSum(byte tableId,
-                                 CProfile firstGrpBy,
-                                 CProfile secondGrpBy,
-                                 int tsColId,
-                                 long blockId,
-                                 long begin,
-                                 long end,
-                                 CompositeFilter compositeFilter,
-                                 Map<String, Double> resultMap) {
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamps);
-    BitSet acc = acceptedRows(timestamps, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch data
-    EColumn firstCol = enumDAO.getEColumnValues(tableId, blockId, firstGrpBy.getColId());
-    int[] firstDict = firstCol.getValues();
-    byte[] firstBytes = firstCol.getDataByte();
-    double[] secondColumnValues = getDoubleArrayValuesRaw(rawDAO, tableId, blockId, secondGrpBy);
-
-    // Pre-compute conversions
-    Map<Integer, String> firstValueCache = new HashMap<>();
-
-    // Single pass over accepted rows
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      int firstIntValue = EnumHelper.getIndexValue(firstDict, firstBytes[i]);
-      String groupKey = firstValueCache.computeIfAbsent(firstIntValue,
-                                                        k -> converter.convertIntToRaw(k, firstGrpBy));
-      resultMap.merge(groupKey, secondColumnValues[i], Double::sum);
-    }
-  }
-
-  private void computeRawEnumSum(byte tableId,
-                                 CProfile firstGrpBy,
-                                 CProfile secondGrpBy,
-                                 int tsColId,
-                                 long blockId,
-                                 long begin,
-                                 long end,
-                                 CompositeFilter compositeFilter,
-                                 Map<String, Double> resultMap) {
-    long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
-    Map<FilterCondition, String[]> cache = buildFilterCache(compositeFilter, tableId, blockId, timestamps);
-    BitSet acc = acceptedRows(timestamps, begin, end, compositeFilter, cache);
-
-    if (acc.isEmpty()) {
-      return;
-    }
-
-    // Pre-fetch data
-    String[] firstColumnValues = getStringArrayValuesRaw(rawDAO, tableId, blockId, firstGrpBy);
-    double[] secondColumnValues = getDoubleArrayValues(rawDAO, enumDAO, histogramDAO, converter,
-                                                       tableId, secondGrpBy, blockId, timestamps);
-
-    // Single pass over accepted rows
-    for (int i = acc.nextSetBit(0); i >= 0; i = acc.nextSetBit(i + 1)) {
-      resultMap.merge(firstColumnValues[i], secondColumnValues[i], Double::sum);
+    for (Map.Entry<String, Double> entry : inputMap.entrySet()) {
+      try {
+        String[] array = parseStringToTypedArray(entry.getKey(), ",");
+        if (array.length == 0) {
+          outputMap.merge(Mapper.STRING_NULL, entry.getValue(), Double::sum);
+        } else {
+          double distributedValue = entry.getValue() / array.length;
+          for (String element : array) {
+            String trimmedElement = element.trim();
+            if (!trimmedElement.isEmpty()) {
+              if (filterElements == null || filterElements.contains(trimmedElement)) {
+                outputMap.merge(trimmedElement, distributedValue, Double::sum);
+              }
+            }
+          }
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse array for gantt sum: '{}' for column {}", entry.getKey(), cProfile.getColName(), e);
+        if (filterElements == null) {
+          outputMap.merge(entry.getKey(), entry.getValue(), Double::sum);
+        }
+      }
     }
   }
 
@@ -1300,8 +632,10 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
       return rawDAO.getDistinct(tableName, tsProfile, cProfile, orderBy, compositeFilter, limit, begin, end);
     }
 
-    Set<String> columnData = new LinkedHashSet<>();
+    Set<String> distinctSet = new LinkedHashSet<>();
     byte tableId = metaModelApi.getTableId(tableName);
+    int tsColId = tsProfile.getColId();
+
     long previousBlockId = this.rawDAO.getPreviousBlockId(tableId, begin);
     Map.Entry<MetadataKey, MetadataKey> keyEntry = getMetadataKeyPair(tableId, begin, end, previousBlockId);
 
@@ -1309,50 +643,52 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
       Metadata columnKey;
       while ((columnKey = cursor.next()) != null) {
         long blockId = columnKey.getMetadataKey().getBlockId();
-        long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsProfile.getColId());
+        long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsColId);
 
-        // Pre-store all filter condition values in a map for condition-based access
-        Map<FilterCondition, String[]> filterConditionValuesMap = new HashMap<>();
-        if (compositeFilter != null && !compositeFilter.getConditions().isEmpty()) {
-          for (FilterCondition condition : compositeFilter.getConditions()) {
-            String[] conditionValues = getStringArrayValues(rawDAO, enumDAO, histogramDAO, converter,
-                                                            tableId, condition.getCProfile(), blockId, timestamps);
-            filterConditionValuesMap.put(condition, conditionValues);
-          }
+        StorageContext context = StorageContext.builder()
+            .tableId(tableId)
+            .blockId(blockId)
+            .timestamps(timestamps)
+            .rawDAO(rawDAO)
+            .enumDAO(enumDAO)
+            .histogramDAO(histogramDAO)
+            .converter(converter)
+            .build();
+
+        Map<FilterCondition, String[]> filterCache = buildFilterCacheWithFormats(compositeFilter, context, columnKey);
+        BitSet accepted = acceptedRows(timestamps, begin, end, compositeFilter, filterCache);
+        if (accepted.isEmpty()) continue;
+
+        SType sType = getSType(cProfile.getColId(), columnKey);
+        String[] values;
+        try {
+          values = storageManager.readStringValues(context, cProfile, sType);
+        } catch (Exception e) {
+          log.error("Failed to fetch distinct values for '{}' using SType '{}': {}",
+                    cProfile.getColName(), sType, e.toString(), e);
+          continue;
         }
 
-        // Get the distinct column values
-        String[] distinctValues = getStringArrayValues(rawDAO, enumDAO, histogramDAO, converter,
-                                                       tableId, cProfile, blockId, timestamps);
+        DataType dataType = cProfile.getCsType().getDType();
+        for (int i = accepted.nextSetBit(0); i >= 0; i = accepted.nextSetBit(i + 1)) {
+          if (i >= values.length) break;
+          String v = values[i];
+          v = formatFloatingPoint(v, cProfile.getCsType().getCType());
 
-        for (int i = 0; i < timestamps.length; i++) {
-          if (timestamps[i] >= begin && timestamps[i] <= end) {
-            // Check composite filter conditions
-            boolean includeRow = true;
-            if (compositeFilter != null && !compositeFilter.getConditions().isEmpty()) {
-              String[] filterValues = new String[compositeFilter.getConditions().size()];
-              int idx = 0;
-              for (FilterCondition condition : compositeFilter.getConditions()) {
-                String rawValue = filterConditionValuesMap.get(condition)[i];
-                String formattedValue = formatFloatingPoint(rawValue, condition.getCProfile().getCsType().getCType());
-                filterValues[idx++] = formattedValue;
-              }
-              includeRow = compositeFilter.test(filterValues);
-            }
-
-            if (includeRow) {
-              String value = distinctValues[i];
-              value = formatFloatingPoint(value, cProfile.getCsType().getCType());
-              columnData.add(value);
-            }
+          if (DataType.MAP.equals(dataType)) {
+            processMapValueForDistinct(v, distinctSet, cProfile, compositeFilter);
+          } else if (DataType.ARRAY.equals(dataType)) {
+            processArrayValueForDistinct(v, distinctSet, cProfile, compositeFilter);
+          } else {
+            distinctSet.add(v);
           }
         }
       }
     } catch (Exception e) {
-      log.error("Error processing distinct data with composite filter", e);
+      log.error("Error processing distinct data with composite filter (refactored)", e);
     }
 
-    List<String> resultList = new ArrayList<>(columnData);
+    List<String> resultList = new ArrayList<>(distinctSet);
 
     if (cProfile.getCsType().getCType() == CType.FLOAT ||
         cProfile.getCsType().getCType() == CType.DOUBLE) {
@@ -1362,12 +698,70 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     } else {
       Collections.sort(resultList);
     }
-
     if (OrderBy.DESC.equals(orderBy)) {
       Collections.reverse(resultList);
     }
 
     return resultList.subList(0, Math.min(limit, resultList.size()));
+  }
+
+  /**
+   * Build filter cache via StorageManager, similar to getGanttCount approach.
+   */
+  private Map<FilterCondition, String[]> buildFilterCacheWithFormats(CompositeFilter compositeFilter,
+                                                                     StorageContext context,
+                                                                     Metadata columnKey) {
+    Map<FilterCondition, String[]> cache = new HashMap<>();
+    if (compositeFilter == null) return cache;
+
+    for (FilterCondition c : compositeFilter.getConditions()) {
+      try {
+        SType sType = getSType(c.getCProfile().getColId(), columnKey);
+        String[] vals = storageManager.readStringValues(context, c.getCProfile(), sType);
+        cache.put(c, vals);
+      } catch (Exception e) {
+        log.error("Failed to build filter cache for column '{}' using unified StorageManager: {}",
+                  c.getCProfile().getColName(), e.toString(), e);
+      }
+    }
+    return cache;
+  }
+
+  private void processMapValueForDistinct(String value, Set<String> distinctSet, CProfile cProfile, CompositeFilter compositeFilter) {
+    try {
+      Map<String, Long> parsedMap = parseStringToTypedMap(value, String::new, Long::parseLong, "=");
+      Set<String> filterKeys = getFilterDataForProfile(cProfile, compositeFilter);
+
+      for (String mapKey : parsedMap.keySet()) {
+        if (filterKeys == null || filterKeys.contains(mapKey)) {
+          distinctSet.add(mapKey);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse map value for distinct: '{}'", value, e);
+      if (getFilterDataForProfile(cProfile, compositeFilter) == null) {
+        distinctSet.add(value);
+      }
+    }
+  }
+
+  private void processArrayValueForDistinct(String value, Set<String> distinctSet, CProfile cProfile, CompositeFilter compositeFilter) {
+    try {
+      String[] array = parseStringToTypedArray(value, ",");
+      Set<String> filterElements = getFilterDataForProfile(cProfile, compositeFilter);
+
+      for (String element : array) {
+        String trimmedElement = element.trim();
+        if (!trimmedElement.isEmpty() && (filterElements == null || filterElements.contains(trimmedElement))) {
+          distinctSet.add(trimmedElement);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse array value for distinct: '{}'", value, e);
+      if (getFilterDataForProfile(cProfile, compositeFilter) == null) {
+        distinctSet.add(value);
+      }
+    }
   }
 
   private String formatFloatingPoint(String value, CType cType) {
@@ -1423,13 +817,13 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     }
     @Override
     protected void compute() {
-      log.info("Start task at: " + LocalDateTime.now());
+      log.info("Start task at: {}", LocalDateTime.now());
       try {
         ganttColumnCountList = getGanttCount(tableName, firstGrpBy, secondGrpBy, compositeFilter, begin, end);
       } catch (SqlColMetadataException e) {
         throw new RuntimeException(e);
       }
-      log.info("End task at: " + LocalDateTime.now());
+      log.info("End task at: {}", LocalDateTime.now());
     }
   }
 }

@@ -1,34 +1,24 @@
 package ru.dimension.db.service.impl;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.core.metamodel.MetaModelApi;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.CSType;
-import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.service.CommonServiceApi;
 import ru.dimension.db.service.StatisticsService;
 import ru.dimension.db.service.StoreService;
-import ru.dimension.db.service.mapping.Mapper;
 import ru.dimension.db.service.store.TStore;
 import ru.dimension.db.service.store.UStore;
 import ru.dimension.db.service.store.UStore.LFUCache;
@@ -36,7 +26,8 @@ import ru.dimension.db.storage.Converter;
 import ru.dimension.db.storage.EnumDAO;
 import ru.dimension.db.storage.HistogramDAO;
 import ru.dimension.db.storage.RawDAO;
-import ru.dimension.db.util.CachedLastLinkedHashMap;
+import ru.dimension.db.storage.format.StorageContext;
+import ru.dimension.db.storage.format.StorageManager;
 
 @Log4j2
 public class StoreServiceImpl extends CommonServiceApi implements StoreService {
@@ -55,6 +46,9 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
 
   private final ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, LFUCache>> globalConversionCache = new ConcurrentHashMap<>();
 
+  // New unified storage manager
+  private final StorageManager storageManager;
+
   public StoreServiceImpl(MetaModelApi metaModelApi,
                           StatisticsService statisticsService,
                           Converter converter,
@@ -64,10 +58,12 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
     this.metaModelApi = metaModelApi;
     this.statisticsService = statisticsService;
     this.converter = converter;
-
     this.rawDAO = rawDAO;
     this.enumDAO = enumDAO;
     this.histogramDAO = histogramDAO;
+
+    // Initialize unified storage manager
+    this.storageManager = new StorageManager();
   }
 
   @Override
@@ -133,7 +129,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
         }
       }
 
-      /** Update SType statistic **/
+      // Update SType statistic if table stats do not exist yet
       if (!isStatByTableExist) {
         uStore.analyzeAndConvertColumns(rowCount, colIdToProfile);
         colIdSTypeMap.clear();
@@ -143,7 +139,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
       if (tStore.size() == 0) return;
       long blockId = tStore.getBlockId();
 
-      // Store data using UStore
+      // Store data using unified StorageManager
       storeDataLocal(tableId, blockId, compression, cProfiles, tStore, uStore, colIdSTypeMap);
 
       // Full mode analysis after storing data
@@ -162,7 +158,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
     boolean compression = metaModelApi.getTableCompression(tableName);
     List<CProfile> cProfiles = metaModelApi.getCProfiles(tableName);
     int colCount = cProfiles.size();
-    int rowCount = data.get(0).size();
+    int rowCount = data.getFirst().size();
 
     // Initialize storage type map
     Map<Integer, SType> colIdSTypeMap = new HashMap<>();
@@ -202,7 +198,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
       if (tStore.size() == 0) return;
       long blockId = tStore.getBlockId();
 
-      // Store data using UStore
+      // Store data using unified StorageManager
       storeDataLocal(tableId, blockId, compression, cProfiles, tStore, uStore, colIdSTypeMap);
 
     } catch (Exception e) {
@@ -264,7 +260,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
         }
       }
 
-      /** Update SType statistic **/
+      // Update SType statistic
       if (!isStatByTableExist) {
         uStore.analyzeAndConvertColumns(iRow.get(), colIdToProfile);
         colIdSTypeMap.clear();
@@ -274,7 +270,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
       if (tStore.size() == 0) return -1;
       long blockId = tStore.getBlockId();
 
-      // Store data using UStore
+      // Store data using unified StorageManager
       storeDataLocal(tableId, blockId, compression, cProfiles, tStore, uStore, colIdSTypeMap);
 
       // Full mode analysis after storing data
@@ -418,7 +414,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
       if (tStore.size() == 0) return -1;
       long blockId = tStore.getBlockId();
 
-      // Store data using UStore
+      // Store data using unified StorageManager
       storeDataLocal(tableId, blockId, compression, cProfiles, tStore, uStore, colIdSTypeMap);
       return tStore.getTail();
     } catch (SQLException e) {
@@ -434,20 +430,34 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
                               TStore tStore,
                               UStore uStore,
                               Map<Integer, SType> colIdSTypeMap) {
-    // Store metadata
+
+    // Create enhanced context for unified storage
+    StorageContext context = StorageContext.builder()
+        .tableId(tableId)
+        .blockId(blockId)
+        .timestamps(new long[0]) // Not needed for write operations
+        .rawDAO(rawDAO)
+        .enumDAO(enumDAO)
+        .histogramDAO(histogramDAO)
+        .converter(converter)
+        .compressionEnabled(compression)
+        .readRegistry(storageManager.getReadRegistry())
+        .writeRegistry(storageManager.getWriteRegistry())
+        .build();
+
     storeMetadataLocal(tableId, blockId, cProfiles, colIdSTypeMap);
 
-    // Store timestamp data
     storeTStore(tableId, blockId, compression, tStore);
 
-    // Store RAW data
-    storeRawFromUStore(tableId, blockId, compression, cProfiles, uStore);
+    Map<CProfile, SType> profileStorageMap = new HashMap<>();
+    for (CProfile profile : cProfiles) {
+      if (!profile.getCsType().isTimeStamp()) {
+        SType sType = colIdSTypeMap.get(profile.getColId());
+        profileStorageMap.put(profile, sType);
+      }
+    }
 
-    // Store ENUM data
-    storeEnumFromUStore(tableId, blockId, compression, uStore);
-
-    // Store HISTOGRAM data
-    storeHistogramsEntry(tableId, blockId, compression, uStore);
+    storageManager.writeAllData(context, uStore, profileStorageMap);
   }
 
   private void storeMetadataLocal(byte tableId,
@@ -485,114 +495,6 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
     } else {
       rawDAO.putLong(tableId, blockId, tStore.mappingToArray(), tStore.dataToArray());
     }
-  }
-
-  private void storeRawFromUStore(byte tableId,
-                                  long blockId,
-                                  boolean compression,
-                                  List<CProfile> cProfiles,
-                                  UStore uStore) {
-
-    Map<Integer, CProfile> colIdToProfile = new HashMap<>();
-    cProfiles.forEach(p -> colIdToProfile.put(p.getColId(), p));
-
-    Map<CType, Map<Integer, List<Object>>> rawDataByType = new EnumMap<>(CType.class);
-
-    uStore.getRawDataMap().forEach((colId, data) -> {
-      if (uStore.getStorageTypeMap().get(colId) == SType.RAW) {
-        CType cType = Mapper.isCType(colIdToProfile.get(colId));
-        rawDataByType
-            .computeIfAbsent(cType, k -> new HashMap<>())
-            .put(colId, data);
-      }
-    });
-
-    if (compression) {
-      rawDAO.putCompressed(tableId, blockId, rawDataByType);
-    } else {
-      rawDataByType.forEach((cType, colDataMap) -> {
-        int[] colIds = colDataMap.keySet().stream().mapToInt(i -> i).toArray();
-
-        switch (cType) {
-          case INT:
-            int[][] intData = colDataMap.values().stream()
-                .map(list -> list.stream().mapToInt(i -> (Integer) i).toArray())
-                .toArray(int[][]::new);
-            rawDAO.putInt(tableId, blockId, colIds, intData);
-            break;
-
-          case LONG:
-            long[][] longData = colDataMap.values().stream()
-                .map(list -> list.stream().mapToLong(l -> (Long) l).toArray())
-                .toArray(long[][]::new);
-            rawDAO.putLong(tableId, blockId, colIds, longData);
-            break;
-
-          case FLOAT:
-            float[][] floatData = colDataMap.values().stream()
-                .map(list -> {
-                  float[] arr = new float[list.size()];
-                  for (int i = 0; i < list.size(); i++) {
-                    arr[i] = (Float) list.get(i);
-                  }
-                  return arr;
-                })
-                .toArray(float[][]::new);
-            rawDAO.putFloat(tableId, blockId, colIds, floatData);
-            break;
-
-          case DOUBLE:
-            double[][] doubleData = colDataMap.values().stream()
-                .map(list -> list.stream().mapToDouble(d -> (Double) d).toArray())
-                .toArray(double[][]::new);
-            rawDAO.putDouble(tableId, blockId, colIds, doubleData);
-            break;
-
-          case STRING:
-            String[][] stringData = colDataMap.values().stream()
-                .map(list -> list.toArray(String[]::new))
-                .toArray(String[][]::new);
-            rawDAO.putString(tableId, blockId, colIds, stringData);
-            break;
-        }
-      });
-    }
-  }
-
-  private void storeEnumFromUStore(byte tableId,
-                                   long blockId,
-                                   boolean compression,
-                                   UStore uStore) {
-    uStore.getEnumDataMap().forEach((colId, byteList) -> {
-      CachedLastLinkedHashMap<Integer, Byte> dictionary = uStore.getEnumDictionaries().get(colId);
-
-      int[] values = getIntegerFromSet(dictionary.keySet());
-
-      byte[] data = getByteFromList(byteList);
-
-      try {
-        enumDAO.putEColumn(tableId, blockId, colId, values, data, compression);
-      } catch (IOException e) {
-        log.error("Error storing enum data", e);
-        throw new RuntimeException(e);
-      }
-    });
-  }
-
-  private void storeHistogramsEntry(byte tableID,
-                                    long blockId,
-                                    boolean compression,
-                                    UStore uStore) {
-
-    uStore.getHistogramDataMap().forEach((colId, h) -> {
-      if (h.getSize() > 0) {
-        if (compression) {
-          this.histogramDAO.putCompressedKeysValues(tableID, blockId, colId, h.getIndices(), h.getValues());
-        } else {
-          this.histogramDAO.put(tableID, blockId, colId, getArrayFromMapHEntry(h));
-        }
-      }
-    });
   }
 
   @Override
@@ -783,7 +685,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
     if (tStore.size() == 0) return;
 
     try {
-      /** Update SType statistic **/
+      // Update SType statistic if needed
       if (!isStatByTableExist) {
         uStore.analyzeAndConvertColumns(rowCount, colIdToProfile);
         colIdSTypeMap.clear();
@@ -792,10 +694,8 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
 
       long blockId = tStore.getBlockId();
 
-      // Store data using UStore
       storeDataLocal(tableId, blockId, compression, cProfiles, tStore, uStore, colIdSTypeMap);
 
-      // Full mode analysis after storing data
       AtomicInteger iRow = new AtomicInteger(rowCount);
       fullModeColumnAnalyze(tableId, cProfiles, uStore, iRow);
 
@@ -815,7 +715,6 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
     try {
       long blockId = tStore.getBlockId();
 
-      // Store data using UStore
       storeDataLocal(tableId, blockId, compression, cProfiles, tStore, uStore, colIdSTypeMap);
 
       log.info("Processed batch with {} rows, blockId: {}", rowCount, blockId);
@@ -823,176 +722,6 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
     } catch (Exception e) {
       log.catching(e);
       throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  public void putDataCsvBatch(String tableName,
-                              String fileName,
-                              String csvSplitBy,
-                              Integer fBaseBatchSize) {
-    byte tableId = metaModelApi.getTableId(tableName);
-    boolean compression = metaModelApi.getTableCompression(tableName);
-    List<CProfile> cProfiles = metaModelApi.getCProfiles(tableName);
-
-    final AtomicLong counter = new AtomicLong(rawDAO.getLastBlockId(tableId));
-
-    int colRawDataLongCount = Mapper.getColumnCount(cProfiles, isRaw, isLong);
-    List<List<Long>> rawDataLong = new ArrayList<>(colRawDataLongCount);
-    fillArrayList(rawDataLong, colRawDataLongCount);
-    List<Integer> rawDataLongMapping = new ArrayList<>(colRawDataLongCount);
-    fillMappingRaw(cProfiles, rawDataLongMapping, isRaw, isLong);
-
-    int colRawDataDoubleCount = Mapper.getColumnCount(cProfiles, isRaw, isDouble);
-    List<List<Double>> rawDataDouble = new ArrayList<>(colRawDataDoubleCount);
-    fillArrayList(rawDataDouble, colRawDataDoubleCount);
-    List<Integer> rawDataDoubleMapping = new ArrayList<>(colRawDataDoubleCount);
-    fillMappingRaw(cProfiles, rawDataDoubleMapping, isRaw, isDouble);
-
-    int colRawDataStringCount = Mapper.getColumnCount(cProfiles, isRaw, isString);
-    List<List<String>> rawDataString = new ArrayList<>(colRawDataStringCount);
-    fillArrayList(rawDataString, colRawDataStringCount);
-    List<Integer> rawDataStringMapping = new ArrayList<>(colRawDataStringCount);
-    fillMappingRaw(cProfiles, rawDataStringMapping, isRaw, isString);
-
-    String line;
-    try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
-      line = br.readLine();
-      String[] headers = line.split(csvSplitBy);
-      log.info("Header = " + Arrays.toString(headers));
-
-      final AtomicInteger iRow = new AtomicInteger(0);
-      while ((line = br.readLine()) != null) {
-        int iR = iRow.getAndAdd(1);
-
-        if (iR == fBaseBatchSize) {
-          long blockId = counter.getAndAdd(1);
-          this.storeMetadata(tableId, blockId, cProfiles);
-          this.storeData(tableId, compression, blockId,
-                         colRawDataLongCount, rawDataLongMapping, rawDataLong,
-                         colRawDataDoubleCount, rawDataDoubleMapping, rawDataDouble,
-                         colRawDataStringCount, rawDataStringMapping, rawDataString);
-
-          iRow.set(0);
-
-          rawDataLong = new ArrayList<>(colRawDataLongCount);
-          fillArrayList(rawDataLong, colRawDataLongCount);
-          rawDataLongMapping = new ArrayList<>(colRawDataLongCount);
-          fillMappingRaw(cProfiles, rawDataLongMapping, isRaw, isLong);
-
-          rawDataDouble = new ArrayList<>(colRawDataDoubleCount);
-          fillArrayList(rawDataDouble, colRawDataDoubleCount);
-          rawDataDoubleMapping = new ArrayList<>(colRawDataDoubleCount);
-          fillMappingRaw(cProfiles, rawDataDoubleMapping, isRaw, isDouble);
-
-          rawDataString = new ArrayList<>(colRawDataStringCount);
-          fillArrayList(rawDataString, colRawDataStringCount);
-          rawDataStringMapping = new ArrayList<>(colRawDataStringCount);
-          fillMappingRaw(cProfiles, rawDataStringMapping, isRaw, isString);
-        }
-
-        String[] data = line.split(csvSplitBy);
-        for (int iC = 0; iC < headers.length; iC++) {
-          String header = headers[iC];
-          String colData = data[iC];
-
-          Optional<CProfile> optionalCProfile = cProfiles.stream()
-              .filter(f -> f.getColName().equals(header))
-              .findAny();
-
-          if (optionalCProfile.isPresent()) {
-            CProfile cProfile = optionalCProfile.get();
-            if (cProfile.getCsType().getSType() == SType.RAW) {
-              if (CType.LONG == Mapper.isCType(cProfile)) {
-                rawDataLong.get(rawDataLongMapping.indexOf(iC)).add(Long.valueOf(colData));
-              } else if (CType.DOUBLE == Mapper.isCType(cProfile)) {
-                rawDataDouble.get(rawDataDoubleMapping.indexOf(iC)).add(Double.valueOf(colData));
-              } else if (CType.STRING == Mapper.isCType(cProfile)) {
-                rawDataString.get(rawDataStringMapping.indexOf(iC)).add(colData);
-              }
-            }
-          }
-        }
-      }
-
-      if (iRow.get() <= fBaseBatchSize) {
-        long blockId = counter.getAndAdd(1);
-        this.storeMetadata(tableId, blockId, cProfiles);
-        this.storeData(tableId, compression, blockId,
-                       colRawDataLongCount, rawDataLongMapping, rawDataLong,
-                       colRawDataDoubleCount, rawDataDoubleMapping, rawDataDouble,
-                       colRawDataStringCount, rawDataStringMapping, rawDataString);
-        log.info("Final flush for iRow: " + iRow.get());
-      }
-    } catch (IOException e) {
-      log.catching(e);
-    }
-  }
-
-  private void storeMetadata(byte tableId,
-                             long blockId,
-                             List<CProfile> cProfiles) {
-    List<Byte> rawCTypeKeys = new ArrayList<>();
-    List<Integer> rawColIds = new ArrayList<>();
-    List<Integer> enumColIds = new ArrayList<>();
-    List<Integer> histogramColIds = new ArrayList<>();
-
-    cProfiles.forEach(cProfile -> {
-      if (SType.RAW.equals(cProfile.getCsType().getSType())) {
-        rawCTypeKeys.add(cProfile.getCsType().getCType().getKey());
-        rawColIds.add(cProfile.getColId());
-      } else if (SType.ENUM.equals(cProfile.getCsType().getSType())) {
-        enumColIds.add(cProfile.getColId());
-      } else if (SType.HISTOGRAM.equals(cProfile.getCsType().getSType())) {
-        histogramColIds.add(cProfile.getColId());
-      }
-    });
-
-    this.rawDAO.putMetadata(tableId, blockId, getByteFromList(rawCTypeKeys),
-                            rawColIds.stream().mapToInt(j -> j).toArray(),
-                            enumColIds.stream().mapToInt(j -> j).toArray(),
-                            histogramColIds.stream().mapToInt(j -> j).toArray());
-  }
-
-  private void storeData(byte tableId,
-                         boolean compression,
-                         long blockId,
-                         int colRawDataLongCount,
-                         List<Integer> rawDataLongMapping,
-                         List<List<Long>> rawDataLong,
-                         int colRawDataDoubleCount,
-                         List<Integer> rawDataDoubleMapping,
-                         List<List<Double>> rawDataDouble,
-                         int colRawDataStringCount,
-                         List<Integer> rawDataStringMapping,
-                         List<List<String>> rawDataString) {
-
-    if (compression) {
-      try {
-        rawDAO.putCompressed(tableId, blockId,
-                             Collections.emptyList(), Collections.emptyList(),
-                             Collections.emptyList(), Collections.emptyList(),
-                             rawDataLongMapping, rawDataLong,
-                             Collections.emptyList(), Collections.emptyList(),
-                             rawDataDoubleMapping, rawDataDouble,
-                             rawDataStringMapping, rawDataString);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      return;
-    }
-
-    if (colRawDataLongCount > 0) {
-      this.rawDAO.putLong(tableId, blockId, rawDataLongMapping.stream().mapToInt(i -> i)
-          .toArray(), getArrayLong(rawDataLong));
-    }
-    if (colRawDataDoubleCount > 0) {
-      this.rawDAO.putDouble(tableId, blockId, rawDataDoubleMapping.stream().mapToInt(i -> i)
-          .toArray(), getArrayDouble(rawDataDouble));
-    }
-    if (colRawDataStringCount > 0) {
-      this.rawDAO.putString(tableId, blockId, rawDataStringMapping.stream().mapToInt(i -> i)
-          .toArray(), getArrayString(rawDataString));
     }
   }
 }

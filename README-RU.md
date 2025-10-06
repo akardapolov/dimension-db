@@ -39,7 +39,7 @@
           - [Параметры хранения столбца таблицы - класс CSType](#параметры-хранения-столбца-таблицы---класс-cstype)
             - [Тип хранения данных - enum SType](#тип-хранения-данных---enum-stype)
             - [Тип хранения данных Java - enum CType](#тип-хранения-данных-java---enum-ctype)
-            - [Тип хранения данных JDBC/CSV - enum DataType](#тип-хранения-данных-jdbccsv---enum-datatype)
+            - [Тип хранения данных JDBC - enum DataType](#тип-хранения-данных-jdbc---enum-datatype)
         - [Входные параметры](#входные-параметры)
           - [Настройки БД - класс Dimension DBConfig](#настройки-бд---класс-dimension-dbconfig)
           - [Настройки таблицы SProfile](#настройки-таблицы-sprofile)
@@ -370,8 +370,6 @@ flowchart TD
   DStore_Write_Interface --> |Прямая вставка| LocalBerkleyDB[(Локальная база данных Berkley DB)]
   DStore_Write_Interface --> |Извлечение данных| ExternalDB_Write[(Внешние базы данных JDBC)]
   ExternalDB_Write --> LocalBerkleyDB
-  DStore_Write_Interface --> |Данные CSV| CSV_Source[Файлы CSV]
-  CSV_Source --> LocalBerkleyDB
   
   DStore_Read_Interface --> |Локальное чтение| LocalBerkleyDB
   DStore_Read_Interface --> |Внешнее чтение| ExternalDB_Read[(Внешние БД JDBC)]
@@ -453,7 +451,6 @@ DStore fStore = Dimension DB.getDStore();
   - **Direct** — вставка данных в локальную БД с использованием промежуточной Java структуры данных табличного вида.
   - **JDBC** — вставка данных в локальную БД с использованием данных, получаемых из внешнего источника данных по JDBC, что позволяет осуществлять интеграцию с другими системами, способными работать с JDBC.
   - **JDBC Batch** — пакетная загрузка в локальную БД с использованием данных, получаемых из внешнего источника данных по JDBC, минимизирующая количество транзакций для масштабной вставки.
-  - **CSV Batch** — пакетная загрузка из CSV-файлов, для переноса больших объемов данных из файлов в локальную БД (экспериментально).
 
 - **Чтение данных**. В процессе извлечения данных из **Dimension DB** используются API, каждый из которых оптимизирован для соответствующих типов запросов:
 
@@ -462,7 +459,7 @@ DStore fStore = Dimension DB.getDStore();
   - **Raw** — извлечение исходных данных в табличном формате, для просмотра детальной информации по всему массиву собранных данных.
   - **BatchResultSet** — извлечение исходных данных в табличном формате с построчным доступом, для получения только части строк из результирующего набора в БД.
 
-- **Загрузка метаданных**. Для работы с внешними источниками данных требуется выполнять запросы к источникам по JDBC, CSV-файлам и табличным Java структурам. Для хранения информации по таблицам и типам данных, используемых для локального хранения и обращения к внешним источникам данных по JDBC используется API для загрузки и просмотра этой информации в локальный файл хранилища метаданных Dimension DB. 
+- **Загрузка метаданных**. Для работы с внешними источниками данных требуется выполнять запросы к источникам по JDBC или табличным Java структурам. Для хранения информации по таблицам и типам данных, используемых для локального хранения и обращения к внешним источникам данных по JDBC используется API для загрузки и просмотра этой информации в локальный файл хранилища метаданных Dimension DB. 
 
 API для записи данных работают только с локальным хранилищем данных типа "ключ-значение" Berkley DB. Методы API для чтения данных могут работать как с локальным хранилищем Berkley DB, так и с внешними источниками данных по JDBC с использованием автоматической генерации SQL запросов.
 
@@ -476,7 +473,6 @@ API для записи данных работают только с локал
 | 4      | Чтение                     | PostgreSQL           | реляционная     |
 | 5      | Чтение                     | Microsoft SQL Server | реляционная     |
 | 6      | Чтение                     | MySQL                | реляционная     |
-| 7      | Чтение                     | CSV файлы            | файловая        |
 
 Перед тем, как приступить к записи данных, необходимо установить параметры хранения и метаданные для таблиц и столбцов в объекте **SProfile**.
 
@@ -499,7 +495,6 @@ sequenceDiagram
   participant MetadataAPI as API метаданных
   participant LocalDB as Локальное хранилище Berkley DB
   participant ExternalDB as Внешние базы данных через JDBC
-  participant CSV as CSV файлы
 
   Client->>DStore_Write: Запрос на запись
   DStore_Write->>MetadataAPI: Получение метаданных
@@ -510,9 +505,6 @@ sequenceDiagram
     DStore_Write->>ExternalDB: Получение данных
     ExternalDB->>DStore_Write: Возврат данных
     DStore_Write->>LocalDB: Вставка из ExternalDB
-    DStore_Write->>CSV: Получение данных CSV
-    CSV->>DStore_Write: Возврат данных CSV
-    DStore_Write->>LocalDB: Вставка из CSV
   end
 
   Client->>DStore_Read: Запрос на чтение
@@ -547,27 +539,25 @@ sequenceDiagram
 | 2  | loadDirectTableMetadata | Метаданные | Загрузить метаданные из SProfile                  | SProfile sProfile                                                                                                                 | TProfile                              |
 | 3  | loadJdbcTableMetadata   | Метаданные | Загрузить метаданные через JDBC с запросом        | Connection connection, String query, SProfile sProfile                                                                            | TProfile                              |
 | 4  | loadJdbcTableMetadata   | Метаданные | Загрузить метаданные через JDBC (схема и таблица) | Connection connection, String sqlSchemaName, String sqlTableName, SProfile sProfile                                               | TProfile                              |
-| 5  | loadCsvTableMetadata    | Метаданные | Загрузить метаданные из CSV-файла                 | String fileName, String csvSplitBy, SProfile sProfile                                                                             | TProfile                              |
-| 6  | setTimestampColumn      | Метаданные | Установить столбец с метками времени              | String tableName, String timestampColumnName                                                                                      | void                                  |
-| 7  | putDataDirect           | Запись     | Сохранить данные с использованием Java-структуры  | String tableName, List<List<Object>> data                                                                                         | void                                  |
-| 8  | putDataJdbc             | Запись     | Сохранить данные из JDBC ResultSet                | String tableName, ResultSet resultSet                                                                                             | long (метка времени последней строки) |
-| 9  | putDataJdbcBatch        | Запись     | Пакетное сохранение из JDBC ResultSet             | String tableName, ResultSet resultSet, Integer batchSize                                                                          | void                                  |
-| 10 | putDataCsvBatch         | Запись     | Пакетное сохранение из CSV-файла                  | String tableName, String fileName, String csvSplitBy, Integer batchSize                                                           | void                                  |
-| 11 | getBlockKeyTailList     | Чтение     | Получить блоки с ключами и диапазонами            | String tableName, long begin, long end                                                                                            | List<BlockKeyTail>                    |
-| 12 | getStacked              | Чтение     | Получить агрегированные данные                    | String tableName, CProfile cProfile, GroupFunction groupFunction, CompositeFilter compositeFilter, long begin, long end           | List<StackedColumn>                   |
-| 13 | getGanttCount           | Чтение     | Двухуровневая группировка COUNT                   | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, long begin, long end                | List<GanttColumnCount>                |
-| 14 | getGanttCount           | Чтение     | Двухуровневая группировка COUNT (многопоточная)   | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, int batchSize, long begin, long end | List<GanttColumnCount>                |
-| 15 | getGanttSum             | Чтение     | Двухуровневая группировка SUM                     | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, long begin, long end                | List<GanttColumnSum>                  |
-| 16 | getDistinct             | Чтение     | Получить уникальные значения                      | String tableName, CProfile cProfile, OrderBy orderBy, CompositeFilter compositeFilter, int limit, long begin, long end            | List<String>                          |
-| 17 | getRawDataAll           | Чтение     | Получить сырые данные (все столбцы, без фильтра)  | String tableName, long begin, long end                                                                                            | List<List<Object>>                    |
-| 18 | getRawDataAll           | Чтение     | Получить сырые данные (все столбцы, с фильтром)   | String tableName, CProfile cProfileFilter, String filter, long begin, long end                                                    | List<List<Object>>                    |
-| 19 | getRawDataByColumn      | Чтение     | Получить сырые данные для конкретного столбца     | String tableName, CProfile cProfile, long begin, long end                                                                         | List<List<Object>>                    |
-| 20 | getBatchResultSet       | Чтение     | Пакетное чтение (обычные таблицы)                 | String tableName, int fetchSize                                                                                                   | BatchResultSet                        |
-| 21 | getBatchResultSet       | Чтение     | Пакетное чтение (time-series таблицы)             | String tableName, long begin, long end, int fetchSize                                                                             | BatchResultSet                        |
-| 22 | getFirst                | Метаданные | Получить первую метку времени                     | String tableName, long begin, long end                                                                                            | long                                  |
-| 23 | getLast                 | Метаданные | Получить последнюю метку времени                  | String tableName, long begin, long end                                                                                            | long                                  |
-| 24 | syncBackendDb           | Бэкенд     | Синхронизировать Berkley DB с диском              | -                                                                                                                                 | void                                  |
-| 25 | closeBackendDb          | Бэкенд     | Закрыть Berkley DB                                | -                                                                                                                                 | void                                  |
+| 5  | setTimestampColumn      | Метаданные | Установить столбец с метками времени              | String tableName, String timestampColumnName                                                                                      | void                                  |
+| 6  | putDataDirect           | Запись     | Сохранить данные с использованием Java-структуры  | String tableName, List<List<Object>> data                                                                                         | void                                  |
+| 7  | putDataJdbc             | Запись     | Сохранить данные из JDBC ResultSet                | String tableName, ResultSet resultSet                                                                                             | long (метка времени последней строки) |
+| 8  | putDataJdbcBatch        | Запись     | Пакетное сохранение из JDBC ResultSet             | String tableName, ResultSet resultSet, Integer batchSize                                                                          | void                                  |
+| 9  | getBlockKeyTailList     | Чтение     | Получить блоки с ключами и диапазонами            | String tableName, long begin, long end                                                                                            | List<BlockKeyTail>                    |
+| 10 | getStacked              | Чтение     | Получить агрегированные данные                    | String tableName, CProfile cProfile, GroupFunction groupFunction, CompositeFilter compositeFilter, long begin, long end           | List<StackedColumn>                   |
+| 11 | getGanttCount           | Чтение     | Двухуровневая группировка COUNT                   | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, long begin, long end                | List<GanttColumnCount>                |
+| 12 | getGanttCount           | Чтение     | Двухуровневая группировка COUNT (многопоточная)   | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, int batchSize, long begin, long end | List<GanttColumnCount>                |
+| 13 | getGanttSum             | Чтение     | Двухуровневая группировка SUM                     | String tableName, CProfile firstGrpBy, CProfile secondGrpBy, CompositeFilter compositeFilter, long begin, long end                | List<GanttColumnSum>                  |
+| 14 | getDistinct             | Чтение     | Получить уникальные значения                      | String tableName, CProfile cProfile, OrderBy orderBy, CompositeFilter compositeFilter, int limit, long begin, long end            | List<String>                          |
+| 15 | getRawDataAll           | Чтение     | Получить сырые данные (все столбцы, без фильтра)  | String tableName, long begin, long end                                                                                            | List<List<Object>>                    |
+| 16 | getRawDataAll           | Чтение     | Получить сырые данные (все столбцы, с фильтром)   | String tableName, CProfile cProfileFilter, String filter, long begin, long end                                                    | List<List<Object>>                    |
+| 17 | getRawDataByColumn      | Чтение     | Получить сырые данные для конкретного столбца     | String tableName, CProfile cProfile, long begin, long end                                                                         | List<List<Object>>                    |
+| 18 | getBatchResultSet       | Чтение     | Пакетное чтение (обычные таблицы)                 | String tableName, int fetchSize                                                                                                   | BatchResultSet                        |
+| 19 | getBatchResultSet       | Чтение     | Пакетное чтение (time-series таблицы)             | String tableName, long begin, long end, int fetchSize                                                                             | BatchResultSet                        |
+| 20 | getFirst                | Метаданные | Получить первую метку времени                     | String tableName, long begin, long end                                                                                            | long                                  |
+| 21 | getLast                 | Метаданные | Получить последнюю метку времени                  | String tableName, long begin, long end                                                                                            | long                                  |
+| 22 | syncBackendDb           | Бэкенд     | Синхронизировать Berkley DB с диском              | -                                                                                                                                 | void                                  |
+| 23 | closeBackendDb          | Бэкенд     | Закрыть Berkley DB                                | -                                                                                                                                 | void                                  |
 
 [Вернуться в Оглавление](#Оглавление)
 
@@ -648,12 +638,12 @@ sequenceDiagram
 
 Таблица 13. Класс CSType для хранения параметров хранения и типов данных столбцов таблицы
 
-| Имя свойства | Тип      | Значение по умолчанию | Описание                                                                                                                   |
-|--------------|----------|-----------------------|----------------------------------------------------------------------------------------------------------------------------|
-| isTimeStamp  | boolean  | false                 | Флаг, обозначающий столбец, который хранит временную метку                                                                 |
-| sType        | SType    | null                  | Тип хранения данных в таблице (RAW, HISTOGRAM, ENUM)                                                                       |
-| cType        | CType    | null                  | Тип данных Java, используемый для хранения данных в БД Berkley DB (Int, Long, Double, String ... etc.)                     |
-| dType        | DataType | null                  | Тип данных JDBC/CSV, используемый для конвертации данных в тип Java Berkley DB (INTEGER, DATE, DATETIME, VARCHAR ... etc.) |
+| Имя свойства | Тип      | Значение по умолчанию | Описание                                                                                                               |
+|--------------|----------|-----------------------|------------------------------------------------------------------------------------------------------------------------|
+| isTimeStamp  | boolean  | false                 | Флаг, обозначающий столбец, который хранит временную метку                                                             |
+| sType        | SType    | null                  | Тип хранения данных в таблице (RAW, HISTOGRAM, ENUM)                                                                   |
+| cType        | CType    | null                  | Тип данных Java, используемый для хранения данных в БД Berkley DB (Int, Long, Double, String ... etc.)                 |
+| dType        | DataType | null                  | Тип данных JDBC, используемый для конвертации данных в тип Java Berkley DB (INTEGER, DATE, DATETIME, VARCHAR ... etc.) |
 
 [Вернуться в Оглавление](#Оглавление)
 
@@ -684,9 +674,9 @@ sequenceDiagram
 
 [Вернуться в Оглавление](#Оглавление)
 
-###### Тип хранения данных JDBC/CSV - enum DataType
+###### Тип хранения данных JDBC - enum DataType
 
-Таблица 16. Класс DataType для хранения типов данных JDBC/CSV, который используется для конвертации данных в формат хранения Java в БД Berkley DB столбца таблицы БД Dimension DB
+Таблица 16. Класс DataType для хранения типов данных JDBC, который используется для конвертации данных в формат хранения Java в БД Berkley DB столбца таблицы БД Dimension DB
 
 | Имя свойства | Тип  | Значение по умолчанию | Описание                      |
 |--------------|------|-----------------------|-------------------------------|
@@ -812,31 +802,29 @@ sequenceDiagram
 | 2     | `loadDirectTableMetadata`         | Метаданные | Загрузить метаданные напрямую из `SProfile`                 | [loadDirectTableMetadata](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)          |
 | 3     | `loadJdbcTableMetadata`           | Метаданные | Загрузить метаданные из JDBC-соединения (запрос)            | [loadJdbcTableMetadata](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
 | 4     | `loadJdbcTableMetadata`           | Метаданные | Загрузить метаданные из JDBC (схема + таблица, Oracle)      |                                                                                              |
-| 5     | `loadCsvTableMetadata`            | Метаданные | Загрузить метаданные из CSV-файла                           | [loadCsvTableMetadata](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)             |
-| 6     | `setTimestampColumn`              | Метаданные | Установить столбец с временной меткой                       | [setTimestampColumn](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)               |
-| 7     | `putDataDirect`                   | Запись     | Сохранить данные из Java-структуры (`List<List<Object>>`)   | [putDataDirect](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                    |
-| 8     | `putDataJdbc`                     | Запись     | Сохранить данные из `ResultSet` (JDBC)                      | [putDataJdbc](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
-| 9     | `putDataJdbcBatch`                | Запись     | Пакетная загрузка из `ResultSet`                            | [putDataJdbcBatch](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                 |
-| 10    | `putDataCsvBatch`                 | Запись     | Пакетная загрузка из CSV                                    | [getBatchResultSetRegularTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)    |
-| 11    | `getBlockKeyTailList`             | Чтение     | Получить список блоков с ключами и диапазонами              | [getBlockKeyTailList](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
-| 12    | `getStacked`                      | Чтение     | Получить агрегированные данные (COUNT/SUM/AVG) по столбцу   | [getStacked](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                       |
-| 13    | `getStacked` (с фильтром)         | Чтение     | Агрегация с фильтром по другому столбцу                     | [getStackedCountFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
-| 14    | `getGantt`                        | Чтение     | Двухуровневая группировка (COUNT)                           | [getGantt](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
-| 15    | `getGantt` (многопоточный)        | Чтение     | Двухуровневая группировка с пакетной обработкой             | [getGantt](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
-| 16    | `getGantt` (с фильтром)           | Чтение     | Двухуровневая группировка с фильтром                        | [getGanttFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                   |
-| 17    | `getGanttSum`                     | Чтение     | Двухуровневая группировка с суммированием числовых значений | [getGanttSum](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
-| 18    | `getGanttSum` (с фильтром)        | Чтение     | Группировка с суммированием и фильтром                      | [getGanttSumFiltered](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
-| 19    | `getDistinct`                     | Чтение     | Уникальные значения столбца                                 | [getDistinct](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
-| 20    | `getDistinct` (с фильтром)        | Чтение     | Уникальные значения с фильтрацией                           | [getDistinctWithFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
-| 21    | `getRawDataAll`                   | Чтение     | Сырые данные по всем столбцам                               | [getRawDataAll](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                    |
-| 22    | `getRawDataAll` (с фильтром)      | Чтение     | Сырые данные с фильтром по столбцу                          | [getRawDataAllFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
-| 23    | `getRawDataByColumn`              | Чтение     | Сырые данные по одному столбцу                              | [getRawDataByColumn](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)               |
-| 24    | `getBatchResultSet`               | Чтение     | Постраничное чтение (обычные таблицы)                       | [getBatchResultSetRegularTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)    |
-| 25    | `getBatchResultSet` (time-series) | Чтение     | Постраничное чтение с временным диапазоном                  | [getBatchResultSetTimeSeriesTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java) |
-| 26    | `getFirst`                        | Метаданные | Первая временная метка в диапазоне                          | [getFirst](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
-| 27    | `getLast`                         | Метаданные | Последняя временная метка в диапазоне                       | [getLast](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                          |
-| 28    | `syncBackendDb`                   | Backend    | Синхронизация Berkley DB с диском                           |                                                                                              |
-| 29    | `closeBackendDb`                  | Backend    | Закрытие Berkley DB                                         |                                                                                              |
+| 5     | `setTimestampColumn`              | Метаданные | Установить столбец с временной меткой                       | [setTimestampColumn](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)               |
+| 6     | `putDataDirect`                   | Запись     | Сохранить данные из Java-структуры (`List<List<Object>>`)   | [putDataDirect](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                    |
+| 7     | `putDataJdbc`                     | Запись     | Сохранить данные из `ResultSet` (JDBC)                      | [putDataJdbc](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
+| 8     | `putDataJdbcBatch`                | Запись     | Пакетная загрузка из `ResultSet`                            | [putDataJdbcBatch](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                 |
+| 9     | `getBlockKeyTailList`             | Чтение     | Получить список блоков с ключами и диапазонами              | [getBlockKeyTailList](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
+| 10    | `getStacked`                      | Чтение     | Получить агрегированные данные (COUNT/SUM/AVG) по столбцу   | [getStacked](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                       |
+| 11    | `getStacked` (с фильтром)         | Чтение     | Агрегация с фильтром по другому столбцу                     | [getStackedCountFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
+| 12    | `getGantt`                        | Чтение     | Двухуровневая группировка (COUNT)                           | [getGantt](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
+| 13    | `getGantt` (многопоточный)        | Чтение     | Двухуровневая группировка с пакетной обработкой             | [getGantt](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
+| 14    | `getGantt` (с фильтром)           | Чтение     | Двухуровневая группировка с фильтром                        | [getGanttFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                   |
+| 15    | `getGanttSum`                     | Чтение     | Двухуровневая группировка с суммированием числовых значений | [getGanttSum](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
+| 16    | `getGanttSum` (с фильтром)        | Чтение     | Группировка с суммированием и фильтром                      | [getGanttSumFiltered](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
+| 17    | `getDistinct`                     | Чтение     | Уникальные значения столбца                                 | [getDistinct](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                      |
+| 18    | `getDistinct` (с фильтром)        | Чтение     | Уникальные значения с фильтрацией                           | [getDistinctWithFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)            |
+| 19    | `getRawDataAll`                   | Чтение     | Сырые данные по всем столбцам                               | [getRawDataAll](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                    |
+| 20    | `getRawDataAll` (с фильтром)      | Чтение     | Сырые данные с фильтром по столбцу                          | [getRawDataAllFilter](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)              |
+| 21    | `getRawDataByColumn`              | Чтение     | Сырые данные по одному столбцу                              | [getRawDataByColumn](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)               |
+| 22    | `getBatchResultSet`               | Чтение     | Постраничное чтение (обычные таблицы)                       | [getBatchResultSetRegularTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)    |
+| 23    | `getBatchResultSet` (time-series) | Чтение     | Постраничное чтение с временным диапазоном                  | [getBatchResultSetTimeSeriesTable](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java) |
+| 24    | `getFirst`                        | Метаданные | Первая временная метка в диапазоне                          | [getFirst](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                         |
+| 25    | `getLast`                         | Метаданные | Последняя временная метка в диапазоне                       | [getLast](src/test/java/ru/dimension/db/DBaseUseCasesCodeTest.java)                          |
+| 26    | `syncBackendDb`                   | Backend    | Синхронизация Berkley DB с диском                           |                                                                                              |
+| 27    | `closeBackendDb`                  | Backend    | Закрытие Berkley DB                                         |                                                                                              |
 
 [Вернуться в Оглавление](#Оглавление)
 
@@ -883,38 +871,77 @@ Table 26. Профили загрузки
 
 | # | TType       | IType  | AType          | Compression | Load (min)    | Size (GB) |
 |--:|-------------|--------|----------------|-------------|---------------|-----------|
-| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 26 min 3 sec  | 9,175     |
-| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 22 min 42 sec | 11,801    |
-| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 21 min 46 sec | 11,968    |
-| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 22 min 59 sec | 11,924    |
+| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 27 min 55 sec | 9,164     |
+| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 21 min 48 sec | 12,287    |
+| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 21 min 58 sec | 12,180    |
+| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 21 min 39 sec | 11,604    |
 
-Table 27. Performance tests for gantt API
+Table 27. Тесты производительности gantt API (count)
 
 | № | Test name        | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | PASS_ONCE <br/>Execution time <br/>(single/2-thread) (sec) | PASS_EACH <br/>Execution time <br/>(single/2-thread) (sec) |
 |---|------------------|----------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|
-| 1 | getGanttRawRaw   | 13,6 / 8,5                                               | 13,7 / 10,7                                              | 13,1 / 8,5                                                 | 14,4 / 8,8                                                 |
-| 2 | getGanttEnumEnum | 4,3 / 2,4                                                | 10,4 / 7,9                                               | 9,5 / 6,7                                                  | 10,1 / 7,2                                                 |
-| 3 | getGanttHistHist | 3,4 / 1,8                                                | 13,1 / 9,1                                               | 11,5 / 8,0                                                 | 12,2 / 9,2                                                 |
-| 4 | getGanttHistRaw  | 9,0 / 6,3                                                | 11,1 / 8,3                                               | 10,0 / 7,7                                                 | 10,9 / 7,4                                                 |
-| 5 | getGanttHistEnum | 3,5 / 1,9                                                | 13,4 / 8,4                                               | 11,6 / 8,1                                                 | 12,1 / 7,9                                                 |
-| 6 | getGanttEnumRaw  | 7,7 / 5,2                                                | 12,9 / 9,8                                               | 12,5 / 9,8                                                 | 13,5 / 9,9                                                 |
-| 7 | getGanttEnumHist | 3,6 / 1,9                                                | 14,1 / 10,4                                              | 14,2 / 10,3                                                | 14,0 / 11,2                                                |
-| 8 | getGanttRawHist  | 9,3 / 6,6                                                | 12,9 / 9,4                                               | 12,8 / 9,6                                                 | 13,1 / 9,4                                                 |
-| 9 | getGanttRawEnum  | 10,5 / 7,2                                               | 12,7 / 9,2                                               | 12,6 / 9,0                                                 | 13,4 / 8,9                                                 |
+| 1 | getGanttRawRaw   | 11,6 / 8,2                                               | 12,4 / 8,5                                               | 11,9 / 8,3                                                 | 11,8 / 8,4                                                 |
+| 2 | getGanttEnumEnum | 7,2 / 4,1                                                | 10,3 / 6,8                                               | 9,7 / 6,5                                                  | 9,5 / 6,7                                                  |
+| 3 | getGanttHistHist | 6,5 / 3,5                                                | 11,8 / 8,2                                               | 11,9 / 8,2                                                 | 11,7 / 8,1                                                 |
+| 4 | getGanttHistRaw  | 10,1 / 6,4                                               | 10,2 / 7,5                                               | 9,9 / 7,4                                                  | 10,1 / 7,7                                                 |
+| 5 | getGanttHistEnum | 6,9 / 3,6                                                | 11,5 / 8,1                                               | 11,2 / 8,0                                                 | 12,9 / 8,2                                                 |
+| 6 | getGanttEnumRaw  | 9,2 / 5,9                                                | 12,8 / 9,1                                               | 12,7 / 9,0                                                 | 13,0 / 9,2                                                 |
+| 7 | getGanttEnumHist | 5,8 / 3,4                                                | 13,9 / 9,9                                               | 13,6 / 9,6                                                 | 14,5 / 10,1                                                |
+| 8 | getGanttRawHist  | 8,9 / 6,0                                                | 12,8 / 9,3                                               | 12,6 / 9,2                                                 | 12,7 / 9,3                                                 |
+| 9 | getGanttRawEnum  | 8,4 / 5,9                                                | 12,6 / 9,3                                               | 13,6 / 9,7                                                 | 16,0 / 10,1                                                |
 
-Table 28. Таблица запросов
+Table 28. Тесты производительности gantt API (sum)
 
-| № | Имя теста        | SQL запрос                                                                                                                                                                      |
-|---|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | getGanttRawRaw   | `SELECT pickup_cdeligibil, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, vendor_id;`                   |
-| 2 | getGanttHistRaw  | `SELECT trip_type, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, vendor_id;`                                   |
-| 3 | getGanttRawEnum  | `SELECT pickup_cdeligibil, cab_type, COUNT(cab_type) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, cab_type;`                      |
-| 4 | getGanttRawHist  | `SELECT pickup_cdeligibil, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, pickup_boroname;` |
-| 5 | getGanttEnumEnum | `SELECT dropoff_puma, dropoff_borocode, COUNT(dropoff_borocode) FROM datasets.trips_mergetree where toYear(pickup_date) = 2016 group by dropoff_puma, dropoff_borocode;`        |
-| 6 | getGanttEnumHist | `SELECT dropoff_boroname, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, pickup_boroname;`   |
-| 7 | getGanttEnumRaw  | `SELECT dropoff_boroname, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, vendor_id;`                     |
-| 8 | getGanttHistEnum | `SELECT trip_type, dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, dropoff_boroname;`              |
-| 9 | getGanttHistHist | `SELECT trip_type, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, pickup_boroname;`                 |
+| № | Test name                    | ON_LOAD <br/>Execution time | ON_LOAD <br/>Execution time | PASS_ONCE <br/>Execution time | PASS_EACH <br/>Execution time |
+|---|------------------------------|-----------------------------|-----------------------------|-------------------------------|-------------------------------|
+| 1 | getGanttSumHistRaw           | 5,5                         | 7,3                         | 7,4                           | 7,0                           |
+| 2 | getGanttSumEnumRaw           | 5,5                         | 9,7                         | 11,0                          | 10,1                          |
+| 3 | getGanttSumRawRaw            | 8,1                         | 8,6                         | 8,6                           | 8,8                           |
+| 4 | getGanttSumHistHist          | 3,6                         | 6,3                         | 5,7                           | 6,8                           |
+| 5 | getGanttSumEnumEnum          | 4,0                         | 9,7                         | 8,7                           | 14,2                          |
+| 6 | getGanttSumRawEnum           | 7,2                         | 7,6                         | 7,4                           | 8,7                           |
+| 7 | getGanttSumHistRawWithFilter | 5,5                         | 8,8                         | 8,8                           | 14,3                          |
+
+Table 29. Тесты производительности stacked API
+
+| № | Test name       | ON_LOAD <br/>Execution time | ON_LOAD <br/>Execution time | PASS_ONCE <br/>Execution time | PASS_EACH <br/>Execution time |
+|---|-----------------|-----------------------------|-----------------------------|-------------------------------|-------------------------------|
+| 1 | stackedHist     | 3,9                         | 5,8                         | 5,4                           | 5,1                           |
+| 2 | stackedHistDate | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
+| 3 | stackedEnum     | 4,0                         | 8,6                         | 8,6                           | 9,8                           |
+| 4 | stackedEnumDate | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
+| 5 | stackedRaw      | 6,5                         | 6,7                         | 7,3                           | 6,6                           |
+| 6 | stackedRawDate  | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
+
+Table 30. Таблица запросов
+
+| №  | Test name             | SQL query                                                                                                                                                                       |
+|----|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|    | **Gantt API (Count)** |                                                                                                                                                                                 |
+| 1  | getGanttRawRaw        | `SELECT pickup_cdeligibil, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, vendor_id;`                   |
+| 2  | getGanttHistRaw       | `SELECT trip_type, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, vendor_id;`                                   |
+| 3  | getGanttRawEnum       | `SELECT pickup_cdeligibil, cab_type, COUNT(cab_type) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, cab_type;`                      |
+| 4  | getGanttRawHist       | `SELECT pickup_cdeligibil, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil, pickup_boroname;` |
+| 5  | getGanttEnumEnum      | `SELECT dropoff_puma, dropoff_borocode, COUNT(dropoff_borocode) FROM datasets.trips_mergetree where toYear(pickup_date) = 2016 group by dropoff_puma, dropoff_borocode;`        |
+| 6  | getGanttEnumHist      | `SELECT dropoff_boroname, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, pickup_boroname;`   |
+| 7  | getGanttEnumRaw       | `SELECT dropoff_boroname, vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname, vendor_id;`                     |
+| 8  | getGanttHistEnum      | `SELECT trip_type, dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, dropoff_boroname;`              |
+| 9  | getGanttHistHist      | `SELECT trip_type, pickup_boroname, COUNT(pickup_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type, pickup_boroname;`                 |
+|    | **Gantt API (Sum)**   |                                                                                                                                                                                 |
+| 10 | getGanttSumHistRaw    | `SELECT trip_type, SUM(fare_amount) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type;`                                                         |
+| 11 | getGanttSumEnumRaw    | `SELECT pickup_boroname, SUM(trip_distance) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_boroname;`                                           |
+| 12 | getGanttSumRawRaw     | `SELECT vendor_id, SUM(total_amount) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY vendor_id;`                                                        |
+| 13 | getGanttSumHistHist   | `SELECT trip_type, SUM(passenger_count) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type;`                                                     |
+| 14 | getGanttSumEnumEnum   | `SELECT dropoff_boroname, SUM(dropoff_borocode) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname;`                                      |
+| 15 | getGanttSumRawEnum    | `SELECT pickup_cdeligibil, SUM(pickup_borocode) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY pickup_cdeligibil;`                                     |
+| 16 | getGanttSumWithFilter | `SELECT trip_type, SUM(fare_amount) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 AND trip_type IN (1, 2) GROUP BY trip_type;`                                 |
+|    | **Stacked API**       |                                                                                                                                                                                 |
+| 17 | stackedHist           | `SELECT trip_type, COUNT(trip_type) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY trip_type;`                                                         |
+| 18 | stackedHistDate       | `SELECT trip_type, COUNT(trip_type) FROM datasets.trips_mergetree WHERE toYYYYMMDD(pickup_datetime) = 20160101 GROUP BY trip_type;`                                             |
+| 19 | stackedEnum           | `SELECT dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY dropoff_boroname;`                                    |
+| 20 | stackedEnumDate       | `SELECT dropoff_boroname, COUNT(dropoff_boroname) FROM datasets.trips_mergetree WHERE toYYYYMMDD(pickup_datetime) = 20160101 GROUP BY dropoff_boroname;`                        |
+| 21 | stackedRaw            | `SELECT vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYear(pickup_date) = 2016 GROUP BY vendor_id;`                                                         |
+| 22 | stackedRawDate        | `SELECT vendor_id, COUNT(vendor_id) FROM datasets.trips_mergetree WHERE toYYYYMMDD(pickup_datetime) = 20160101 GROUP BY vendor_id;`                                             |
 
 ## Загрузка
 - Сборка и установка Dimension DB из исходных кодов в локальный репозиторий Maven описана в разделе [Сборка проекта](#сборка-проекта).

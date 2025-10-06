@@ -1,6 +1,5 @@
 package ru.dimension.db;
 
-import static ru.dimension.db.config.FileConfig.FILE_SEPARATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -8,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -20,7 +18,16 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
-import ru.dimension.db.common.mode.CSVMode;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import ru.dimension.db.common.mode.DirectMode;
 import ru.dimension.db.common.mode.JDBCMode;
 import ru.dimension.db.exception.BeginEndWrongOrderException;
@@ -34,6 +41,9 @@ import ru.dimension.db.model.DBaseTestConfig;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
 import ru.dimension.db.model.Person;
+import ru.dimension.db.model.filter.CompositeFilter;
+import ru.dimension.db.model.filter.FilterCondition;
+import ru.dimension.db.model.filter.LogicalOperator;
 import ru.dimension.db.model.output.BlockKeyTail;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
@@ -50,41 +60,24 @@ import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.source.H2Database;
 import ru.dimension.db.sql.BatchResultSet;
-import ru.dimension.db.model.filter.CompositeFilter;
-import ru.dimension.db.model.filter.FilterCondition;
-import ru.dimension.db.model.filter.LogicalOperator;
-
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.io.TempDir;
 
 @Log4j2
 @TestInstance(Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
+public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode {
 
   @TempDir
   static File databaseDir;
 
   static File databaseDirDirect;
   static File databaseDirJdbc;
-  static File databaseDirCsv;
 
   private DBaseTestConfig configDirect;
   private DBaseTestConfig configJdbc;
-  private DBaseTestConfig configCsv;
 
   private static final String GET_TABLE_PROFILE_USE_CASE_TABLE_NAME = "table_name_get_table_profile_use_case_test";
   private static final String LOAD_DIRECT_METADATA_USE_CASE_TABLE_NAME = "table_name_load_direct_metadata_use_case_test";
   private static final String LOAD_JDBC_METADATA_USE_CASE_TABLE_NAME = "table_name_load_jdbc_metadata_use_case_test";
-  private static final String LOAD_CSV_METADATA_USE_CASE_TABLE_NAME = "table_name_load_csv_metadata_use_case_test";
   private static final String SET_TIMESTAMP_COLUMN_USE_CASE_TABLE_NAME = "table_name_set_timestamp_column_use_case_test";
   private static final String PUT_DIRECT_USE_CASE_TABLE_NAME = "table_name_put_direct_use_case_test";
   private static final String PUT_JDBC_USE_CASE_TABLE_NAME = "table_name_put_jdbc_use_case_test";
@@ -98,7 +91,6 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   private static final String GET_RAW_USE_CASE_TABLE_NAME = "table_name_raw_use_case_test";
   private static final String GET_RAW_FILTER_USE_CASE_TABLE_NAME = "table_name_raw_filter_use_case_test";
   private static final String GET_RAW_COLUMN_USE_CASE_TABLE_NAME = "table_name_raw_column_use_case_test";
-  private static final String GET_RESULT_SET_REGULAR_USE_CASE_TABLE_NAME = "table_name_result_set_regular_use_case_test";
   private static final String GET_RESULT_SET_TIME_SERIES_USE_CASE_TABLE_NAME = "table_name_result_time_series_set_use_case_test";
   private static final String GET_FIRST_TIMESTAMP_USE_CASE_TABLE_NAME = "table_name_first_timestamp_use_case_test";
   private static final String GET_LAST_TIMESTAMP_USE_CASE_TABLE_NAME = "table_name_last_timestamp_use_case_test";
@@ -110,14 +102,12 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   public void initialization() throws SQLException, IOException {
     databaseDirDirect = createSubDirWithPostfix(databaseDir, "direct");
     databaseDirJdbc = createSubDirWithPostfix(databaseDir, "jdbc");
-    databaseDirCsv = createSubDirWithPostfix(databaseDir, "csv");
 
     h2Db = new H2Database("jdbc:h2:mem:use_case_test");
     loadDataTablePersonH2(h2Db);
 
     configDirect = new DBaseTestConfig(databaseDirDirect, h2Db);
     configJdbc = new DBaseTestConfig(databaseDirJdbc, h2Db);
-    configCsv = new DBaseTestConfig(databaseDirCsv, h2Db);
   }
 
   @Order(1)
@@ -149,18 +139,6 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
     SProfile sProfile = getSProfileJdbc(LOAD_JDBC_METADATA_USE_CASE_TABLE_NAME, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
     TProfile tProfile = configDirect.getDStore().loadJdbcTableMetadata(configDirect.getH2DbConnection(), select, sProfile);
     assertEquals(LOAD_JDBC_METADATA_USE_CASE_TABLE_NAME, tProfile.getTableName());
-    log.info(tProfile);
-  }
-
-  @Order(4)
-  @Test
-  public void loadCsvTableMetadata() throws TableNameEmptyException {
-    log.info("Use case: load table metadata from CSV");
-    String fileName = new File("").getAbsolutePath() + FILE_SEPARATOR + Paths.get("src", "test", "resources", "csv", "file-l.csv");
-    String csvSplitBy = ",";
-    SProfile sProfile = getSProfileCsv(LOAD_CSV_METADATA_USE_CASE_TABLE_NAME, fileName, csvSplitBy, TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, true);
-    TProfile tProfile = configCsv.getDStore().loadCsvTableMetadata(fileName, csvSplitBy, sProfile);
-    assertEquals(LOAD_CSV_METADATA_USE_CASE_TABLE_NAME, tProfile.getTableName());
     log.info(tProfile);
   }
 
@@ -749,19 +727,6 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
     assertForRaw(expected.stream().filter(filter).map(map -> List.of(map.get(0), map.get(1))).collect(Collectors.toList()), actual);
   }
 
-  @Order(19)
-  @Test
-  public void getBatchResultSetRegularTable() throws TableNameEmptyException, SqlColMetadataException, IOException {
-    log.info("Use case: get raw data using BatchResultSet for regular table with CSV");
-    String fileName = new File("").getAbsolutePath() + FILE_SEPARATOR + Paths.get("src", "test", "resources", "csv", "file.csv");
-    String csvSplitBy = ",";
-    SProfile sProfile = getSProfileCsv(GET_RESULT_SET_REGULAR_USE_CASE_TABLE_NAME, fileName, csvSplitBy,
-                                       TType.REGULAR, IType.GLOBAL, AType.ON_LOAD, BType.BERKLEYDB, false);
-    TProfile tProfile = configCsv.getDStore().loadCsvTableMetadata(fileName, csvSplitBy, sProfile);
-    configCsv.getDStore().putDataCsvBatch(tProfile.getTableName(), fileName, csvSplitBy, 2);
-    assertDataCsvBatchTest(configCsv.getDStore(), sProfile, fileName, false, 10, false);
-  }
-
   @Order(20)
   @Test
   public void getBatchResultSetTimeSeriesTable() throws SQLException, TableNameEmptyException {
@@ -969,6 +934,5 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode, CSVMode {
   public void closeDb() {
     configDirect.getBerkleyDB().closeDatabase();
     configJdbc.getBerkleyDB().closeDatabase();
-    configCsv.getBerkleyDB().closeDatabase();
   }
 }

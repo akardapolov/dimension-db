@@ -14,9 +14,4 @@ public interface StoreService {
   void putDataJdbcBatch(String tableName,
                         ResultSet resultSet,
                         Integer fBaseBatchSize);
-
-  void putDataCsvBatch(String tableName,
-                       String fileName,
-                       String csvSplitBy,
-                       Integer fBaseBatchSize);
 }
