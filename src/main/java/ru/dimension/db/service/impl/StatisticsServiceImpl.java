@@ -1,7 +1,7 @@
 package ru.dimension.db.service.impl;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.service.StatisticsService;
 
@@ -9,14 +9,14 @@ public class StatisticsServiceImpl implements StatisticsService {
   private static final int HISTORY_SIZE = 5;
 
   // tableId -> colId -> stack of storage types (limited to HISTORY_SIZE)
-  private final Map<Byte, Map<Integer, STypeCircularBuffer>> stats = new HashMap<>();
-  private final Map<Byte, Integer> lastAnalyzedColIdMap = new HashMap<>();
-  private final Map<Byte, Boolean> fullPassDoneMap = new HashMap<>();
+  private final Map<Byte, Map<Integer, STypeCircularBuffer>> stats = new ConcurrentHashMap<>();
+  private final Map<Byte, Integer> lastAnalyzedColIdMap = new ConcurrentHashMap<>();
+  private final Map<Byte, Boolean> fullPassDoneMap = new ConcurrentHashMap<>();
 
   @Override
   public boolean isStatByTableExist(byte tableId) {
     if (stats.get(tableId) == null || stats.get(tableId).isEmpty()) {
-      stats.computeIfAbsent(tableId, k -> new HashMap<>());
+      stats.computeIfAbsent(tableId, k -> new ConcurrentHashMap<>());
       return false;
     } else {
       return true;
@@ -50,7 +50,7 @@ public class StatisticsServiceImpl implements StatisticsService {
   }
 
   public void updateSType(byte tableId, int colId, SType sType) {
-    stats.computeIfAbsent(tableId, k -> new HashMap<>())
+    stats.computeIfAbsent(tableId, k -> new ConcurrentHashMap<>())
         .computeIfAbsent(colId, k -> new STypeCircularBuffer(HISTORY_SIZE))
         .add(sType);
   }

@@ -6,7 +6,6 @@ import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.storage.format.StorageContext;
 import ru.dimension.db.storage.format.StorageReader;
-import ru.dimension.db.storage.format.DualColumnProcessor;
 import ru.dimension.db.storage.bdb.entity.column.EColumn;
 import ru.dimension.db.storage.helper.EnumHelper;
 
@@ -71,22 +70,5 @@ public class EnumStorageReader implements StorageReader {
       ints[i] = EnumHelper.getIndexValue(dict, bytes[i]);
     }
     return ints;
-  }
-
-  @Override
-  public void processDualColumns(StorageContext context,
-                                 CProfile firstProfile,
-                                 CProfile secondProfile,
-                                 DualColumnProcessor processor) {
-    EColumn firstColumn = context.getEnumDAO().getEColumnValues(
-        context.getTableId(), context.getBlockId(), firstProfile.getColId());
-    EColumn secondColumn = context.getEnumDAO().getEColumnValues(
-        context.getTableId(), context.getBlockId(), secondProfile.getColId());
-
-    for (int i = 0; i < context.getTimestamps().length; i++) {
-      int firstValue = EnumHelper.getIndexValue(firstColumn.getValues(), firstColumn.getDataByte()[i]);
-      int secondValue = EnumHelper.getIndexValue(secondColumn.getValues(), secondColumn.getDataByte()[i]);
-      processor.process(firstValue, secondValue);
-    }
   }
 }

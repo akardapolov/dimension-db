@@ -83,7 +83,7 @@ The library can be used as a lightweight analytical database for backend data pr
 [Return to Contents](#contents)
 
 ## Minimum technical requirements
-**Dimension DB** is compatible with Java 24+ and comes with a small set of dependencies.
+**Dimension DB** is compatible with Java 25+ and comes with a small set of dependencies.
 
 ### Hardware requirements
 
@@ -868,50 +868,50 @@ Table 25. Data for 2016
 |-----------------|------------|--------------|
 | 78325655        | 6.88 GiB   | 94.37 B      |
 
-Table 26. Load profiles
+Table 26. Load profiles with compression
 
-| # | TType       | IType  | AType          | Compression | Load (min)    | Size (GB) |
-|--:|-------------|--------|----------------|-------------|---------------|-----------|
-| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | true        | 27 min 55 sec | 9,164     |
-| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | true        | 21 min 48 sec | 12,287    |
-| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | true        | 21 min 58 sec | 12,180    |
-| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | true        | 21 min 39 sec | 11,604    |
+| # | TType       | IType  | AType          | Load (min)    | Size (GB) | Avg Rows/Sec | Avg MB/Sec |
+|--:|-------------|--------|----------------|---------------|-----------|--------------|------------|
+| 1 | TIME_SERIES | GLOBAL | ON_LOAD        | 30 min 27 sec | 9,133     | 42 855       | 5,4        |
+| 2 | TIME_SERIES | LOCAL  | ON_LOAD        | 25 min 37 sec | 11,530    | 50 930       | 6,4        |
+| 3 | TIME_SERIES | LOCAL  | FULL_PASS_ONCE | 25 min 18 sec | 11,899    | 51 580       | 6,4        |
+| 4 | TIME_SERIES | LOCAL  | FULL_PASS_EACH | 25 min 26 sec | 12,195    | 51 316       | 6,4        |
 
 Table 27. Performance tests for gantt API (count)
 
-| № | Test name        | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | ON_LOAD <br/>Execution time <br/>(single/2-thread) (sec) | PASS_ONCE <br/>Execution time <br/>(single/2-thread) (sec) | PASS_EACH <br/>Execution time <br/>(single/2-thread) (sec) |
-|---|------------------|----------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|
-| 1 | getGanttRawRaw   | 11,6 / 8,2                                               | 12,4 / 8,5                                               | 11,9 / 8,3                                                 | 11,8 / 8,4                                                 |
-| 2 | getGanttEnumEnum | 7,2 / 4,1                                                | 10,3 / 6,8                                               | 9,7 / 6,5                                                  | 9,5 / 6,7                                                  |
-| 3 | getGanttHistHist | 6,5 / 3,5                                                | 11,8 / 8,2                                               | 11,9 / 8,2                                                 | 11,7 / 8,1                                                 |
-| 4 | getGanttHistRaw  | 10,1 / 6,4                                               | 10,2 / 7,5                                               | 9,9 / 7,4                                                  | 10,1 / 7,7                                                 |
-| 5 | getGanttHistEnum | 6,9 / 3,6                                                | 11,5 / 8,1                                               | 11,2 / 8,0                                                 | 12,9 / 8,2                                                 |
-| 6 | getGanttEnumRaw  | 9,2 / 5,9                                                | 12,8 / 9,1                                               | 12,7 / 9,0                                                 | 13,0 / 9,2                                                 |
-| 7 | getGanttEnumHist | 5,8 / 3,4                                                | 13,9 / 9,9                                               | 13,6 / 9,6                                                 | 14,5 / 10,1                                                |
-| 8 | getGanttRawHist  | 8,9 / 6,0                                                | 12,8 / 9,3                                               | 12,6 / 9,2                                                 | 12,7 / 9,3                                                 |
-| 9 | getGanttRawEnum  | 8,4 / 5,9                                                | 12,6 / 9,3                                               | 13,6 / 9,7                                                 | 16,0 / 10,1                                                |
+| № | Test name        | ON_LOAD <br/>Execution time | ON_LOAD <br/>Execution time | PASS_ONCE <br/>Execution time | PASS_EACH <br/>Execution time |
+|---|------------------|-----------------------------|-----------------------------|-------------------------------|-------------------------------|
+| 1 | getGanttRawRaw   | 14,0 / 9,9                  | 13,4 / 9,0                  | 14,5 / 10,1                   | 15,5 / 10,9                   |
+| 2 | getGanttEnumEnum | 8,7 / 4,5                   | 10,5 / 7,1                  | 11,2 / 7,7                    | 12,0 / 8,0                    |
+| 3 | getGanttHistHist | 7,8 / 4,3                   | 12,8 / 8,9                  | 14,2 / 10,1                   | 14,4 / 10,1                   |
+| 4 | getGanttHistRaw  | 10,5 / 7,0                  | 11,2 / 7,9                  | 12,3 / 8,9                    | 12,4 / 8,8                    |
+| 5 | getGanttHistEnum | 8,3 / 4,2                   | 12,4 / 9,2                  | 15,4 / 9,7                    | 13,9 / 9,6                    |
+| 6 | getGanttEnumRaw  | 11,3 / 7,2                  | 14,8 / 10,2                 | 15,7 / 11,1                   | 17,4 / 11,4                   |
+| 7 | getGanttEnumHist | 8,5 / 4,6                   | 16,2 / 10,9                 | 16,4 / 11,7                   | 18,3 / 11,5                   |
+| 8 | getGanttRawHist  | 11,2 / 7,2                  | 14,7 / 10,1                 | 15,7 / 10,8                   | 15,0 / 10,4                   |
+| 9 | getGanttRawEnum  | 10,6 / 6,9                  | 14,3 / 9,9                  | 15,7 / 10,1                   | 14,7 / 10,2                   |
 
 Table 28. Performance tests for gantt API (sum)
 
 | № | Test name                    | ON_LOAD <br/>Execution time | ON_LOAD <br/>Execution time | PASS_ONCE <br/>Execution time | PASS_EACH <br/>Execution time |
 |---|------------------------------|-----------------------------|-----------------------------|-------------------------------|-------------------------------|
-| 1 | getGanttSumHistRaw           | 5,5                         | 7,3                         | 7,4                           | 7,0                           |
-| 2 | getGanttSumEnumRaw           | 5,5                         | 9,7                         | 11,0                          | 10,1                          |
-| 3 | getGanttSumRawRaw            | 8,1                         | 8,6                         | 8,6                           | 8,8                           |
-| 4 | getGanttSumHistHist          | 3,6                         | 6,3                         | 5,7                           | 6,8                           |
-| 5 | getGanttSumEnumEnum          | 4,0                         | 9,7                         | 8,7                           | 14,2                          |
-| 6 | getGanttSumRawEnum           | 7,2                         | 7,6                         | 7,4                           | 8,7                           |
-| 7 | getGanttSumHistRawWithFilter | 5,5                         | 8,8                         | 8,8                           | 14,3                          |
+| 1 | getGanttSumHistRaw           | 5,8                         | 7,3                         | 7,3                           | 7,2                           |
+| 2 | getGanttSumEnumRaw           | 6,8                         | 11,0                        | 11,1                          | 11,1                          |
+| 3 | getGanttSumRawRaw            | 10,1                        | 9,4                         | 9,6                           | 9,6                           |
+| 4 | getGanttSumHistHist          | 4,6                         | 6,3                         | 6,3                           | 6,1                           |
+| 5 | getGanttSumEnumEnum          | 4,9                         | 9,5                         | 9,6                           | 9,2                           |
+| 6 | getGanttSumRawEnum           | 8,9                         | 8,5                         | 9,0                           | 8,0                           |
+| 7 | getGanttSumHistRawWithFilter | 7,1                         | 9,7                         | 10,1                          | 9,9                           |
 
 Table 29. Performance tests for stacked API
 
 | № | Test name       | ON_LOAD <br/>Execution time | ON_LOAD <br/>Execution time | PASS_ONCE <br/>Execution time | PASS_EACH <br/>Execution time |
 |---|-----------------|-----------------------------|-----------------------------|-------------------------------|-------------------------------|
-| 1 | stackedHist     | 3,9                         | 5,8                         | 5,4                           | 5,1                           |
+| 1 | stackedHist     | 4,7                         | 6,9                         | 6,3                           | 5,7                           |
 | 2 | stackedHistDate | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
-| 3 | stackedEnum     | 4,0                         | 8,6                         | 8,6                           | 9,8                           |
+| 3 | stackedEnum     | 4,9                         | 8,5                         | 9,1                           | 9,5                           |
 | 4 | stackedEnumDate | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
-| 5 | stackedRaw      | 6,5                         | 6,7                         | 7,3                           | 6,6                           |
+| 5 | stackedRaw      | 8,3                         | 7,1                         | 7,8                           | 8,3                           |
 | 6 | stackedRawDate  | 0,1                         | 0,1                         | 0,1                           | 0,1                           |
 
 Table 30. Queries Table

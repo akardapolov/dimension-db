@@ -6,7 +6,6 @@ import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.service.mapping.Mapper;
 import ru.dimension.db.storage.RawDAO;
-import ru.dimension.db.storage.format.DualColumnProcessor;
 import ru.dimension.db.storage.format.StorageContext;
 import ru.dimension.db.storage.format.StorageReader;
 import ru.dimension.db.util.DateHelper;
@@ -38,19 +37,6 @@ public class RawStorageReader implements StorageReader {
   @Override
   public int[] getIntValues(StorageContext context, CProfile cProfile) {
     throw new UnsupportedOperationException("RAW format does not provide int values");
-  }
-
-  @Override
-  public void processDualColumns(StorageContext context,
-                                 CProfile firstProfile,
-                                 CProfile secondProfile,
-                                 DualColumnProcessor processor) {
-    String[] firstValues = getStringValues(context, firstProfile);
-    String[] secondValues = getStringValues(context, secondProfile);
-
-    for (int i = 0; i < context.getTimestamps().length; i++) {
-      processor.process(firstValues[i], secondValues[i]);
-    }
   }
 
   public String[] getStringArrayValuesRaw(RawDAO rawDAO,

@@ -4,7 +4,7 @@
 
   <groupId>ru.dimension</groupId>
   <artifactId>db</artifactId>
-  <version>25.10.2</version>
+  <version>25.10.3</version>
   <packaging>jar</packaging>
 
   <name>Dimension DB</name>
@@ -240,9 +240,9 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>${maven.compile.plugin.version}</version>
         <configuration>
-          <source>24</source>
-          <target>24</target>
-          <release>24</release>
+          <source>25</source>
+          <target>25</target>
+          <release>25</release>
           <annotationProcessorPaths>
             <path>
               <groupId>org.projectlombok</groupId>

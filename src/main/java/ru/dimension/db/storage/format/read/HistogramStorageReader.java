@@ -6,7 +6,6 @@ import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.storage.format.StorageContext;
 import ru.dimension.db.storage.format.StorageReader;
-import ru.dimension.db.storage.format.DualColumnProcessor;
 
 public class HistogramStorageReader implements StorageReader {
 
@@ -55,24 +54,6 @@ public class HistogramStorageReader implements StorageReader {
     int[][] histograms = context.getHistogramDAO().get(
         context.getTableId(), context.getBlockId(), cProfile.getColId());
     return getHistogramUnPack(context.getTimestamps(), histograms);
-  }
-
-  @Override
-  public void processDualColumns(StorageContext context,
-                                 CProfile firstProfile,
-                                 CProfile secondProfile,
-                                 DualColumnProcessor processor) {
-    int[][] firstHist = context.getHistogramDAO().get(
-        context.getTableId(), context.getBlockId(), firstProfile.getColId());
-    int[][] secondHist = context.getHistogramDAO().get(
-        context.getTableId(), context.getBlockId(), secondProfile.getColId());
-
-    int[] firstUnpacked = getHistogramUnPack(context.getTimestamps(), firstHist);
-    int[] secondUnpacked = getHistogramUnPack(context.getTimestamps(), secondHist);
-
-    for (int i = 0; i < context.getTimestamps().length; i++) {
-      processor.process(firstUnpacked[i], secondUnpacked[i]);
-    }
   }
 
   protected int[] getHistogramUnPack(long[] timestamps,

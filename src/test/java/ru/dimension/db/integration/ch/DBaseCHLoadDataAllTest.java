@@ -67,6 +67,9 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
   private static final String NL = System.lineSeparator();
   private static final int BATCH_SIZE = 2;
 
+  private static final long EXACT_ROW_COUNT = 78325655;
+  private static final double EXACT_DATA_MB = 9880;
+
   private static final List<String> profileKeys = new ArrayList<>();
 
   private static final Map<String, List<String>> testResultsCount = new LinkedHashMap<>();
@@ -159,15 +162,21 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
       runLoadTest(resources, tType, iType, aType, compression);
       Duration loadDuration = Duration.between(start, Instant.now());
       long loadMinutes = loadDuration.toMinutes();
-      long loadSeconds = loadDuration.minusMinutes(loadMinutes).getSeconds();
-      String loadTimeFormatted = String.format("%d min %d sec", loadMinutes, loadSeconds);
+      long loadSecondsPart = loadDuration.minusMinutes(loadMinutes).getSeconds();
+      String loadTimeFormatted = String.format("%d min %d sec", loadMinutes, loadSecondsPart);
+
+      double totalSeconds = loadDuration.toMillis() / 1000.0;
+      long avgRowsPerSec = (totalSeconds > 0) ? (long) (EXACT_ROW_COUNT / totalSeconds) : 0;
+      double avgMBPerSec = (totalSeconds > 0) ? (EXACT_DATA_MB) / totalSeconds : 0.0;
 
       long sizeBytes = calculateFolderSize(resources.databaseDir);
       double sizeGB = sizeBytes / (1024.0 * 1024.0 * 1024.0);
 
       appendMarkdownRow(tType, iType, aType, compression,
                         loadTimeFormatted,
-                        String.format("%.3f", sizeGB));
+                        String.format("%.3f", sizeGB),
+                        String.format("%,d", avgRowsPerSec),
+                        String.format("%.2f", avgMBPerSec));
 
       // Run all tests by profileKey
       String profileKey = String.format("%s_%s_%s_%s", tType, iType, aType, compression);
@@ -561,12 +570,14 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
                                                      AType aType,
                                                      boolean compression,
                                                      String loadTimeMin,
-                                                     String sizeGB) {
+                                                     String sizeGB,
+                                                     String avgRowsPerSec,
+                                                     String avgMBPerSec) {
 
     if (markdownTableByProfile.length() == 0) {
-      markdownTableByProfile.append("| # | TType | IType | AType | Compression | Load (min) | Size (GB) |")
+      markdownTableByProfile.append("| # | TType | IType | AType | Compression | Load (min) | Size (GB) | Avg Rows/Sec | Avg MB/Sec |")
           .append(NL)
-          .append("|--:|-------|-------|-------|-------------|------------|-----------|")
+          .append("|--:|-------|-------|-------|-------------|------------|-----------|--------------|------------|")
           .append(NL);
     }
 
@@ -577,7 +588,9 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
         .append(aType).append(" | ")
         .append(compression).append(" | ")
         .append(loadTimeMin).append(" | ")
-        .append(sizeGB).append(" |")
+        .append(sizeGB).append(" | ")
+        .append(avgRowsPerSec).append(" | ")
+        .append(avgMBPerSec).append(" |")
         .append(NL);
   }
 
@@ -643,64 +656,26 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
     }
   }
 
-  // Helper classes
-  private static class GanttCountTestDefinition {
-    final String testName;
-    final String firstCol;
-    final String secondCol;
-    final String expectedJsonFileName;
+    private record GanttCountTestDefinition(String testName,
+                                            String firstCol,
+                                            String secondCol,
+                                            String expectedJsonFileName) {}
 
-    GanttCountTestDefinition(String testName, String firstCol, String secondCol, String expectedJsonFileName) {
-      this.testName = testName;
-      this.firstCol = firstCol;
-      this.secondCol = secondCol;
-      this.expectedJsonFileName = expectedJsonFileName;
-    }
-  }
+  private record GanttSumTestDefinition(String testName,
+                                        String firstCol,
+                                        String secondCol,
+                                        String expectedJsonFileName,
+                                        FilterSpec filter) {}
 
-  private static class GanttSumTestDefinition {
-    final String testName;
-    final String firstCol;
-    final String secondCol;
-    final String expectedJsonFileName;
-    final FilterSpec filter;
+  private record StackedTestDefinition(String testName,
+                                       String colName,
+                                       boolean useDateRange,
+                                       LocalDate date,
+                                       String expectedJsonFileName) {}
 
-    GanttSumTestDefinition(String testName, String firstCol, String secondCol, String expectedJsonFileName, FilterSpec filter) {
-      this.testName = testName;
-      this.firstCol = firstCol;
-      this.secondCol = secondCol;
-      this.expectedJsonFileName = expectedJsonFileName;
-      this.filter = filter;
-    }
-  }
-
-  private static class StackedTestDefinition {
-    final String testName;
-    final String colName;
-    final boolean useDateRange;
-    final LocalDate date;
-    final String expectedJsonFileName;
-
-    StackedTestDefinition(String testName, String colName, boolean useDateRange, LocalDate date, String expectedJsonFileName) {
-      this.testName = testName;
-      this.colName = colName;
-      this.useDateRange = useDateRange;
-      this.date = date;
-      this.expectedJsonFileName = expectedJsonFileName;
-    }
-  }
-
-  private static class FilterSpec {
-    final String colName;
-    final String[] values;
-    final CompareFunction compareFunction;
-
-    FilterSpec(String colName, String[] values, CompareFunction compareFunction) {
-      this.colName = colName;
-      this.values = values;
-      this.compareFunction = compareFunction;
-    }
-  }
+  private record FilterSpec(String colName,
+                            String[] values,
+                            CompareFunction compareFunction) {}
 
   private static long[] toDayRangeMillis(LocalDate day) {
     LocalDateTime beginLDT = day.atStartOfDay();

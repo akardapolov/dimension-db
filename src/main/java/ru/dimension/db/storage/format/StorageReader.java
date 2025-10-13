@@ -13,9 +13,4 @@ public interface StorageReader {
   default int[] getIntValues(StorageContext context, CProfile cProfile) {
     throw new UnsupportedOperationException("Int values not supported for format: " + getName());
   }
-
-  void processDualColumns(StorageContext context,
-                          CProfile firstProfile,
-                          CProfile secondProfile,
-                          DualColumnProcessor processor);
 }
