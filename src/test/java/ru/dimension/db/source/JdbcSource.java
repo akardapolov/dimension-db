@@ -155,11 +155,11 @@ public interface JdbcSource {
     AtomicInteger byteKey = new AtomicInteger(initialValue);
 
     // Load data types
-    byteStringMap.forEach((key, value) -> {
-      if (includeList.contains(value)) {
-        System.out.println(value.toUpperCase()
+    byteStringMap.forEach((key, val) -> {
+      if (includeList.contains(val)) {
+        System.out.println(val.toUpperCase()
                 + "(" + byteKey.getAndIncrement() + ", \""
-                + value.toUpperCase() + "\"),");
+                + val.toUpperCase() + "\"),");
       }
     });
   }

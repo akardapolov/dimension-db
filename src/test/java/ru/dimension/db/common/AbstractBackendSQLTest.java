@@ -76,7 +76,7 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
                                            String tsName) throws SQLException {
     Map<String, CSType> csTypeMap = new HashMap<>();
 
-    getSProfileForSelect(select, basicDataSource.getConnection()).getCsTypeMap().forEach((key, value) -> {
+    getSProfileForSelect(select, basicDataSource.getConnection()).getCsTypeMap().forEach((key, val) -> {
       if (key.equalsIgnoreCase(tsName)) {
         csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(true).sType(SType.RAW).build());
       } else {

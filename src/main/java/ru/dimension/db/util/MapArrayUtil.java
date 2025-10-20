@@ -72,7 +72,7 @@ public class MapArrayUtil {
 
   public static String mapToJsonRaw(Map<?, ?> map) {
     StringJoiner sj_map = new StringJoiner(", ", "{", "}");
-    map.forEach((key, value) -> sj_map.add("'" + key + "':" + value));
+    map.forEach((key, val) -> sj_map.add("'" + key + "':" + val));
     return sj_map.toString();
   }
 

@@ -83,7 +83,7 @@ public abstract class AbstractOrientDBTest implements JdbcSource {
   protected SProfile getSProfileForAsh(String select) throws SQLException {
     Map<String, CSType> csTypeMap = new HashMap<>();
 
-    getSProfileForSelect(select, dbConnection).getCsTypeMap().forEach((key, value) -> {
+    getSProfileForSelect(select, dbConnection).getCsTypeMap().forEach((key, val) -> {
       if (key.equals("SAMPLE_TIME")) {
         csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(true).sType(SType.RAW).build());
       } else if (key.equals("EVENT")) {

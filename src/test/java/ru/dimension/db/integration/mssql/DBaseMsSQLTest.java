@@ -513,7 +513,7 @@ public class DBaseMsSQLTest extends AbstractMicrosoftSQLTest {
   protected SProfile getSProfile(String select) throws SQLException {
     Map<String, CSType> csTypeMap = new HashMap<>();
 
-    getSProfileForSelect(select, dbConnection).getCsTypeMap().forEach((key, value) -> {
+    getSProfileForSelect(select, dbConnection).getCsTypeMap().forEach((key, val) -> {
       if (key.equalsIgnoreCase("mssql_dt_datetime")) {
         csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(true).sType(SType.RAW).build());
       } else if (key.equalsIgnoreCase("mssql_dt_varbinary")) {

@@ -509,8 +509,8 @@ public abstract class CommonServiceApi {
         Map<String, Map<String, Integer>> updates = new HashMap<>();
         handlerSecondLevelMap(mapFinalOut, updates, secondLevelGroupBy, compositeFilter);
         mapFinalOut.clear();
-        updates.forEach((key, value) ->
-                            value.forEach((updateKey, updateValue) -> setMapValue(mapFinalOut, key, updateKey, updateValue))
+        updates.forEach((key, val) ->
+                            val.forEach((updateKey, updateValue) -> setMapValue(mapFinalOut, key, updateKey, updateValue))
         );
       } else {
         handlerSecondLevelMap(mapFinalIn, mapFinalOut, secondLevelGroupBy, compositeFilter);
@@ -615,8 +615,8 @@ public abstract class CommonServiceApi {
         Map<String, Map<String, Integer>> updates = new HashMap<>();
         handlerSecondLevelArray(mapFinalOut, updates, secondLevelGroupBy, compositeFilter);
         mapFinalOut.clear();
-        updates.forEach((key, value) ->
-                            value.forEach((updateKey, updateValue) -> setMapValue(mapFinalOut, key, updateKey, updateValue))
+        updates.forEach((key, val) ->
+                            val.forEach((updateKey, updateValue) -> setMapValue(mapFinalOut, key, updateKey, updateValue))
         );
       } else {
         handlerSecondLevelArray(mapFinalIn, mapFinalOut, secondLevelGroupBy, compositeFilter);

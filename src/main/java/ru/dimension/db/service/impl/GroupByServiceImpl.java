@@ -299,7 +299,7 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     }
 
     List<GanttColumnCount> list = new ArrayList<>();
-    mapFinal.forEach((key, value) -> list.add(GanttColumnCount.builder().key(key).gantt(value).build()));
+    mapFinal.forEach((key, val) -> list.add(GanttColumnCount.builder().key(key).gantt(val).build()));
     return list;
   }
 

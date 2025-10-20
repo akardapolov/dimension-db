@@ -63,6 +63,7 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
   private static final StringBuilder markdownTableByGanttCount = new StringBuilder();
   private static final StringBuilder markdownTableByGanttSum = new StringBuilder();
   private static final StringBuilder markdownTableByStacked = new StringBuilder();
+  private static final List<Map<String, String>> profileResults = new ArrayList<>();
 
   private static final String NL = System.lineSeparator();
   private static final int BATCH_SIZE = 2;
@@ -172,11 +173,16 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
       long sizeBytes = calculateFolderSize(resources.databaseDir);
       double sizeGB = sizeBytes / (1024.0 * 1024.0 * 1024.0);
 
-      appendMarkdownRow(tType, iType, aType, compression,
-                        loadTimeFormatted,
-                        String.format("%.3f", sizeGB),
-                        String.format("%,d", avgRowsPerSec),
-                        String.format("%.2f", avgMBPerSec));
+      Map<String, String> results = new LinkedHashMap<>();
+      results.put("TType", tType.toString());
+      results.put("IType", iType.toString());
+      results.put("AType", aType.toString());
+      results.put("Compression", String.valueOf(compression));
+      results.put("Load (min)", loadTimeFormatted);
+      results.put("Size (GB)", String.format("%.3f", sizeGB));
+      results.put("Avg Rows/Sec", String.format("%,d", avgRowsPerSec));
+      results.put("Avg MB/Sec", String.format("%.2f", avgMBPerSec));
+      profileResults.add(results);
 
       // Run all tests by profileKey
       String profileKey = String.format("%s_%s_%s_%s", tType, iType, aType, compression);
@@ -565,40 +571,6 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
     }
   }
 
-  private static synchronized void appendMarkdownRow(TType tType,
-                                                     IType iType,
-                                                     AType aType,
-                                                     boolean compression,
-                                                     String loadTimeMin,
-                                                     String sizeGB,
-                                                     String avgRowsPerSec,
-                                                     String avgMBPerSec) {
-
-    if (markdownTableByProfile.length() == 0) {
-      markdownTableByProfile.append("| # | TType | IType | AType | Compression | Load (min) | Size (GB) | Avg Rows/Sec | Avg MB/Sec |")
-          .append(NL)
-          .append("|--:|-------|-------|-------|-------------|------------|-----------|--------------|------------|")
-          .append(NL);
-    }
-
-    markdownTableByProfile.append("| ")
-        .append(getRowCounter()).append(" | ")
-        .append(tType).append(" | ")
-        .append(iType).append(" | ")
-        .append(aType).append(" | ")
-        .append(compression).append(" | ")
-        .append(loadTimeMin).append(" | ")
-        .append(sizeGB).append(" | ")
-        .append(avgRowsPerSec).append(" | ")
-        .append(avgMBPerSec).append(" |")
-        .append(NL);
-  }
-
-  private static int rowCounter = 1;
-  private static synchronized int getRowCounter() {
-    return rowCounter++;
-  }
-
   private static void writeReportToFile() {
     String homeDir = System.getProperty("user.home");
     Path reportPath = Paths.get(homeDir, "dbase_ch_gantt_report.md");
@@ -619,6 +591,7 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
 
   @AfterAll
   public static void printMarkdownReport() {
+    buildProfileTable();
     log.info(NL + NL + "MARKDOWN PROFILE REPORT:" + NL + markdownTableByProfile);
 
     buildMatrixTable("GANTT COUNT", markdownTableByGanttCount, testResultsCount);
@@ -632,14 +605,41 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
     writeReportToFile();
   }
 
+  private static void buildProfileTable() {
+    if (profileResults.isEmpty()) {
+      return;
+    }
+
+    markdownTableByProfile.append("| Property |");
+    for (int i = 1; i <= profileResults.size(); i++) {
+      markdownTableByProfile.append(" № ").append(i).append(" |");
+    }
+    markdownTableByProfile.append(NL);
+
+    markdownTableByProfile.append("|---|");
+    for (int i = 0; i < profileResults.size(); i++) {
+      markdownTableByProfile.append("---|");
+    }
+    markdownTableByProfile.append(NL);
+
+    // Get the keys from the first result map, assuming all maps have the same keys/order
+    Map<String, String> firstResult = profileResults.getFirst();
+    for (String key : firstResult.keySet()) {
+      markdownTableByProfile.append("| ").append(key).append(" |");
+      for (Map<String, String> resultMap : profileResults) {
+        markdownTableByProfile.append(" ").append(resultMap.get(key)).append(" |");
+      }
+      markdownTableByProfile.append(NL);
+    }
+  }
+
+
   private static void buildMatrixTable(String title,
                                        StringBuilder tableBuilder,
                                        Map<String, List<String>> resultsByTest) {
     tableBuilder.append("| № | Test name |");
-    for (String profileKey : profileKeys) {
-      String[] parts = profileKey.split("_");
-      String shortName = parts[parts.length - 3] + "_" + parts[parts.length - 2];
-      tableBuilder.append(" ").append(shortName).append(" <br/>Execution time |");
+    for (int i = 1; i <= profileKeys.size(); i++) {
+      tableBuilder.append(" № ").append(i).append(" |");
     }
     tableBuilder.append(NL).append("|--|--|");
     profileKeys.forEach(k -> tableBuilder.append("--|"));
@@ -656,10 +656,10 @@ public class DBaseCHLoadDataAllTest implements ClickHouse {
     }
   }
 
-    private record GanttCountTestDefinition(String testName,
-                                            String firstCol,
-                                            String secondCol,
-                                            String expectedJsonFileName) {}
+  private record GanttCountTestDefinition(String testName,
+                                          String firstCol,
+                                          String secondCol,
+                                          String expectedJsonFileName) {}
 
   private record GanttSumTestDefinition(String testName,
                                         String firstCol,

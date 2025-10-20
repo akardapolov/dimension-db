@@ -329,7 +329,7 @@ public class DBaseOracleSQLTest extends AbstractOracleSQLTest {
   protected SProfile getSProfile(String select) throws SQLException {
     Map<String, CSType> csTypeMap = new HashMap<>();
 
-    getSProfileForSelect(select, dbConnection).getCsTypeMap().forEach((key, value) -> {
+    getSProfileForSelect(select, dbConnection).getCsTypeMap().forEach((key, val) -> {
       if (key.equalsIgnoreCase("oracle_dt_timestamp")) {
         csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(true).sType(SType.RAW).build());
       } else if (key.equalsIgnoreCase("oracle_dt_raw")) {

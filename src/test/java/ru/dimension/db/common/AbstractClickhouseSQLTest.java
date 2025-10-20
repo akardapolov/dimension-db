@@ -71,7 +71,7 @@ public abstract class AbstractClickhouseSQLTest implements JdbcSource {
   protected SProfile getSProfileForDataTypeTest(String select) throws SQLException {
     Map<String, CSType> csTypeMap = new HashMap<>();
 
-    getSProfileForSelect(select, dbConnection).getCsTypeMap().forEach((key, value) -> {
+    getSProfileForSelect(select, dbConnection).getCsTypeMap().forEach((key, val) -> {
       if (key.equalsIgnoreCase("ch_dt_timestamp")) {
         csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(true).sType(SType.RAW).build());
       } else if (key.equalsIgnoreCase("pg_dt_bytea")) {
