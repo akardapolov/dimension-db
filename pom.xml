@@ -4,7 +4,7 @@
 
   <groupId>ru.dimension</groupId>
   <artifactId>db</artifactId>
-  <version>25.10.4</version>
+  <version>25.10.5</version>
   <packaging>jar</packaging>
 
   <name>Dimension DB</name>
