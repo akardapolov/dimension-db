@@ -101,7 +101,7 @@ Table 2. Software requirements
 
 | Software | Requirements             |
 |:---------|:-------------------------|
-| Java     | Java version 24+         |
+| Java     | Java version 25+         |
 | Maven    | Not lower than version 3 |
 | Git      | Latest current version   |
 
@@ -118,7 +118,7 @@ Table 3. Operating system requirements
 ### Getting started with the project
 
 #### Building the project
-Make sure you have JDK 24+, Maven and the latest Git
+Make sure you have JDK 25+, Maven and the latest Git
   ```shell
     java -version
     mvn -version
