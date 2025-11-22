@@ -28,7 +28,7 @@ import ru.dimension.db.storage.dialect.DatabaseDialect;
 @Log4j2
 public abstract class QueryJdbcApi {
 
-  private final BasicDataSource basicDataSource;
+  protected final BasicDataSource basicDataSource;
 
   protected QueryJdbcApi(BasicDataSource basicDataSource) {
     this.basicDataSource = basicDataSource;
@@ -81,15 +81,13 @@ public abstract class QueryJdbcApi {
                                        GroupFunction groupFunction,
                                        String selectClass,
                                        String whereClass) {
-    if (GroupFunction.COUNT.equals(groupFunction)) {
+    if (GroupFunction.COUNT.equals(groupFunction) ||
+        GroupFunction.SUM.equals(groupFunction) ||
+        GroupFunction.AVG.equals(groupFunction)) {
       return selectClass +
           "FROM " + tableName + " " +
           whereClass +
           " GROUP BY " + colName;
-    } else if (GroupFunction.SUM.equals(groupFunction) || GroupFunction.AVG.equals(groupFunction)) {
-      return selectClass +
-          "FROM " + tableName + " " +
-          whereClass;
     } else {
       throw new RuntimeException("Not supported group function: " + groupFunction);
     }

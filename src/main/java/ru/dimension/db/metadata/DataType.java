@@ -89,6 +89,9 @@ public enum DataType {
   /* MySQL */
   SET(76, "SET"),
 
+  /* Firebird DB */
+  DOUBLE_PRECISION(77, "DOUBLE PRECISION"),
+
   INTEGER(122, "INTEGER"),
   OID(123, "OID"),
   NAME(124, "NAME"),

@@ -600,7 +600,6 @@ public class DBaseCHQueryGanttCountTest implements ClickHouse {
         .append(" |\n");
     testCounter++;
 
-    // Fixed the counter to use testCounter-1 for consistent numbering
     markdownQueryTable.append("| ").append(testCounter-1).append(" | ")
         .append(testName).append(" | ")
         .append("`").append(formatQueryForMarkdown(query)).append("`").append(" |\n");

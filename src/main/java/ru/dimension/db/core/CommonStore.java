@@ -117,7 +117,7 @@ public abstract class CommonStore implements DStore {
     cProfiles.stream()
         .filter(cProfile -> cProfile.getCsType().isTimeStamp())
         .findAny()
-        .ifPresentOrElse((value) -> {
+        .ifPresentOrElse((val) -> {
                            tProfile.setTableType(TType.TIME_SERIES);
                            tProfile.setCProfiles(cProfiles);
                          },

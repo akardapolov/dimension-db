@@ -474,6 +474,8 @@ Table 5. Supported databases for working with API in Dimension DB
 | 4 | Read                     | PostgreSQL           | relational    |
 | 5 | Read                     | Microsoft SQL Server | relational    |
 | 6 | Read                     | MySQL                | relational    |
+| 7 | Read                     | DuckDB               | analytical    |
+| 8 | Read                     | Firebird             | relational    |
 
 Before you start writing data, you need to set storage parameters and metadata for tables and columns in the **SProfile** object.
 

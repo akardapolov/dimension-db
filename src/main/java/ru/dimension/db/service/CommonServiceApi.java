@@ -231,10 +231,11 @@ public abstract class CommonServiceApi {
                                           long blockId,
                                           CProfile cProfile) {
     int colId = cProfile.getColId();
-    CType cType = Mapper.isCType(cProfile);
+    CType cType = cProfile.getCsType().getCType();
     switch (cType) {
       case INT -> {
         int[] intVals = rawDAO.getRawInt(tableId, blockId, colId);
+        if (intVals == null) return new String[0];
         String[] resI = new String[intVals.length];
         for (int i = 0; i < intVals.length; i++) {
           resI[i] = (intVals[i] == Mapper.INT_NULL) ? "" : String.valueOf(intVals[i]);
@@ -243,6 +244,7 @@ public abstract class CommonServiceApi {
       }
       case LONG -> {
         long[] longVals = rawDAO.getRawLong(tableId, blockId, colId);
+        if (longVals == null) return new String[0];
         String[] resL = new String[longVals.length];
         for (int i = 0; i < longVals.length; i++) {
           if (longVals[i] == Mapper.LONG_NULL) {
@@ -257,6 +259,7 @@ public abstract class CommonServiceApi {
       }
       case FLOAT -> {
         float[] floatVals = rawDAO.getRawFloat(tableId, blockId, colId);
+        if (floatVals == null) return new String[0];
         String[] resF = new String[floatVals.length];
         for (int i = 0; i < floatVals.length; i++) {
           resF[i] = (floatVals[i] == Mapper.FLOAT_NULL) ? "" : String.valueOf(floatVals[i]);
@@ -265,6 +268,7 @@ public abstract class CommonServiceApi {
       }
       case DOUBLE -> {
         double[] doubleVals = rawDAO.getRawDouble(tableId, blockId, colId);
+        if (doubleVals == null) return new String[0];
         String[] resD = new String[doubleVals.length];
         for (int i = 0; i < doubleVals.length; i++) {
           resD[i] = (doubleVals[i] == Mapper.DOUBLE_NULL) ? "" : String.valueOf(doubleVals[i]);
@@ -273,6 +277,7 @@ public abstract class CommonServiceApi {
       }
       case STRING -> {
         String[] strVals = rawDAO.getRawString(tableId, blockId, colId);
+        if (strVals == null) return new String[0];
         for (int i = 0; i < strVals.length; i++) {
           if (strVals[i] == null)
             strVals[i] = "";
@@ -340,10 +345,11 @@ public abstract class CommonServiceApi {
                                              long blockId,
                                              CProfile cProfile) {
     int colId = cProfile.getColId();
-    CType cType = Mapper.isCType(cProfile);
+    CType cType = cProfile.getCsType().getCType();
     switch (cType) {
       case INT -> {
         int[] vals = rawDAO.getRawInt(tableId, blockId, colId);
+        if (vals == null) return new double[0];
         double[] res = new double[vals.length];
         for (int i = 0; i < vals.length; i++)
           res[i] = (vals[i] == Mapper.INT_NULL) ? 0 : vals[i];
@@ -351,6 +357,7 @@ public abstract class CommonServiceApi {
       }
       case LONG -> {
         long[] vals = rawDAO.getRawLong(tableId, blockId, colId);
+        if (vals == null) return new double[0];
         double[] res = new double[vals.length];
         for (int i = 0; i < vals.length; i++)
           res[i] = (vals[i] == Mapper.LONG_NULL) ? 0 : vals[i];
@@ -358,6 +365,7 @@ public abstract class CommonServiceApi {
       }
       case FLOAT -> {
         float[] vals = rawDAO.getRawFloat(tableId, blockId, colId);
+        if (vals == null) return new double[0];
         double[] res = new double[vals.length];
         for (int i = 0; i < vals.length; i++)
           res[i] = (vals[i] == Mapper.FLOAT_NULL) ? 0 : vals[i];
@@ -365,6 +373,7 @@ public abstract class CommonServiceApi {
       }
       case DOUBLE -> {
         double[] vals = rawDAO.getRawDouble(tableId, blockId, colId);
+        if (vals == null) return new double[0];
         double[] res = new double[vals.length];
         for (int i = 0; i < vals.length; i++)
           res[i] = (vals[i] == Mapper.DOUBLE_NULL) ? 0 : vals[i];

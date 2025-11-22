@@ -7,5 +7,6 @@ public enum BType {
   POSTGRES,
   MSSQL,
   MYSQL,
-  DUCKDB
+  DUCKDB,
+  FIREBIRD
 }

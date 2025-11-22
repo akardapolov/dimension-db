@@ -10,6 +10,8 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.sql.Blob;
+import java.sql.Clob;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Time;
@@ -158,6 +160,23 @@ public class Converter {
       case NVARCHAR:
       case NULLABLE:
       case SET:
+        if (obj instanceof byte[]) {
+          return dimensionDAO.getOrLoad(new String((byte[]) obj, StandardCharsets.UTF_8));
+        } else if (obj instanceof Clob clob) {
+          try {
+            return dimensionDAO.getOrLoad(clob.getSubString(1, (int) clob.length()));
+          } catch (SQLException e) {
+            log.warn("Failed to read Clob in convertRawToInt: {}", e.getMessage());
+            return dimensionDAO.getOrLoad(String.valueOf(obj));
+          }
+        } else if (obj instanceof Blob blob) {
+          try {
+            return dimensionDAO.getOrLoad(new String(blob.getBytes(1, (int) blob.length()), StandardCharsets.UTF_8));
+          } catch (SQLException e) {
+            log.warn("Failed to read Blob (Text) in convertRawToInt: {}", e.getMessage());
+            return dimensionDAO.getOrLoad(String.valueOf(obj));
+          }
+        }
         return dimensionDAO.getOrLoad((String) obj);
       case ARRAY:
         if (obj.getClass().isArray()) {
@@ -182,7 +201,10 @@ public class Converter {
       case BINARY:
       case RAW:
       case VARBINARY:
-        return dimensionDAO.getOrLoad(new String((byte[]) obj, StandardCharsets.UTF_8));
+        if (obj instanceof byte[]) {
+          return dimensionDAO.getOrLoad(new String((byte[]) obj, StandardCharsets.UTF_8));
+        }
+        return dimensionDAO.getOrLoad(String.valueOf(obj));
       default:
         return Mapper.INT_NULL;
     }
@@ -200,7 +222,7 @@ public class Converter {
 
     return switch (Mapper.isDBType(cProfile)) {
       case ENUM8, ENUM16, CHAR, NCHAR, NCLOB, CLOB, NAME, TEXT, NTEXT,
-          VARCHAR, NVARCHAR2, VARCHAR2, NVARCHAR, RAW, VARBINARY, BYTEA, JSONB, POINT, INTERVAL, BINARY, SYSNAME, NULLABLE, STRING ->
+           VARCHAR, NVARCHAR2, VARCHAR2, NVARCHAR, RAW, VARBINARY, BYTEA, JSONB, POINT, INTERVAL, BINARY, SYSNAME, NULLABLE, STRING ->
           dimensionDAO.getStringById(objIndex);
       case IPV4, IPV6 -> getCanonicalHost(dimensionDAO.getStringById(objIndex));
       case UINT8, UINT16, INTEGER -> String.valueOf(objIndex);

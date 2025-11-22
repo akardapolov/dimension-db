@@ -44,17 +44,22 @@ public class MetadataHandler {
     List<CProfile> cProfileList = new ArrayList<>();
 
     try (Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(select)) { // Try-with-resources for automatic closing
+        ResultSet resultSet = statement.executeQuery(select)) {
 
       ResultSetMetaData metaData = resultSet.getMetaData();
       int columnCount = metaData.getColumnCount();
 
       for (int i = 1; i <= columnCount; i++) {
+        String name = metaData.getColumnLabel(i);
+        if (name == null || name.isBlank()) {
+          name = metaData.getColumnName(i);
+        }
+
         cProfileList.add(i - 1,
                          CProfile.builder()
                              .colId(i - 1)
                              .colIdSql(i)
-                             .colName(metaData.getColumnName(i).toUpperCase())
+                             .colName(name.toUpperCase())
                              .colDbTypeName(metaData.getColumnTypeName(i).toUpperCase())
                              .colSizeDisplay(metaData.getColumnDisplaySize(i))
                              .build());

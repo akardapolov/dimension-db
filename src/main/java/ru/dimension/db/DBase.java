@@ -7,6 +7,7 @@ import ru.dimension.db.config.DBaseConfig;
 import ru.dimension.db.core.BdbStore;
 import ru.dimension.db.core.ChStore;
 import ru.dimension.db.core.DStore;
+import ru.dimension.db.core.FirebirdStore;
 import ru.dimension.db.core.GenericSqlStore;
 import ru.dimension.db.core.MsSqlStore;
 import ru.dimension.db.core.OracleStore;
@@ -37,6 +38,7 @@ public class DBase {
       case POSTGRES -> this.dStore = new PgSqlStore(this.dBaseConfig, basicDataSource);
       case ORACLE -> this.dStore = new OracleStore(this.dBaseConfig, basicDataSource);
       case MSSQL -> this.dStore = new MsSqlStore(this.dBaseConfig, basicDataSource);
+      case FIREBIRD -> this.dStore = new FirebirdStore(this.dBaseConfig, basicDataSource);
       case MYSQL, DUCKDB -> this.dStore = new GenericSqlStore(this.dBaseConfig, basicDataSource, new GenericDialect());
       default -> throw new RuntimeException("Not supported yet for: " + backendType);
     }

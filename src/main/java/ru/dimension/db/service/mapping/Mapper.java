@@ -44,10 +44,12 @@ public class Mapper {
 
   public static CType isCType(CProfile cProfile) {
     String typeName = cProfile.getColDbTypeName().toUpperCase();
-    
+
     if (typeName.contains("FIXEDSTRING")) return CType.STRING;
     if (typeName.contains("ENUM")) return CType.STRING;
     if (typeName.contains("SET")) return CType.STRING;
+
+    if (typeName.equals("DOUBLE PRECISION")) return CType.DOUBLE;
 
     if (typeName.contains("DECIMAL")) return CType.DOUBLE;
     if (typeName.contains("DATETIME")) return CType.LONG;
@@ -65,7 +67,7 @@ public class Mapper {
           SERIAL, SMALLSERIAL, BIGSERIAL, LONG ->
           CType.LONG;
       case FLOAT4, FLOAT32, REAL -> CType.FLOAT;
-      case FLOAT64, NUMERIC, FLOAT, FLOAT8, MONEY, SMALLMONEY, DECIMAL, DOUBLE -> CType.DOUBLE;
+      case FLOAT64, NUMERIC, FLOAT, FLOAT8, MONEY, SMALLMONEY, DECIMAL, DOUBLE, DOUBLE_PRECISION -> CType.DOUBLE;
       default -> CType.STRING;
     };
   }
@@ -80,11 +82,15 @@ public class Mapper {
       if (typeName.contains("BIGINT")) return DataType.UINT64;
     }
 
+    if (typeName.equals("DOUBLE PRECISION")) return DataType.DOUBLE_PRECISION;
+
     if (typeName.contains("DECIMAL")) return DataType.DECIMAL;
     if (typeName.contains("FIXEDSTRING")) return DataType.FIXEDSTRING;
     if (typeName.contains("ENUM8")) return DataType.ENUM8;
     if (typeName.contains("ENUM16")) return DataType.ENUM16;
     if (typeName.contains("ENUM")) return DataType.ENUM;
+
+    if (typeName.contains("TIMESTAMP WITH TIME ZONE")) return DataType.TIMESTAMPTZ;
 
     if (typeName.equals("DATETIME")) return DataType.DATETIME;
     if (typeName.equals("DATETIME2")) return DataType.DATETIME2;
@@ -93,6 +99,8 @@ public class Mapper {
     if (typeName.contains("NULLABLE")) return DataType.NULLABLE;
     if (typeName.contains("ARRAY")) return DataType.ARRAY;
     if (typeName.contains("MAP")) return DataType.MAP;
+
+    if (typeName.contains("BLOB SUB_TYPE TEXT")) return DataType.TEXT;
 
     if (typeName.contains("SET")) return DataType.SET;
 
@@ -236,6 +244,7 @@ public class Mapper {
       case FLOAT64:
       case FLOAT8:
       case DOUBLE:
+      case DOUBLE_PRECISION:
         return (Double) obj;
       case MONEY:
       case FLOAT:
@@ -274,11 +283,12 @@ public class Mapper {
       case NVARCHAR:
       case NULLABLE:
       case SET:
-        return (String) obj;
+        return String.valueOf(obj);
       case ARRAY:
         if (obj.getClass().isArray()) {
           return arrayToString(obj);
         }
+        return String.valueOf(obj);
       case MAP:
         if (obj instanceof LinkedHashMap map) {
           return String.valueOf(map);
@@ -295,7 +305,7 @@ public class Mapper {
       case NCHAR:
       case CHAR:
       case SYSNAME:
-        String v = (String) obj;
+        String v = String.valueOf(obj);
         return v.trim();
       case OID:
         return valueOf(obj);
@@ -313,6 +323,7 @@ public class Mapper {
         return valueOf(f);
       case FLOAT64:
       case DOUBLE:
+      case DOUBLE_PRECISION:
         Double d = (Double) obj;
         return valueOf(d);
       case NUMBER:
@@ -331,19 +342,24 @@ public class Mapper {
         if (obj instanceof Boolean b) {
           return b.toString();
         }
+        return String.valueOf(obj);
       case STRING:
       case UNIQUEIDENTIFIER:
-        return (String) obj;
+        return String.valueOf(obj);
       case UUID:
         if (obj instanceof UUID u) {
           return u.toString();
         }
+        return String.valueOf(obj);
       case RAW:
       case BYTEA:
       case BINARY:
       case VARBINARY:
-        return new String((byte[]) obj, StandardCharsets.UTF_8);
-      case JSONB, POINT, INTERVAL:
+        if (obj instanceof byte[]) {
+          return new String((byte[]) obj, StandardCharsets.UTF_8);
+        }
+        return String.valueOf(obj);
+      case JSONB, POINT, INTERVAL, TIMESTAMPTZ, TIMESTAMP:
         return obj.toString();
       default:
         return STRING_NULL;

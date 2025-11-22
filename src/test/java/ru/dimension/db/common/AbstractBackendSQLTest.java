@@ -1,3 +1,4 @@
+// filename: src/test/java/ru/dimension/db/common/AbstractBackendSQLTest.java
 package ru.dimension.db.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +22,9 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.io.TempDir;
 import ru.dimension.db.DBase;
 import ru.dimension.db.config.DBaseConfig;
 import ru.dimension.db.core.DStore;
@@ -35,17 +39,13 @@ import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.source.JdbcSource;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.junit.jupiter.api.io.TempDir;
 
 @Log4j2
 @TestInstance(Lifecycle.PER_CLASS)
 public abstract class AbstractBackendSQLTest implements JdbcSource {
 
   @TempDir
-  static File databaseDir;
+  protected static File databaseDir;
 
   protected DBaseConfig dBaseConfig;
   protected DBase dBase;
@@ -76,13 +76,15 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
                                            String tsName) throws SQLException {
     Map<String, CSType> csTypeMap = new HashMap<>();
 
-    getSProfileForSelect(select, basicDataSource.getConnection()).getCsTypeMap().forEach((key, val) -> {
-      if (key.equalsIgnoreCase(tsName)) {
-        csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(true).sType(SType.RAW).build());
-      } else {
-        csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(false).sType(SType.RAW).build());
-      }
-    });
+    try (Connection conn = basicDataSource.getConnection()) {
+      getSProfileForSelect(select, conn).getCsTypeMap().forEach((key, val) -> {
+        if (key.equalsIgnoreCase(tsName)) {
+          csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(true).sType(SType.RAW).build());
+        } else {
+          csTypeMap.put(key, new CSType().toBuilder().isTimeStamp(false).sType(SType.RAW).build());
+        }
+      });
+    }
 
     return new SProfile().setTableName(tableName)
         .setTableType(TType.TIME_SERIES)
@@ -115,6 +117,8 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
       if (BType.CLICKHOUSE.equals(bType)) {
         basicDataSource.setValidationQuery("SELECT 1");
         basicDataSource.addConnectionProperty("compress", "0");
+      } else if (BType.FIREBIRD.equals(bType)) {
+        basicDataSource.setValidationQuery("SELECT 1 FROM RDB$DATABASE");
       }
 
       basicDataSource.setInitialSize(3);
@@ -124,6 +128,8 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
     } catch (Exception e) {
       log.catching(e);
     }
+
+
 
     return basicDataSource;
   }
@@ -175,6 +181,21 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
     }
   }
 
+  protected static void dropTableFirebird(Connection connection, String tableName) throws SQLException {
+    // Firebird identifiers are case-insensitive and stored as uppercase.
+    // The check needs to use the uppercase name.
+    if (tableExists(connection, tableName.toUpperCase())) {
+      String sql = "DROP TABLE " + tableName;
+      try (Statement statement = connection.createStatement()) {
+        log.info("SQL statement: " + sql);
+        statement.executeUpdate(sql);
+        log.info("Table dropped successfully!");
+      }
+    } else {
+      log.info("Skip drop operation, table " + tableName + " does not exist in DB.");
+    }
+  }
+
   protected static boolean tableExists(Connection connection, String tableName) throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
 
@@ -195,7 +216,7 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
   }
 
   protected CProfile getCProfileByName(TProfile tProfile,
-                                     String colName) {
+                                       String colName) {
     return tProfile.getCProfiles().stream()
         .filter(f -> f.getColName().equalsIgnoreCase(colName))
         .findAny().orElseThrow();
@@ -203,9 +224,5 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
 
   private String getStackedTestData(String fileName) throws IOException {
     return Files.readString(Paths.get("src", "test", "resources", "json", "stacked", fileName));
-  }
-
-  @AfterAll
-  public void closeDb() throws IOException {
   }
 }

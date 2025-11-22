@@ -1,0 +1,18 @@
+services:
+  firebird:
+    image: firebirdsql/firebird
+    restart: always
+    ports:
+      - "3050:3050"
+    environment:
+      - FIREBIRD_DATABASE=testrs.fdb
+      - FIREBIRD_USER=SYSDBA
+      - FIREBIRD_PASSWORD=masterkey
+      - FIREBIRD_ROOT_PASSWORD=masterkey
+      - FIREBIRD_DATABASE_DEFAULT_CHARSET=UTF8
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d
+      - firebird_data:/firebird/data
+
+volumes:
+  firebird_data:
