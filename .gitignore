@@ -1,23 +1,53 @@
-# Eclipse Files
-bin
-.project
-.classpath
-.settings
-
-#IntelliJ IDEA Files
-.idea
-*.iml
-target
-out
-
-#Build
-build
-
 #Artifact
 release.properties
 pom.xml.releaseBackup
 pom.xml.next
 pom.xml.tag
 
-#Runtime
-database
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.flattened-pom.xml
+
+### IntelliJ IDEA ###
+.idea/
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+target/
+out/
+
+### Eclipse ###
+bin
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Dimension DB specific ###
+*.db
+*.jdb
+*.lck

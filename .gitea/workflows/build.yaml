@@ -5,14 +5,13 @@ jobs:
   desktop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Install maven
-        run: apt-get update && apt-get install -y maven
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
+      - uses: actions/checkout@v4
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'adopt'
+          java-version: '25'
+          distribution: 'liberica'
+          cache: maven
       - name: Check maven
         run: mvn -v
       - name: Build with maven

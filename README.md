@@ -117,64 +117,106 @@ Table 3. Operating system requirements
 
 ### Getting started with the project
 
-#### Building the project
-Make sure you have JDK 25+, Maven and the latest Git
-  ```shell
-    java -version
-    mvn -version
-    git --version
-  ```
+**Prerequisites:** Java 25+, Maven 3.9+ and the latest Git.
 
-Download the Dimension DB repository sources:
-  ```shell
-    git clone <<url>>
-    cd Dimension DB
-  ```
-
-To compile the project sources, run:
-  ```shell
-    mvn clean compile
-  ```
-
-To run unit tests, run:
-  ```shell
-    mvn clean test
-  ```
-
-To build the project into a **Dimension DB** jar file, run:
-  ```shell
-    mvn clean package
-  ```
-
-To build and install the **Dimension DB** jar file into your local Maven repository, run:
-  ```shell
-    mvn clean install
-  ```
-
-Notes:
-- Building the project may include running unit tests from **Dimension DBRunnerTest** and **DBaseRunnerUseCasesTest**, which take approximately 25 minutes to complete.
-- The majority of this time is consumed by the **DimensionDBRunnerTest** class, which runs 45 tests with various configurations.
-- Both **Dimension DBRunnerTest** and **DBaseRunnerUseCasesTest** are disabled by default using the **@Disabled** annotation.
-- The **DimensionDBRunnerTest** class contains tests with different permutation levels, as detailed below:
-
-Table 4. Parameters and statistics for **Dimension DBRunnerTest** tests
-
-| Test name              | PermutationState | Number of configurations | Total tests | Execution time |
-|------------------------|------------------|--------------------------|-------------|----------------|
-| testPermutationNone    | NONE             | 108                      | 4 860       | ~ 9 seconds    |
-| testPermutationPartial | PARTIAL          | 1 944                    | 87 480      | ~ 2 minutes    |
-| testPermutationAll     | ALL              | 26 244                   | 1 180 980   | ~ 25 minutes   |
-
-- To reduce build time by skipping these tests, use the following Maven commands:
 ```shell
-# Skip DimensionDBRunnerTest during testing phase
-mvn clean test -Dtest=!DimensionDBRunnerTest
+java -version
+mvn -version
+git --version
+```
 
-# Skip during packaging
-mvn clean package -Dtest=!DimensionDBRunnerTest
+### Getting the source
 
-# Skip during installation
-mvn clean install -Dtest=!DimensionDBRunnerTest
+```shell
+git clone https://github.com/akardapolov/dimension-db.git
+cd dimension-db
+```
+
+### Building the project
+
+To compile the project sources:
+
+```shell
+mvn clean compile
+```
+
+To run unit tests:
+
+```shell
+mvn clean test
+```
+
+To build the project into a **Dimension DB** jar file:
+
+```shell
+mvn clean package
+```
+
+To build and install the **Dimension DB** jar file into your local Maven repository:
+
+```shell
+mvn clean install
+```
+
+To build with an explicit version (override `${revision}` for this build):
+
+```shell
+mvn clean install -Drevision=26.2.3
+```
+
+> **Notes on test execution:**
+> - Building the project may include running unit tests from **DimensionDBRunnerTest** and **DBaseRunnerUseCasesTest**, which take approximately 25 minutes to complete.
+> - The majority of this time is consumed by the **DimensionDBRunnerTest** class, which runs 45 tests with various configurations.
+> - Both **DimensionDBRunnerTest** and **DBaseRunnerUseCasesTest** are disabled by default using the **@Disabled** annotation.
+> - The **DimensionDBRunnerTest** class contains tests with different permutation levels, as detailed below:
+>
+> | Test name              | PermutationState | Number of configurations | Total tests | Execution time |
+> |------------------------|------------------|--------------------------|-------------|----------------|
+> | testPermutationNone    | NONE             | 108                      | 4 860       | ~ 9 seconds    |
+> | testPermutationPartial | PARTIAL          | 1 944                    | 87 480      | ~ 2 minutes    |
+> | testPermutationAll     | ALL              | 26 244                   | 1 180 980   | ~ 25 minutes   |
+>
+> To reduce build time by skipping these tests, use the following Maven commands:
+> ```shell
+> mvn clean test -Dtest=!DimensionDBRunnerTest
+> mvn clean package -Dtest=!DimensionDBRunnerTest
+> mvn clean install -Dtest=!DimensionDBRunnerTest
+> ```
+
+### Release via Git tag
+
+Use this workflow when publishing/deployment is handled by the CI pipeline on tag push. The CI will automatically build, test, and publish to GitHub Releases.
+
+**Linux / macOS (Bash)**
+
+```bash
+export RELEASE_VERSION=26.2.3
+git tag -a v"$RELEASE_VERSION" -m "Release $RELEASE_VERSION"
+git push origin v"$RELEASE_VERSION"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:RELEASE_VERSION="26.2.3"
+git tag -a v"$env:RELEASE_VERSION" -m "Release $env:RELEASE_VERSION"
+git push origin v"$env:RELEASE_VERSION"
+```
+
+**Windows (CMD)**
+
+```cmd
+set RELEASE_VERSION=26.2.3
+git tag -a v%RELEASE_VERSION% -m "Release %RELEASE_VERSION%"
+git push origin v%RELEASE_VERSION%
+```
+
+### Manual publish (Maven Central)
+
+If you need to publish manually from your machine (requires configured `settings.xml` credentials and GPG signing):
+
+```bash
+mvn deploy -Pcentral -DperformRelease=true -Drevision=26.2.3
 ```
 
 [Return to Contents](#contents)
