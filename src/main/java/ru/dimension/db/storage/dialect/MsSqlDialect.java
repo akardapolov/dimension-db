@@ -3,17 +3,16 @@ package ru.dimension.db.storage.dialect;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import ru.dimension.db.metadata.DataType;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
 import ru.dimension.db.model.filter.CompositeFilter;
-import ru.dimension.db.model.profile.CProfile;
-
-import java.util.ArrayList;
-import java.util.List;
 import ru.dimension.db.model.filter.FilterCondition;
 import ru.dimension.db.model.filter.LogicalOperator;
+import ru.dimension.db.model.profile.CProfile;
 
 public class MsSqlDialect implements DatabaseDialect {
 
@@ -82,6 +81,11 @@ public class MsSqlDialect implements DatabaseDialect {
   }
 
   @Override
+  public String getOffsetClass(int offset) {
+    return " OFFSET " + offset + " ROWS ";
+  }
+
+  @Override
   public void setDateTime(CProfile tsCProfile,
                           PreparedStatement ps,
                           int parameterIndex,
@@ -121,6 +125,34 @@ public class MsSqlDialect implements DatabaseDialect {
     return whereClause.toString();
   }
 
+  @Override
+  public String getWhereClassWithCompositeFilterNoTimestamp(CompositeFilter compositeFilter) {
+    if (compositeFilter == null || compositeFilter.getConditions().isEmpty()) {
+      return "";
+    }
+
+    StringBuilder whereClause = new StringBuilder();
+    whereClause.append("WHERE (");
+
+    List<String> conditions = new ArrayList<>();
+    for (FilterCondition condition : compositeFilter.getConditions()) {
+      String conditionStr = buildCondition(condition);
+      if (!conditionStr.isEmpty()) {
+        conditions.add(conditionStr);
+      }
+    }
+
+    if (conditions.isEmpty()) {
+      return "";
+    }
+
+    String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+    whereClause.append(String.join(joinOperator, conditions))
+        .append(")");
+
+    return whereClause.toString();
+  }
+
   private String buildCondition(FilterCondition condition) {
     CProfile filterProfile = condition.getCProfile();
     CompareFunction compareFunction = condition.getCompareFunction();
@@ -135,7 +167,7 @@ public class MsSqlDialect implements DatabaseDialect {
     boolean isNumeric = isNumericType(filterProfile);
 
     for (String value : filterData) {
-      if (conditionBuilder.length() > 0) {
+      if (!conditionBuilder.isEmpty()) {
         conditionBuilder.append(" OR ");
       }
       if (value == null || value.trim().isEmpty()) {
@@ -156,7 +188,7 @@ public class MsSqlDialect implements DatabaseDialect {
       }
     }
 
-    return conditionBuilder.length() == 0 ? "" : "(" + conditionBuilder + ")";
+    return conditionBuilder.isEmpty() ? "" : "(" + conditionBuilder + ")";
   }
 
   private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
@@ -185,12 +217,12 @@ public class MsSqlDialect implements DatabaseDialect {
           condition = columnName + " = '" + formattedValue.replace("'", "''") + "'";
         }
       }
-      if (filterClause.length() > 0) {
+      if (!filterClause.isEmpty()) {
         filterClause.append(" OR ");
       }
       filterClause.append(condition);
     }
 
-    return filterClause.length() == 0 ? "" : " AND (" + filterClause.toString() + ")";
+    return filterClause.isEmpty() ? "" : " AND (" + filterClause.toString() + ")";
   }
 }

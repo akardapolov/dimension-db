@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.dbcp2.BasicDataSource;
 import ru.dimension.db.model.GroupFunction;
@@ -21,6 +22,7 @@ import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
 import ru.dimension.db.model.output.StackedColumn;
 import ru.dimension.db.model.profile.CProfile;
+import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.sql.BatchResultSet;
 import ru.dimension.db.sql.BatchResultSetSqlImpl;
 import ru.dimension.db.storage.dialect.DatabaseDialect;
@@ -71,6 +73,61 @@ public abstract class QueryJdbcApi {
     } catch (SQLException e) {
       log.info("Query: " + query);
       throw new RuntimeException("Error executing stacked query with composite filter: " + e.getMessage(), e);
+    }
+
+    return results;
+  }
+
+  protected List<StackedColumn> getStackedCommonRegular(String tableName,
+                                                        CProfile cProfile,
+                                                        GroupFunction groupFunction,
+                                                        CompositeFilter compositeFilter,
+                                                        int limit,
+                                                        DatabaseDialect databaseDialect) {
+    List<StackedColumn> results = new ArrayList<>();
+
+    String colName = cProfile.getColName().toLowerCase();
+    String selectClass = databaseDialect.getSelectClassStacked(groupFunction, cProfile);
+
+    String whereClause = "";
+    if (compositeFilter != null && compositeFilter.getConditions() != null && !compositeFilter.getConditions().isEmpty()) {
+      whereClause = databaseDialect.getWhereClassWithCompositeFilterNoTimestamp(compositeFilter);
+    }
+
+    String limitClause = databaseDialect.getLimitClass(limit);
+    String orderForOffset = limitClause.toUpperCase().contains("OFFSET") ? " ORDER BY (SELECT NULL) " : "";
+
+    String subQuery = "(SELECT * FROM " + tableName + " "
+        + whereClause
+        + orderForOffset
+        + limitClause + ") sub_t";
+
+    String query;
+    if (GroupFunction.COUNT.equals(groupFunction) ||
+        GroupFunction.SUM.equals(groupFunction) ||
+        GroupFunction.AVG.equals(groupFunction)) {
+      query = selectClass + "FROM " + subQuery + " GROUP BY " + colName;
+    } else {
+      throw new RuntimeException("Not supported group function: " + groupFunction);
+    }
+
+    try (Connection conn = basicDataSource.getConnection();
+        PreparedStatement ps = conn.prepareStatement(query)) {
+
+      ResultSet rs = ps.executeQuery();
+
+      StackedColumn column = new StackedColumn();
+      column.setKey(0);
+      column.setTail(0);
+
+      while (rs.next()) {
+        fillKeyData(rs, groupFunction, column);
+      }
+
+      results.add(column);
+    } catch (SQLException e) {
+      log.info("Query: " + query);
+      throw new RuntimeException("Error executing stacked query for regular table: " + e.getMessage(), e);
     }
 
     return results;
@@ -150,6 +207,69 @@ public abstract class QueryJdbcApi {
     return ganttColumnCounts;
   }
 
+  protected List<GanttColumnCount> getGanttCountCommonRegular(String tableName,
+                                                              CProfile firstGrpBy,
+                                                              CProfile secondGrpBy,
+                                                              CompositeFilter compositeFilter,
+                                                              int limit,
+                                                              DatabaseDialect databaseDialect) {
+    List<GanttColumnCount> ganttColumnCounts = new ArrayList<>();
+
+    String firstColName = firstGrpBy.getColName().toLowerCase();
+    String secondColName = secondGrpBy.getColName().toLowerCase();
+
+    String whereClause = "";
+    if (compositeFilter != null && compositeFilter.getConditions() != null && !compositeFilter.getConditions().isEmpty()) {
+      whereClause = databaseDialect.getWhereClassWithCompositeFilterNoTimestamp(compositeFilter);
+    }
+
+    String limitClause = databaseDialect.getLimitClass(limit);
+    String orderForOffset = limitClause.toUpperCase().contains("OFFSET") ? " ORDER BY (SELECT NULL) " : "";
+
+    String subQuery = "(SELECT * FROM " + tableName + " "
+        + whereClause
+        + orderForOffset
+        + limitClause + ") sub_t";
+
+    String query =
+        "SELECT " + firstColName + ", " + secondColName + ", COUNT(*) " +
+            " FROM " + subQuery +
+            " GROUP BY " + firstColName + ", " + secondColName;
+    log.info("Query: " + query);
+
+    Map<String, Map<String, Integer>> map = new LinkedHashMap<>();
+
+    try (Connection conn = basicDataSource.getConnection();
+        PreparedStatement ps = conn.prepareStatement(query)) {
+
+      ResultSet rs = ps.executeQuery();
+
+      while (rs.next()) {
+        String key = rs.getString(1);
+        String keyGantt = rs.getString(2);
+        int countGantt = rs.getInt(3);
+
+        if (Objects.isNull(key)) {
+          key = "";
+        }
+        if (Objects.isNull(keyGantt)) {
+          keyGantt = "";
+        }
+
+        map.computeIfAbsent(key, k -> new HashMap<>()).put(keyGantt, countGantt);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Error executing Gantt query for regular table: " + e.getMessage(), e);
+    }
+
+    for (Map.Entry<String, Map<String, Integer>> entry : map.entrySet()) {
+      GanttColumnCount column = new GanttColumnCount(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
+      ganttColumnCounts.add(column);
+    }
+
+    return ganttColumnCounts;
+  }
+
   private void fillKeyData(ResultSet rs,
                            GroupFunction groupFunction,
                            StackedColumn column) throws SQLException {
@@ -195,7 +315,6 @@ public abstract class QueryJdbcApi {
     try (Connection conn = basicDataSource.getConnection();
         PreparedStatement ps = conn.prepareStatement(query)) {
 
-      // Set timestamp parameters
       int paramIndex = 1;
       databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, begin);
       databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, end);
@@ -210,6 +329,53 @@ public abstract class QueryJdbcApi {
       }
     } catch (SQLException e) {
       throw new RuntimeException("Error executing gantt sum with composite filter query: " + e.getMessage(), e);
+    }
+
+    return results;
+  }
+
+  protected List<GanttColumnSum> getGanttSumCommonRegular(String tableName,
+                                                          CProfile firstGrpBy,
+                                                          CProfile secondGrpBy,
+                                                          CompositeFilter compositeFilter,
+                                                          int limit,
+                                                          DatabaseDialect databaseDialect) {
+    List<GanttColumnSum> results = new ArrayList<>();
+    String firstColName = firstGrpBy.getColName().toLowerCase();
+    String secondColName = secondGrpBy.getColName().toLowerCase();
+
+    String whereClause = "";
+    if (compositeFilter != null && compositeFilter.getConditions() != null && !compositeFilter.getConditions().isEmpty()) {
+      whereClause = databaseDialect.getWhereClassWithCompositeFilterNoTimestamp(compositeFilter);
+    }
+
+    String limitClause = databaseDialect.getLimitClass(limit);
+    String orderForOffset = limitClause.toUpperCase().contains("OFFSET") ? " ORDER BY (SELECT NULL) " : "";
+
+    String subQuery = "(SELECT * FROM " + tableName + " "
+        + whereClause
+        + orderForOffset
+        + limitClause + ") sub_t";
+
+    String query =
+        "SELECT " + firstColName + ", SUM(" + secondColName + ") " +
+            "FROM " + subQuery +
+            " GROUP BY " + firstColName;
+    log.info("Query: " + query);
+
+    try (Connection conn = basicDataSource.getConnection();
+        PreparedStatement ps = conn.prepareStatement(query)) {
+
+      ResultSet rs = ps.executeQuery();
+
+      while (rs.next()) {
+        String key = rs.getString(1);
+        double sum = rs.getDouble(2);
+        if (key == null) key = "";
+        results.add(new GanttColumnSum(key, sum));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Error executing gantt sum for regular table: " + e.getMessage(), e);
     }
 
     return results;
@@ -251,6 +417,45 @@ public abstract class QueryJdbcApi {
       }
     } catch (SQLException e) {
       throw new RuntimeException("Error getting distinct values with composite filter: " + e.getMessage(), e);
+    }
+
+    return distinctValues;
+  }
+
+  protected List<String> getDistinctCommonRegular(String tableName,
+                                                  CProfile cProfile,
+                                                  OrderBy orderBy,
+                                                  CompositeFilter compositeFilter,
+                                                  int limit,
+                                                  DatabaseDialect databaseDialect) {
+    String colName = cProfile.getColName().toLowerCase();
+
+    String whereClause = "";
+    if (compositeFilter != null && compositeFilter.getConditions() != null && !compositeFilter.getConditions().isEmpty()) {
+      whereClause = databaseDialect.getWhereClassWithCompositeFilterNoTimestamp(compositeFilter);
+    }
+
+    String query =
+        "SELECT DISTINCT " + colName +
+            " FROM " + tableName + " " +
+            whereClause +
+            databaseDialect.getOrderByClass(cProfile, orderBy) +
+            databaseDialect.getLimitClass(limit);
+    log.info("Query: " + query);
+
+    List<String> distinctValues = new ArrayList<>();
+
+    try (Connection conn = basicDataSource.getConnection();
+        PreparedStatement ps = conn.prepareStatement(query)) {
+
+      ResultSet rs = ps.executeQuery();
+
+      while (rs.next()) {
+        String val = rs.getString(1);
+        distinctValues.add(Objects.requireNonNullElse(val, ""));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Error getting distinct values for regular table: " + e.getMessage(), e);
     }
 
     return distinctValues;
@@ -302,14 +507,37 @@ public abstract class QueryJdbcApi {
                                                    int fetchSize,
                                                    List<CProfile> cProfiles,
                                                    DatabaseDialect databaseDialect) {
-    CProfile tsCProfile = cProfiles.stream()
+    Optional<CProfile> tsCProfile = cProfiles.stream()
         .filter(k -> k.getCsType().isTimeStamp())
-        .findAny()
-        .orElseThrow(() -> new RuntimeException("API working only for time-series tables"));
+        .findAny();
 
-    long maxBlockId = getLastBlockIdLocal(tableName, tsCProfile, begin, end, databaseDialect);
+    if (tsCProfile.isPresent()) {
+      long maxBlockId = getLastBlockIdLocal(tableName, tsCProfile.get(), begin, end, databaseDialect);
+      return new BatchResultSetSqlImpl(tableName, fetchSize, begin, end, maxBlockId,
+                                       cProfiles, basicDataSource, databaseDialect, TType.TIME_SERIES);
+    }
 
-    return new BatchResultSetSqlImpl(tableName, fetchSize, begin, end, maxBlockId, cProfiles, basicDataSource, databaseDialect);
+    long totalRows = getRowCount(tableName);
+    return new BatchResultSetSqlImpl(tableName, fetchSize, 0, totalRows, totalRows,
+                                     cProfiles, basicDataSource, databaseDialect, TType.REGULAR);
+  }
+
+  protected long getRowCount(String tableName) {
+    long count = 0;
+    String query = "SELECT COUNT(*) FROM " + tableName;
+
+    try (Connection conn = basicDataSource.getConnection();
+        PreparedStatement ps = conn.prepareStatement(query)) {
+
+      ResultSet rs = ps.executeQuery();
+      if (rs.next()) {
+        count = rs.getLong(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Error getting row count: " + e.getMessage(), e);
+    }
+
+    return count;
   }
 
   protected long getFirstBlockIdLocal(String tableName,
@@ -346,7 +574,6 @@ public abstract class QueryJdbcApi {
 
       while (rs.next()) {
         Object object = rs.getObject(1);
-
         lastBlockId = convertRawToLong(object, tsCProfile);
       }
 
@@ -391,7 +618,6 @@ public abstract class QueryJdbcApi {
 
       while (rs.next()) {
         Object object = rs.getObject(1);
-
         lastBlockId = convertRawToLong(object, tsCProfile);
       }
 
@@ -401,7 +627,6 @@ public abstract class QueryJdbcApi {
 
     return lastBlockId;
   }
-
 
   protected static void checkDataType(CProfile cProfile, String dataType) {
     boolean containsIgnoreCase = cProfile.getColDbTypeName()

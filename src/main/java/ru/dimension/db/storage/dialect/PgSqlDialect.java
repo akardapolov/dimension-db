@@ -32,9 +32,9 @@ public class PgSqlDialect implements DatabaseDialect {
     if (GroupFunction.COUNT.equals(groupFunction)) {
       return "SELECT " + colName + ", COUNT(" + colName + ") ";
     } else if (GroupFunction.SUM.equals(groupFunction)) {
-      return "SELECT '" + colName + "', SUM(" + colName + ") ";
+      return "SELECT " + colName + ", SUM(" + colName + ") ";
     } else if (GroupFunction.AVG.equals(groupFunction)) {
-      return "SELECT '" + colName + "', AVG(" + colName + ") ";
+      return "SELECT " + colName + ", AVG(" + colName + ") ";
     } else {
       throw new RuntimeException("Not supported");
     }
@@ -77,6 +77,11 @@ public class PgSqlDialect implements DatabaseDialect {
     }
 
     return "";
+  }
+
+  @Override
+  public String getOffsetClass(int offset) {
+    return " OFFSET " + offset + " ";
   }
 
   @Override
@@ -124,6 +129,34 @@ public class PgSqlDialect implements DatabaseDialect {
     return whereClause.toString();
   }
 
+  @Override
+  public String getWhereClassWithCompositeFilterNoTimestamp(CompositeFilter compositeFilter) {
+    if (compositeFilter == null || compositeFilter.getConditions().isEmpty()) {
+      return "";
+    }
+
+    StringBuilder whereClause = new StringBuilder();
+    whereClause.append("WHERE (");
+
+    List<String> conditions = new ArrayList<>();
+    for (FilterCondition condition : compositeFilter.getConditions()) {
+      String conditionStr = buildCondition(condition);
+      if (!conditionStr.isEmpty()) {
+        conditions.add(conditionStr);
+      }
+    }
+
+    if (conditions.isEmpty()) {
+      return "";
+    }
+
+    String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+    whereClause.append(String.join(joinOperator, conditions))
+        .append(")");
+
+    return whereClause.toString();
+  }
+
   private String buildCondition(FilterCondition condition) {
     CProfile filterProfile = condition.getCProfile();
     CompareFunction compareFunction = condition.getCompareFunction();
@@ -138,7 +171,7 @@ public class PgSqlDialect implements DatabaseDialect {
     boolean isNumeric = isNumericType(filterProfile);
 
     for (String value : filterData) {
-      if (conditionBuilder.length() > 0) {
+      if (!conditionBuilder.isEmpty()) {
         conditionBuilder.append(" OR ");
       }
       if (value == null || value.trim().isEmpty()) {
@@ -159,7 +192,7 @@ public class PgSqlDialect implements DatabaseDialect {
       }
     }
 
-    return conditionBuilder.length() == 0 ? "" : "(" + conditionBuilder + ")";
+    return conditionBuilder.isEmpty() ? "" : "(" + conditionBuilder + ")";
   }
 
   private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
@@ -188,12 +221,12 @@ public class PgSqlDialect implements DatabaseDialect {
           condition = columnName + " = '" + formattedValue.replace("'", "''").replace("\\", "\\\\") + "'";
         }
       }
-      if (filterClause.length() > 0) {
+      if (!filterClause.isEmpty()) {
         filterClause.append(" OR ");
       }
       filterClause.append(condition);
     }
 
-    return filterClause.length() == 0 ? "" : " AND (" + filterClause + ")";
+    return filterClause.isEmpty() ? "" : " AND (" + filterClause + ")";
   }
 }

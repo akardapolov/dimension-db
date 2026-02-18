@@ -215,6 +215,15 @@ public class RawFirebirdImpl extends QueryJdbcApi implements RawDAO {
   }
 
   @Override
+  public List<StackedColumn> getStackedRegular(String tableName,
+                                               CProfile cProfile,
+                                               GroupFunction groupFunction,
+                                               CompositeFilter compositeFilter,
+                                               int limit) {
+    return getStackedCommonRegular(tableName, cProfile, groupFunction, compositeFilter, limit, databaseDialect);
+  }
+
+  @Override
   public List<GanttColumnCount> getGanttCount(String tableName,
                                               CProfile tsCProfile,
                                               CProfile firstGrpBy,
@@ -248,8 +257,8 @@ public class RawFirebirdImpl extends QueryJdbcApi implements RawDAO {
       ResultSet rs = ps.executeQuery();
 
       while (rs.next()) {
-        String key = rs.getString(1);      // Access by index (1 = KEY1)
-        String keyGantt = rs.getString(2); // Access by index (2 = KEY2)
+        String key = rs.getString(1);
+        String keyGantt = rs.getString(2);
         int countGantt = rs.getInt(3);
 
         if (Objects.isNull(key)) {
@@ -274,6 +283,15 @@ public class RawFirebirdImpl extends QueryJdbcApi implements RawDAO {
   }
 
   @Override
+  public List<GanttColumnCount> getGanttCountRegular(String tableName,
+                                                     CProfile firstGrpBy,
+                                                     CProfile secondGrpBy,
+                                                     CompositeFilter compositeFilter,
+                                                     int limit) {
+    return getGanttCountCommonRegular(tableName, firstGrpBy, secondGrpBy, compositeFilter, limit, databaseDialect);
+  }
+
+  @Override
   public List<GanttColumnSum> getGanttSum(String tableName,
                                           CProfile tsCProfile,
                                           CProfile firstGrpBy,
@@ -283,6 +301,15 @@ public class RawFirebirdImpl extends QueryJdbcApi implements RawDAO {
                                           long end) {
     return getGanttSumCommon(tableName, tsCProfile, firstGrpBy, secondGrpBy,
                              compositeFilter, begin, end, databaseDialect);
+  }
+
+  @Override
+  public List<GanttColumnSum> getGanttSumRegular(String tableName,
+                                                 CProfile firstGrpBy,
+                                                 CProfile secondGrpBy,
+                                                 CompositeFilter compositeFilter,
+                                                 int limit) {
+    return getGanttSumCommonRegular(tableName, firstGrpBy, secondGrpBy, compositeFilter, limit, databaseDialect);
   }
 
   @Override
@@ -306,6 +333,17 @@ public class RawFirebirdImpl extends QueryJdbcApi implements RawDAO {
   }
 
   @Override
+  public List<String> getDistinctRegular(String tableName,
+                                         CProfile cProfile,
+                                         OrderBy orderBy,
+                                         CompositeFilter compositeFilter,
+                                         int limit) {
+    checkDataType(cProfile, "BLOB");
+    checkDataType(cProfile, "TEXT");
+    return getDistinctCommonRegular(tableName, cProfile, orderBy, compositeFilter, limit, databaseDialect);
+  }
+
+  @Override
   public BatchResultSet getBatchResultSet(String tableName,
                                           long begin,
                                           long end,
@@ -317,12 +355,22 @@ public class RawFirebirdImpl extends QueryJdbcApi implements RawDAO {
   private long getFirstBlockIdLocal(byte tableId, long begin, long end) {
     String tableName = metaModelApi.getTableName(tableId);
     CProfile tsCProfile = metaModelApi.getTimestampCProfile(tableName);
+
+    if (tsCProfile == null) {
+      return 0L;
+    }
+
     return getFirstBlockIdLocal(tableName, tsCProfile, begin, end, databaseDialect);
   }
 
   private long getLastBlockIdLocal(byte tableId, long begin, long end) {
     String tableName = metaModelApi.getTableName(tableId);
     CProfile tsCProfile = metaModelApi.getTimestampCProfile(tableName);
+
+    if (tsCProfile == null) {
+      return getRowCount(tableName);
+    }
+
     return getLastBlockIdLocal(tableName, tsCProfile, begin, end, databaseDialect);
   }
 }

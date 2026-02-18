@@ -10,6 +10,10 @@ import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.filter.FilterCondition;
 import ru.dimension.db.model.profile.CProfile;
 
+import java.util.ArrayList;
+import java.util.List;
+import ru.dimension.db.model.filter.LogicalOperator;
+
 public class GenericDialect implements DatabaseDialect {
 
   @Override
@@ -62,6 +66,11 @@ public class GenericDialect implements DatabaseDialect {
   }
 
   @Override
+  public String getOffsetClass(int offset) {
+    return " OFFSET " + offset;
+  }
+
+  @Override
   public void setDateTime(CProfile tsCProfile, PreparedStatement ps,
                           int parameterIndex, long unixTimestamp) throws SQLException {
     ps.setTimestamp(parameterIndex, new Timestamp(unixTimestamp));
@@ -73,20 +82,64 @@ public class GenericDialect implements DatabaseDialect {
     whereClause.append(tsCProfile.getColName()).append(" BETWEEN ? AND ?");
 
     if (compositeFilter != null && !compositeFilter.getConditions().isEmpty()) {
+      whereClause.append(" AND (");
+
+      List<String> conditions = new ArrayList<>();
       for (FilterCondition condition : compositeFilter.getConditions()) {
-        String filterStr = getFilterAndString(
-            condition.getCProfile(),
-            condition.getFilterData(),
-            condition.getCompareFunction()
-        );
-        whereClause.append(filterStr);
+        String filterStr = getFilterConditionString(condition);
+        if (!filterStr.isEmpty()) {
+          conditions.add(filterStr);
+        }
       }
+
+      if (!conditions.isEmpty()) {
+        String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+        whereClause.append(String.join(joinOperator, conditions));
+      }
+
+      whereClause.append(")");
     }
 
     return whereClause.toString();
   }
 
-  private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
+  @Override
+  public String getWhereClassWithCompositeFilterNoTimestamp(CompositeFilter compositeFilter) {
+    if (compositeFilter == null || compositeFilter.getConditions().isEmpty()) {
+      return "";
+    }
+
+    StringBuilder whereClause = new StringBuilder();
+    whereClause.append("WHERE (");
+
+    List<String> conditions = new ArrayList<>();
+    for (FilterCondition condition : compositeFilter.getConditions()) {
+      String filterStr = getFilterConditionString(condition);
+      if (!filterStr.isEmpty()) {
+        conditions.add(filterStr);
+      }
+    }
+
+    if (conditions.isEmpty()) {
+      return "";
+    }
+
+    String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+    whereClause.append(String.join(joinOperator, conditions))
+        .append(")");
+
+    return whereClause.toString();
+  }
+
+  private String getFilterConditionString(FilterCondition condition) {
+    return "(" + getFilterAndStringRaw(
+        condition.getCProfile(),
+        condition.getFilterData(),
+        condition.getCompareFunction()
+    ) + ")";
+  }
+
+  private String getFilterAndStringRaw(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
     if (cProfileFilter == null || filterData == null) {
       return "";
     }
@@ -118,6 +171,11 @@ public class GenericDialect implements DatabaseDialect {
       filterClause.append(condition);
     }
 
-    return filterClause.length() == 0 ? "" : " AND (" + filterClause + ")";
+    return filterClause.toString();
+  }
+
+  private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
+    String raw = getFilterAndStringRaw(cProfileFilter, filterData, compareFunction);
+    return raw.isEmpty() ? "" : " AND (" + raw + ")";
   }
 }

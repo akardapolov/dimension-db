@@ -10,20 +10,19 @@ import ru.dimension.db.model.profile.table.TType;
 public interface MetaModelApi {
 
   byte getTableId(String tableName);
-  String getTableName(Byte tableId);
+
+  String getTableName(byte tableId);
+
+  List<CProfile> getCProfiles(String tableName);
+
+  CProfile getTimestampCProfile(String tableName);
+
+  BType getBackendType(String tableName);
 
   TType getTableType(String tableName);
 
   IType getIndexType(String tableName);
   AType getAnalyzeType(String tableName);
 
-  BType getBackendType(String tableName);
-
   Boolean getTableCompression(String tableName);
-
-  List<CProfile> getCProfiles(String tableName);
-
-  List<CProfile> getCProfiles(Byte tableId);
-
-  CProfile getTimestampCProfile(String tableName);
 }

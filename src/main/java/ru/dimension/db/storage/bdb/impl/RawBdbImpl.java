@@ -661,6 +661,15 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
   }
 
   @Override
+  public List<StackedColumn> getStackedRegular(String tableName,
+                                               CProfile cProfile,
+                                               GroupFunction groupFunction,
+                                               CompositeFilter compositeFilter,
+                                               int limit) {
+    throw new RuntimeException("Not supported");
+  }
+
+  @Override
   public List<GanttColumnCount> getGanttCount(String tableName,
                                               CProfile tsCProfile,
                                               CProfile firstGrpBy,
@@ -668,6 +677,15 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
                                               CompositeFilter compositeFilter,
                                               long begin,
                                               long end) {
+    throw new RuntimeException("Not supported");
+  }
+
+  @Override
+  public List<GanttColumnCount> getGanttCountRegular(String tableName,
+                                                     CProfile firstGrpBy,
+                                                     CProfile secondGrpBy,
+                                                     CompositeFilter compositeFilter,
+                                                     int limit) {
     throw new RuntimeException("Not supported");
   }
 
@@ -683,6 +701,15 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
   }
 
   @Override
+  public List<GanttColumnSum> getGanttSumRegular(String tableName,
+                                                 CProfile firstGrpBy,
+                                                 CProfile secondGrpBy,
+                                                 CompositeFilter compositeFilter,
+                                                 int limit) {
+    throw new RuntimeException("Not supported");
+  }
+
+  @Override
   public List<String> getDistinct(String tableName,
                                   CProfile tsCProfile,
                                   CProfile cProfile,
@@ -691,6 +718,15 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
                                   int limit,
                                   long begin,
                                   long end) {
+    throw new RuntimeException("Not supported");
+  }
+
+  @Override
+  public List<String> getDistinctRegular(String tableName,
+                                         CProfile cProfile,
+                                         OrderBy orderBy,
+                                         CompositeFilter compositeFilter,
+                                         int limit) {
     throw new RuntimeException("Not supported");
   }
 

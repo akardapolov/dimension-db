@@ -1,14 +1,18 @@
 package ru.dimension.db.core.metamodel;
 
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
+import java.util.Optional;
+import lombok.extern.log4j.Log4j2;
 import ru.dimension.db.model.MetaModel;
+import ru.dimension.db.model.MetaModel.TableMetadata;
 import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.table.AType;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.model.profile.table.IType;
 import ru.dimension.db.model.profile.table.TType;
 
+@Log4j2
 public class MetaModelApiImpl implements MetaModelApi {
 
   private final MetaModel metaModel;
@@ -19,21 +23,62 @@ public class MetaModelApiImpl implements MetaModelApi {
 
   @Override
   public byte getTableId(String tableName) {
-    return metaModel.getMetadata().get(tableName).getTableId();
+    TableMetadata tableMetadata = metaModel.getMetadata().get(tableName);
+    if (tableMetadata == null) {
+      throw new RuntimeException("Table not found: " + tableName);
+    }
+    return tableMetadata.getTableId();
   }
 
   @Override
-  public String getTableName(Byte tableId) {
-    return metaModel.getMetadata().entrySet().stream()
-        .filter(f -> Objects.equals(f.getValue().getTableId(), tableId))
-        .findAny()
-        .orElseThrow()
-        .getKey();
+  public String getTableName(byte tableId) {
+    for (Map.Entry<String, TableMetadata> entry : metaModel.getMetadata().entrySet()) {
+      if (entry.getValue().getTableId() == tableId) {
+        return entry.getKey();
+      }
+    }
+    throw new RuntimeException("Table not found for id: " + tableId);
+  }
+
+  @Override
+  public List<CProfile> getCProfiles(String tableName) {
+    TableMetadata tableMetadata = metaModel.getMetadata().get(tableName);
+    if (tableMetadata == null) {
+      throw new RuntimeException("Table not found: " + tableName);
+    }
+    return tableMetadata.getCProfiles();
+  }
+
+  @Override
+  public CProfile getTimestampCProfile(String tableName) {
+    TableMetadata tableMetadata = metaModel.getMetadata().get(tableName);
+    if (tableMetadata == null) {
+      throw new RuntimeException("Table not found: " + tableName);
+    }
+
+    Optional<CProfile> tsCProfile = tableMetadata.getCProfiles().stream()
+        .filter(cp -> cp.getCsType().isTimeStamp())
+        .findAny();
+
+    return tsCProfile.orElse(null);
+  }
+
+  @Override
+  public BType getBackendType(String tableName) {
+    TableMetadata tableMetadata = metaModel.getMetadata().get(tableName);
+    if (tableMetadata == null) {
+      throw new RuntimeException("Table not found: " + tableName);
+    }
+    return tableMetadata.getBackendType();
   }
 
   @Override
   public TType getTableType(String tableName) {
-    return metaModel.getMetadata().get(tableName).getTableType();
+    TableMetadata tableMetadata = metaModel.getMetadata().get(tableName);
+    if (tableMetadata == null) {
+      throw new RuntimeException("Table not found: " + tableName);
+    }
+    return tableMetadata.getTableType();
   }
 
   @Override
@@ -47,35 +92,7 @@ public class MetaModelApiImpl implements MetaModelApi {
   }
 
   @Override
-  public BType getBackendType(String tableName) {
-    return metaModel.getMetadata().get(tableName).getBackendType();
-  }
-
-  @Override
   public Boolean getTableCompression(String tableName) {
     return metaModel.getMetadata().get(tableName).getCompression();
-  }
-
-  @Override
-  public List<CProfile> getCProfiles(String tableName) {
-    return metaModel.getMetadata().get(tableName).getCProfiles();
-  }
-
-  @Override
-  public List<CProfile> getCProfiles(Byte tableId) {
-   return metaModel.getMetadata().entrySet().stream()
-        .filter(f -> Objects.equals(f.getValue().getTableId(), tableId))
-        .findAny()
-        .orElseThrow()
-        .getValue()
-        .getCProfiles();
-  }
-
-  @Override
-  public CProfile getTimestampCProfile(String tableName) {
-    return metaModel.getMetadata().get(tableName).getCProfiles().stream()
-        .filter(k -> k.getCsType().isTimeStamp())
-        .findAny()
-        .orElseThrow(() -> new RuntimeException("Not found timestamp column"));
   }
 }

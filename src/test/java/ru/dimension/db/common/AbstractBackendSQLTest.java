@@ -1,4 +1,3 @@
-// filename: src/test/java/ru/dimension/db/common/AbstractBackendSQLTest.java
 package ru.dimension.db.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
@@ -95,6 +96,40 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
         .setCsTypeMap(csTypeMap);
   }
 
+  protected SProfile getSProfileForRegularBackend(String tableName,
+                                                  BasicDataSource basicDataSource,
+                                                  BType bType,
+                                                  String select) throws SQLException {
+    Map<String, CSType> csTypeMap = new HashMap<>();
+
+    try (Connection conn = basicDataSource.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(select)) {
+
+      ResultSetMetaData meta = rs.getMetaData();
+      for (int i = 1; i <= meta.getColumnCount(); i++) {
+        String colName = meta.getColumnLabel(i);
+        if (colName == null || colName.isBlank()) {
+          colName = meta.getColumnName(i);
+        }
+        colName = colName.toUpperCase();
+        csTypeMap.put(colName, new CSType().toBuilder()
+            .isTimeStamp(false)
+            .sType(SType.RAW)
+            .build());
+      }
+    }
+
+    return new SProfile()
+        .setTableName(tableName)
+        .setTableType(TType.REGULAR)
+        .setIndexType(IType.GLOBAL)
+        .setAnalyzeType(AType.ON_LOAD)
+        .setBackendType(bType)
+        .setCompression(false)
+        .setCsTypeMap(csTypeMap);
+  }
+
   protected BasicDataSource getDatasource(BType bType,
                                           String driverClassName,
                                           String dbUrl,
@@ -128,8 +163,6 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
     } catch (Exception e) {
       log.catching(e);
     }
-
-
 
     return basicDataSource;
   }
@@ -172,8 +205,7 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
       statement.executeUpdate(sql);
       log.info("Table dropped successfully!");
     } catch (SQLException e) {
-      // Handle the case where the table does not exist
-      if (e.getErrorCode() == 3701) { // SQL Server error code for "Cannot drop the table because it does not exist."
+      if (e.getErrorCode() == 3701) {
         log.info("Skip drop operation, table does not exist in DB.");
       } else {
         throw e;
@@ -182,8 +214,6 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
   }
 
   protected static void dropTableFirebird(Connection connection, String tableName) throws SQLException {
-    // Firebird identifiers are case-insensitive and stored as uppercase.
-    // The check needs to use the uppercase name.
     if (tableExists(connection, tableName.toUpperCase())) {
       String sql = "DROP TABLE " + tableName;
       try (Statement statement = connection.createStatement()) {

@@ -36,6 +36,7 @@ import ru.dimension.db.model.profile.CProfile;
 import ru.dimension.db.model.profile.cstype.CType;
 import ru.dimension.db.model.profile.cstype.SType;
 import ru.dimension.db.model.profile.table.BType;
+import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.service.CommonServiceApi;
 import ru.dimension.db.service.GroupByService;
 import ru.dimension.db.service.mapping.Mapper;
@@ -50,6 +51,8 @@ import ru.dimension.db.storage.format.StorageManager;
 
 @Log4j2
 public class GroupByServiceImpl extends CommonServiceApi implements GroupByService {
+
+  private static final int DEFAULT_REGULAR_LIMIT = 100000;
 
   private final MetaModelApi metaModelApi;
   private final Converter converter;
@@ -79,11 +82,6 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                         CompositeFilter compositeFilter,
                                         long begin,
                                         long end) throws SqlColMetadataException {
-    CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
-
-    if (!tsProfile.getCsType().isTimeStamp()) {
-      throw new SqlColMetadataException("Timestamp column not defined..");
-    }
 
     if (cProfile.getCsType().isTimeStamp()) {
       throw new SqlColMetadataException("Not supported for timestamp column..");
@@ -97,8 +95,21 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     }
 
     BType bType = metaModelApi.getBackendType(tableName);
+    TType tType = metaModelApi.getTableType(tableName);
+
     if (!BType.BERKLEYDB.equals(bType)) {
+      if (TType.REGULAR.equals(tType)) {
+        int limit = computeRegularLimit(begin, end);
+        return rawDAO.getStackedRegular(tableName, cProfile, groupFunction, compositeFilter, limit);
+      }
+      CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
       return rawDAO.getStacked(tableName, tsProfile, cProfile, groupFunction, compositeFilter, begin, end);
+    }
+
+    CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
+
+    if (!tsProfile.getCsType().isTimeStamp()) {
+      throw new SqlColMetadataException("Timestamp column not defined..");
     }
 
     byte tableId = metaModelApi.getTableId(tableName);
@@ -229,7 +240,13 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                               long begin,
                                               long end) throws SqlColMetadataException {
     BType bType = metaModelApi.getBackendType(tableName);
+    TType tType = metaModelApi.getTableType(tableName);
+
     if (!BType.BERKLEYDB.equals(bType)) {
+      if (TType.REGULAR.equals(tType)) {
+        int limit = computeRegularLimit(begin, end);
+        return rawDAO.getGanttCountRegular(tableName, firstGrpBy, secondGrpBy, compositeFilter, limit);
+      }
       CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
       return rawDAO.getGanttCount(tableName, tsProfile, firstGrpBy, secondGrpBy, compositeFilter, begin, end);
     }
@@ -433,8 +450,13 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     }
 
     BType bType = metaModelApi.getBackendType(tableName);
+    TType tType = metaModelApi.getTableType(tableName);
 
     if (!BType.BERKLEYDB.equals(bType)) {
+      if (TType.REGULAR.equals(tType)) {
+        int limit = computeRegularLimit(begin, end);
+        return rawDAO.getGanttSumRegular(tableName, firstGrpBy, secondGrpBy, compositeFilter, limit);
+      }
       CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
       return rawDAO.getGanttSum(tableName, tsProfile, firstGrpBy, secondGrpBy, compositeFilter, begin, end);
     }
@@ -624,12 +646,22 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
                                   long begin,
                                   long end) {
     BType bType = metaModelApi.getBackendType(tableName);
+    TType tType = metaModelApi.getTableType(tableName);
+
+    if (!BType.BERKLEYDB.equals(bType)) {
+      if (TType.REGULAR.equals(tType)) {
+        return rawDAO.getDistinctRegular(tableName, cProfile, orderBy, compositeFilter, limit);
+      }
+      CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
+      if (tsProfile.getColId() == cProfile.getColId()) {
+        throw new RuntimeException("Not supported for timestamp column");
+      }
+      return rawDAO.getDistinct(tableName, tsProfile, cProfile, orderBy, compositeFilter, limit, begin, end);
+    }
+
     CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
     if (tsProfile.getColId() == cProfile.getColId()) {
       throw new RuntimeException("Not supported for timestamp column");
-    }
-    if (!BType.BERKLEYDB.equals(bType)) {
-      return rawDAO.getDistinct(tableName, tsProfile, cProfile, orderBy, compositeFilter, limit, begin, end);
     }
 
     Set<String> distinctSet = new LinkedHashSet<>();
@@ -705,9 +737,6 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     return resultList.subList(0, Math.min(limit, resultList.size()));
   }
 
-  /**
-   * Build filter cache via StorageManager, similar to getGanttCount approach.
-   */
   private Map<FilterCondition, String[]> buildFilterCacheWithFormats(CompositeFilter compositeFilter,
                                                                      StorageContext context,
                                                                      Metadata columnKey) {
@@ -774,6 +803,13 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     } catch (NumberFormatException e) {
       return value;
     }
+  }
+
+  private int computeRegularLimit(long begin, long end) {
+    if (end == Long.MAX_VALUE || end - begin > DEFAULT_REGULAR_LIMIT) {
+      return DEFAULT_REGULAR_LIMIT;
+    }
+    return (int) (end - begin);
   }
 
   public static List<GanttColumnCount> mergeGanttColumnsByKey(List<GanttTask> tasks) {

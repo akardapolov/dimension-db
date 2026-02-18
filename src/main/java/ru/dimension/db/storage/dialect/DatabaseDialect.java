@@ -10,25 +10,22 @@ import ru.dimension.db.model.profile.CProfile;
 
 public interface DatabaseDialect {
 
-  // Select class
   String getSelectClassGantt(CProfile firstCProfile, CProfile secondCProfile);
 
   String getSelectClassStacked(GroupFunction groupFunction, CProfile cProfile);
 
-  // Where class
   String getWhereClass(CProfile tsCProfile,
                        CProfile cProfileFilter,
                        String[] filterData,
                        CompareFunction compareFunction);
 
-  // Order by class
   String getOrderByClass(CProfile tsCProfile);
   String getOrderByClass(CProfile cProfile, OrderBy orderBy);
 
-  // Limit class
   String getLimitClass(Integer fetchSize);
 
-  // Set date time for parameter
+  String getOffsetClass(int offset);
+
   void setDateTime(CProfile tsCProfile,
                    PreparedStatement ps,
                    int parameterIndex,
@@ -36,6 +33,8 @@ public interface DatabaseDialect {
 
   String getWhereClassWithCompositeFilter(CProfile tsCProfile,
                                           CompositeFilter compositeFilter);
+
+  String getWhereClassWithCompositeFilterNoTimestamp(CompositeFilter compositeFilter);
 
   default boolean isNumericType(CProfile cProfile) {
     String typeName = cProfile.getColDbTypeName().toUpperCase();

@@ -157,6 +157,12 @@ public interface RawDAO {
                                  long begin,
                                  long end);
 
+  List<StackedColumn> getStackedRegular(String tableName,
+                                        CProfile cProfile,
+                                        GroupFunction groupFunction,
+                                        CompositeFilter compositeFilter,
+                                        int limit);
+
   List<GanttColumnCount> getGanttCount(String tableName,
                                        CProfile tsCProfile,
                                        CProfile firstGrpBy,
@@ -164,6 +170,12 @@ public interface RawDAO {
                                        CompositeFilter compositeFilter,
                                        long begin,
                                        long end);
+
+  List<GanttColumnCount> getGanttCountRegular(String tableName,
+                                              CProfile firstGrpBy,
+                                              CProfile secondGrpBy,
+                                              CompositeFilter compositeFilter,
+                                              int limit);
 
   List<GanttColumnSum> getGanttSum(String tableName,
                                    CProfile tsCProfile,
@@ -173,6 +185,12 @@ public interface RawDAO {
                                    long begin,
                                    long end);
 
+  List<GanttColumnSum> getGanttSumRegular(String tableName,
+                                          CProfile firstGrpBy,
+                                          CProfile secondGrpBy,
+                                          CompositeFilter compositeFilter,
+                                          int limit);
+
   List<String> getDistinct(String tableName,
                            CProfile tsCProfile,
                            CProfile cProfile,
@@ -181,6 +199,12 @@ public interface RawDAO {
                            int limit,
                            long begin,
                            long end);
+
+  List<String> getDistinctRegular(String tableName,
+                                  CProfile cProfile,
+                                  OrderBy orderBy,
+                                  CompositeFilter compositeFilter,
+                                  int limit);
 
   BatchResultSet getBatchResultSet(String tableName,
                                    long begin,
