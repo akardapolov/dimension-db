@@ -14,6 +14,7 @@ import ru.dimension.db.core.OracleStore;
 import ru.dimension.db.core.PgSqlStore;
 import ru.dimension.db.model.profile.table.BType;
 import ru.dimension.db.storage.dialect.GenericDialect;
+import ru.dimension.db.storage.dialect.SQLiteDialect;
 
 public class DBase {
   private final DBaseConfig dBaseConfig;
@@ -40,6 +41,7 @@ public class DBase {
       case MSSQL -> this.dStore = new MsSqlStore(this.dBaseConfig, basicDataSource);
       case FIREBIRD -> this.dStore = new FirebirdStore(this.dBaseConfig, basicDataSource);
       case MYSQL, DUCKDB -> this.dStore = new GenericSqlStore(this.dBaseConfig, basicDataSource, new GenericDialect());
+      case SQLITE -> this.dStore = new GenericSqlStore(this.dBaseConfig, basicDataSource, new SQLiteDialect());
       default -> throw new RuntimeException("Not supported yet for: " + backendType);
     }
   }

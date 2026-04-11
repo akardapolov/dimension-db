@@ -45,37 +45,78 @@ public abstract class QueryJdbcApi {
                                                  long end,
                                                  DatabaseDialect databaseDialect) {
     List<StackedColumn> results = new ArrayList<>();
-
     String colName = cProfile.getColName().toLowerCase();
-    String selectClass = databaseDialect.getSelectClassStacked(groupFunction, cProfile);
     String whereClass = databaseDialect.getWhereClassWithCompositeFilter(tsCProfile, compositeFilter);
 
-    String query = getQueryStackedCommon(tableName, colName, groupFunction, selectClass, whereClass);
+    try (Connection conn = basicDataSource.getConnection()) {
 
-    try (Connection conn = basicDataSource.getConnection();
-        PreparedStatement ps = conn.prepareStatement(query)) {
+      if (GroupFunction.COUNT.equals(groupFunction)) {
+        String selectClass = databaseDialect.getSelectClassStacked(groupFunction, cProfile);
+        String query = getQueryStackedCommon(tableName, colName, groupFunction, selectClass, whereClass);
 
-      int paramIndex = 1;
-      databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, begin);
-      databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, end);
+        log.info("Query: {}", query);
 
-      ResultSet rs = ps.executeQuery();
+        try (PreparedStatement ps = conn.prepareStatement(query)) {
+          int paramIndex = 1;
+          databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, begin);
+          databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, end);
 
-      StackedColumn column = new StackedColumn();
-      column.setKey(begin);
-      column.setTail(end);
+          try (ResultSet rs = ps.executeQuery()) {
+            StackedColumn column = new StackedColumn();
+            column.setKey(begin);
+            column.setTail(end);
 
-      while (rs.next()) {
-        fillKeyData(rs, groupFunction, column);
+            while (rs.next()) {
+              fillKeyData(rs, groupFunction, column);
+            }
+
+            results.add(column);
+          }
+        }
+
+        return results;
       }
 
-      results.add(column);
+      String aggregateExpr = GroupFunction.AVG.equals(groupFunction)
+          ? "AVG(" + colName + ")"
+          : "SUM(" + colName + ")";
+
+      String query = "SELECT " + aggregateExpr + " AS value FROM " + tableName + " " + whereClass;
+
+      log.info("Query: {}", query);
+
+      try (PreparedStatement ps = conn.prepareStatement(query)) {
+        int paramIndex = 1;
+        databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, begin);
+        databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, end);
+
+        try (ResultSet rs = ps.executeQuery()) {
+          StackedColumn column = new StackedColumn();
+          column.setKey(begin);
+          column.setTail(end);
+
+          if (rs.next()) {
+            double value = rs.getDouble(1);
+            if (rs.wasNull()) {
+              value = 0D;
+            }
+
+            if (GroupFunction.AVG.equals(groupFunction)) {
+              column.getKeyAvg().put(cProfile.getColName(), value);
+            } else {
+              column.getKeySum().put(cProfile.getColName(), value);
+            }
+          }
+
+          results.add(column);
+        }
+      }
+
+      return results;
     } catch (SQLException e) {
-      log.info("Query: " + query);
+      log.info("Query: {}", tableName);
       throw new RuntimeException("Error executing stacked query with composite filter: " + e.getMessage(), e);
     }
-
-    return results;
   }
 
   protected List<StackedColumn> getStackedCommonRegular(String tableName,

@@ -52,6 +52,8 @@ public class SqlDB {
       } else if (BType.CLICKHOUSE.equals(bType)) {
         basicDataSource.setValidationQuery("SELECT 1");
         basicDataSource.addConnectionProperty("compress", "0");
+      } else if (BType.SQLITE.equals(bType)) {
+        basicDataSource.setValidationQuery("SELECT 1");
       }
 
       basicDataSource.setInitialSize(3);

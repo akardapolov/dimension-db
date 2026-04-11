@@ -24,14 +24,12 @@ public class ClickHouseDialect implements DatabaseDialect {
                                     CProfile secondCProfile) {
     String firstColName = firstCProfile.getColName().toLowerCase();
     String secondColName = secondCProfile.getColName().toLowerCase();
-
     return "SELECT " + firstColName + ", " + secondColName + ", COUNT(" + secondColName + ") ";
   }
 
   @Override
   public String getSelectClassStacked(GroupFunction groupFunction, CProfile tsCProfile) {
     String colName = tsCProfile.getColName().toLowerCase();
-
     if (GroupFunction.COUNT.equals(groupFunction)) {
       return "SELECT " + colName + ", COUNT(" + colName + ") ";
     } else if (GroupFunction.SUM.equals(groupFunction)) {
@@ -49,20 +47,32 @@ public class ClickHouseDialect implements DatabaseDialect {
                               String[] filterData,
                               CompareFunction compareFunction) {
     DataType dataType = tsCProfile.getCsType().getDType();
-
     if (DataType.DATE.equals(dataType) ||
         DataType.TIMESTAMP.equals(dataType) ||
         DataType.TIMESTAMPTZ.equals(dataType) ||
         DataType.DATETIME2.equals(dataType) ||
         DataType.SMALLDATETIME.equals(dataType)) {
       return "WHERE " + tsCProfile.getColName().toLowerCase()
-          + " BETWEEN ? AND ? " + getFilterAndString(cProfileFilter, filterData, compareFunction);
+          + " BETWEEN ? AND ? "
+          + getFilterAndString(cProfileFilter, filterData, compareFunction);
     } else if (DataType.DATETIME.equals(dataType)) {
       return "WHERE " + tsCProfile.getColName().toLowerCase()
-          + " BETWEEN toDateTime(?) AND toDateTime(?) " + getFilterAndString(cProfileFilter, filterData, compareFunction);
+          + " BETWEEN toDateTime(?) AND toDateTime(?) "
+          + getFilterAndString(cProfileFilter, filterData, compareFunction);
     } else {
-      throw new RuntimeException("Not supported datatype for time-series column: " + tsCProfile.getColName());
+      throw new RuntimeException(
+          "Not supported datatype for time-series column: " + tsCProfile.getColName());
     }
+  }
+
+  @Override
+  public String getWhereClassExcludeBegin(CProfile tsCProfile) {
+    DataType dataType = tsCProfile.getCsType().getDType();
+    String colName = tsCProfile.getColName().toLowerCase();
+    if (DataType.DATETIME.equals(dataType)) {
+      return "WHERE " + colName + " > toDateTime(?) AND " + colName + " <= toDateTime(?)";
+    }
+    return "WHERE " + colName + " > ? AND " + colName + " <= ?";
   }
 
   @Override
@@ -80,7 +90,6 @@ public class ClickHouseDialect implements DatabaseDialect {
     if (fetchSize != null) {
       return " limit " + fetchSize + " ";
     }
-
     return "";
   }
 
@@ -95,7 +104,6 @@ public class ClickHouseDialect implements DatabaseDialect {
                           int parameterIndex,
                           long unixTimestamp) throws SQLException {
     DataType dataType = tsCProfile.getCsType().getDType();
-
     if (DataType.DATE.equals(dataType)) {
       ps.setDate(parameterIndex, new java.sql.Date(unixTimestamp));
     } else if (DataType.DATETIME.equals(dataType)) {
@@ -104,12 +112,14 @@ public class ClickHouseDialect implements DatabaseDialect {
         || DataType.TIMESTAMPTZ.equals(dataType)) {
       ps.setTimestamp(parameterIndex, new Timestamp(unixTimestamp));
     } else {
-      throw new RuntimeException("Not supported datatype for time-series column: " + tsCProfile.getColName());
+      throw new RuntimeException(
+          "Not supported datatype for time-series column: " + tsCProfile.getColName());
     }
   }
 
   @Override
-  public String getWhereClassWithCompositeFilter(CProfile tsCProfile, CompositeFilter compositeFilter) {
+  public String getWhereClassWithCompositeFilter(CProfile tsCProfile,
+                                                 CompositeFilter compositeFilter) {
     StringBuilder whereClause = new StringBuilder();
     whereClause.append("WHERE ")
         .append(tsCProfile.getColName().toLowerCase())
@@ -117,16 +127,14 @@ public class ClickHouseDialect implements DatabaseDialect {
 
     if (compositeFilter != null && !compositeFilter.getConditions().isEmpty()) {
       whereClause.append(" AND (");
-
       List<String> conditions = new ArrayList<>();
       for (FilterCondition condition : compositeFilter.getConditions()) {
         String conditionStr = buildCondition(condition);
         conditions.add(conditionStr);
       }
-
-      String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
-      whereClause.append(String.join(joinOperator, conditions))
-          .append(")");
+      String joinOperator =
+          compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+      whereClause.append(String.join(joinOperator, conditions)).append(")");
     }
 
     return whereClause.toString();
@@ -137,10 +145,8 @@ public class ClickHouseDialect implements DatabaseDialect {
     if (compositeFilter == null || compositeFilter.getConditions().isEmpty()) {
       return "";
     }
-
     StringBuilder whereClause = new StringBuilder();
     whereClause.append("WHERE (");
-
     List<String> conditions = new ArrayList<>();
     for (FilterCondition condition : compositeFilter.getConditions()) {
       String conditionStr = buildCondition(condition);
@@ -148,15 +154,12 @@ public class ClickHouseDialect implements DatabaseDialect {
         conditions.add(conditionStr);
       }
     }
-
     if (conditions.isEmpty()) {
       return "";
     }
-
-    String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
-    whereClause.append(String.join(joinOperator, conditions))
-        .append(")");
-
+    String joinOperator =
+        compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+    whereClause.append(String.join(joinOperator, conditions)).append(")");
     return whereClause.toString();
   }
 
@@ -185,12 +188,15 @@ public class ClickHouseDialect implements DatabaseDialect {
               .append(columnName).append(" = '')");
         }
       } else {
-        String escapedValue = value.trim().replace("'", "''").replace("\\", "\\\\");
+        String escapedValue = value.trim()
+            .replace("'", "''")
+            .replace("\\", "\\\\");
         if (compareFunction == CompareFunction.CONTAIN) {
           conditionBuilder.append("LOWER(").append(columnName).append(") LIKE '%")
               .append(escapedValue.toLowerCase()).append("%'");
         } else {
-          conditionBuilder.append(columnName).append(" = '").append(escapedValue).append("'");
+          conditionBuilder.append(columnName)
+              .append(" = '").append(escapedValue).append("'");
         }
       }
     }
@@ -198,7 +204,9 @@ public class ClickHouseDialect implements DatabaseDialect {
     return conditionBuilder.isEmpty() ? "" : "(" + conditionBuilder + ")";
   }
 
-  private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
+  private String getFilterAndString(CProfile cProfileFilter,
+                                    String[] filterData,
+                                    CompareFunction compareFunction) {
     if (cProfileFilter == null || filterData == null) {
       return "";
     }
@@ -223,13 +231,15 @@ public class ClickHouseDialect implements DatabaseDialect {
         String formattedValue = filterValue;
         if (cProfileFilter.getColDbTypeName().startsWith("ENUM")) {
           Map<String, Integer> enumMap = enumParser(cProfileFilter.getColDbTypeName());
-          Integer enumValue = enumMap.get(formattedValue.toLowerCase());
+          Integer enumValue = enumMap.get(
+              formattedValue != null ? formattedValue.toLowerCase() : "");
           if (enumValue == null) {
             continue;
           }
           formattedValue = String.valueOf(enumValue);
           operator = "=";
-          condition = columnName + " " + operator + " '" + formattedValue.replace("\\", "\\\\").replace("'", "\\'") + "'";
+          condition = columnName + " " + operator + " '"
+              + formattedValue.replace("\\", "\\\\").replace("'", "\\'") + "'";
         } else {
           if (isNumeric) {
             condition = columnName + " IS NULL";
@@ -252,7 +262,8 @@ public class ClickHouseDialect implements DatabaseDialect {
         } else if (compareFunction == CompareFunction.CONTAIN) {
           formattedValue = "%" + formattedValue + "%";
         }
-        condition = columnName + " " + operator + " '" + formattedValue.replace("\\", "\\\\").replace("'", "\\'") + "'";
+        condition = columnName + " " + operator + " '"
+            + formattedValue.replace("\\", "\\\\").replace("'", "\\'") + "'";
       }
       if (!filterClause.isEmpty()) {
         filterClause.append(" OR ");

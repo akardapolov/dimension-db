@@ -42,11 +42,9 @@ public class DBaseFirebirdRSBackendTest extends AbstractBackendSQLTest {
   protected String dbUrl;
   private final String driverClassName = "org.firebirdsql.jdbc.FBDriver";
 
-  // Firebird tables/columns are case-insensitive and stored as uppercase.
   private final String tableName = "FIREBIRD_DATA_RS";
   private final String tsName = "FB_DT_TIMESTAMP";
 
-  // Firebird uses 'FIRST N' syntax instead of 'LIMIT'
   private final String select = "select first 2 * from " + tableName;
 
   private BasicDataSource ds;

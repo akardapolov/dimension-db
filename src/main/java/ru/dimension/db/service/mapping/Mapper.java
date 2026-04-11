@@ -13,6 +13,7 @@ import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.extern.log4j.Log4j2;
@@ -38,6 +40,9 @@ public class Mapper {
   public static float FLOAT_NULL = Float.MIN_VALUE;
   public static double DOUBLE_NULL = Double.MIN_VALUE;
   public static String STRING_NULL = "";
+
+  private static final String DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+  private static final TimeZone UTC_ZONE = TimeZone.getTimeZone("UTC");
 
   public Mapper() {
   }
@@ -60,11 +65,11 @@ public class Mapper {
     DataType dataType = isDBType(cProfile);
     return switch (dataType) {
       case UINT8, UINT16, INT16, INT2, INT4, INT8, INT32,
-          NUMBER, INTEGER, SMALLINT, INT, BIGINT, BIT, TIME, TIMETZ, TINYINT ->
+           NUMBER, INTEGER, SMALLINT, INT, BIGINT, BIT, TIME, TIMETZ, TINYINT ->
           CType.INT;
       case OID, DATE, TIMESTAMP, TIMESTAMPTZ, DATETIME, DATETIME2, SMALLDATETIME,
-          UINT32, UINT64, INT64, INT128, INT256,
-          SERIAL, SMALLSERIAL, BIGSERIAL, LONG ->
+           UINT32, UINT64, INT64, INT128, INT256,
+           SERIAL, SMALLSERIAL, BIGSERIAL, LONG ->
           CType.LONG;
       case FLOAT4, FLOAT32, REAL -> CType.FLOAT;
       case FLOAT64, NUMERIC, FLOAT, FLOAT8, MONEY, SMALLMONEY, DECIMAL, DOUBLE, DOUBLE_PRECISION -> CType.DOUBLE;
@@ -160,6 +165,26 @@ public class Mapper {
     }
   }
 
+  private static long parseUtcDateTimeString(String s) {
+    try {
+      SimpleDateFormat sdf = new SimpleDateFormat(DATETIME_FORMAT);
+      sdf.setTimeZone(UTC_ZONE);
+      return sdf.parse(s).getTime();
+    } catch (Exception e) {
+      // ignore
+    }
+    try {
+      return Timestamp.valueOf(s).getTime();
+    } catch (Exception e) {
+      // ignore
+    }
+    try {
+      return Long.parseLong(s);
+    } catch (Exception e) {
+      return LONG_NULL;
+    }
+  }
+
   public static long convertRawToLong(Object obj,
                                       CProfile cProfile) {
     if (obj == null) {
@@ -173,6 +198,9 @@ public class Mapper {
       case DATETIME:
       case DATETIME2:
       case SMALLDATETIME:
+        if (obj instanceof Number number) {
+          return number.longValue();
+        }
         if (obj instanceof Timestamp ts) {
           return ts.getTime();
         } else if (obj instanceof Instant instant) {
@@ -191,7 +219,10 @@ public class Mapper {
           return date.getTime();
         } else if (obj instanceof OffsetDateTime offsetDateTime) {
           return offsetDateTime.toInstant().toEpochMilli();
+        } else if (obj instanceof String s) {
+          return parseUtcDateTimeString(s);
         }
+        return LONG_NULL;
       case OID:
       case BIGSERIAL:
       case UINT32:
@@ -200,6 +231,12 @@ public class Mapper {
       case LONG:
         if (obj instanceof Long) {
           return (Long) obj;
+        } else if (obj instanceof String s) {
+          try {
+            return Long.parseLong(s);
+          } catch (Exception e) {
+            return LONG_NULL;
+          }
         } else if (ClickHouseHelper.checkUnsigned(obj.getClass().getName())) {
           return ClickHouseHelper.invokeMethod(obj, "longValue", Long.class);
         }
@@ -212,8 +249,27 @@ public class Mapper {
       case SERIAL:
       case SMALLSERIAL:
         if (obj instanceof Integer i) {
-          return i;
+          return i.longValue();
         }
+      case INTEGER:
+      case INT:
+      case BIGINT:
+      case NUMBER:
+      case SMALLINT:
+      case INT2:
+      case INT4:
+      case INT8:
+      case INT16:
+      case INT32:
+      case TINYINT:
+        return switch (obj) {
+          case Long l -> l;
+          case Integer i -> i.longValue();
+          case BigDecimal bd -> bd.longValue();
+          case Number n -> n.longValue();
+          case String s -> Long.parseLong(s);
+          default -> LONG_NULL;
+        };
       default:
         return LONG_NULL;
     }
@@ -224,14 +280,30 @@ public class Mapper {
     if (obj == null) {
       return FLOAT_NULL;
     }
-    if (cProfile.getCsType().getDType() == DataType.FLOAT32) {
-      return (Float) obj;
-    } else if (cProfile.getCsType().getDType() == DataType.FLOAT4) {
-      return (Float) obj;
-    } else if (cProfile.getCsType().getDType() == DataType.REAL) {
-      return (Float) obj;
+
+    switch (cProfile.getCsType().getDType()) {
+      case FLOAT32:
+      case FLOAT4:
+      case REAL:
+        switch (obj) {
+          case Float f -> {
+            return f;
+          }
+          case Double d -> {
+            return d.floatValue();
+          }
+          case Number n -> {
+            return n.floatValue();
+          }
+          default -> {
+          }
+        }
+        log.warn("convertRawToFloat: unexpected type {} for column {}, returning FLOAT_NULL",
+                 obj.getClass().getName(), cProfile.getColName());
+        return FLOAT_NULL;
+      default:
+        return FLOAT_NULL;
     }
-    return FLOAT_NULL;
   }
 
   public static double convertRawToDouble(Object obj,
@@ -319,8 +391,12 @@ public class Mapper {
       case REAL:
       case FLOAT8:
       case FLOAT32:
-        Float f = (Float) obj;
-        return valueOf(f);
+        if (obj instanceof Float floatObj) {
+          return valueOf(floatObj);
+        } else if (obj instanceof Double doubleObj) {
+          return valueOf(doubleObj.floatValue());
+        }
+        return valueOf(obj);
       case FLOAT64:
       case DOUBLE:
       case DOUBLE_PRECISION:
@@ -370,7 +446,6 @@ public class Mapper {
                                    Map<Integer, SType> colIdSTypeMap,
                                    Predicate<CProfile> isNotTimestamp,
                                    Predicate<CProfile> isCustom) {
-
     return (int) cProfiles.stream()
         .filter(isNotTimestamp)
         .filter(f -> SType.RAW.equals(colIdSTypeMap.get(f.getColId())))
@@ -381,7 +456,6 @@ public class Mapper {
   public static int getColumnCount(List<CProfile> cProfiles,
                                    Predicate<CProfile> isRaw,
                                    Predicate<CProfile> isCustom) {
-
     return (int) cProfiles.stream()
         .filter(isRaw)
         .filter(isCustom)

@@ -19,6 +19,17 @@ public interface DatabaseDialect {
                        String[] filterData,
                        CompareFunction compareFunction);
 
+  /**
+   * Used for batch pagination — excludes the left boundary
+   * to avoid duplication of the last record from the previous batch.
+   * The default implementation works for most dialects (Generic, PgSQL, Oracle, MSSQL, Firebird, SQLite).
+   * ClickHouse overrides it because of toDateTime(?).
+   */
+  default String getWhereClassExcludeBegin(CProfile tsCProfile) {
+    return "WHERE " + tsCProfile.getColName() + " > ? AND "
+        + tsCProfile.getColName() + " <= ?";
+  }
+
   String getOrderByClass(CProfile tsCProfile);
   String getOrderByClass(CProfile cProfile, OrderBy orderBy);
 

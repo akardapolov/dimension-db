@@ -50,6 +50,9 @@ public class GenericDialect implements DatabaseDialect {
     return whereClause.toString();
   }
 
+  // Наследуется default из DatabaseDialect:
+  // WHERE ts > ? AND ts <= ?
+
   @Override
   public String getOrderByClass(CProfile tsCProfile) {
     return " ORDER BY " + tsCProfile.getColName();
@@ -77,13 +80,13 @@ public class GenericDialect implements DatabaseDialect {
   }
 
   @Override
-  public String getWhereClassWithCompositeFilter(CProfile tsCProfile, CompositeFilter compositeFilter) {
+  public String getWhereClassWithCompositeFilter(CProfile tsCProfile,
+                                                 CompositeFilter compositeFilter) {
     StringBuilder whereClause = new StringBuilder("WHERE ");
     whereClause.append(tsCProfile.getColName()).append(" BETWEEN ? AND ?");
 
     if (compositeFilter != null && !compositeFilter.getConditions().isEmpty()) {
       whereClause.append(" AND (");
-
       List<String> conditions = new ArrayList<>();
       for (FilterCondition condition : compositeFilter.getConditions()) {
         String filterStr = getFilterConditionString(condition);
@@ -91,12 +94,11 @@ public class GenericDialect implements DatabaseDialect {
           conditions.add(filterStr);
         }
       }
-
       if (!conditions.isEmpty()) {
-        String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+        String joinOperator =
+            compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
         whereClause.append(String.join(joinOperator, conditions));
       }
-
       whereClause.append(")");
     }
 
@@ -108,10 +110,8 @@ public class GenericDialect implements DatabaseDialect {
     if (compositeFilter == null || compositeFilter.getConditions().isEmpty()) {
       return "";
     }
-
     StringBuilder whereClause = new StringBuilder();
     whereClause.append("WHERE (");
-
     List<String> conditions = new ArrayList<>();
     for (FilterCondition condition : compositeFilter.getConditions()) {
       String filterStr = getFilterConditionString(condition);
@@ -119,15 +119,12 @@ public class GenericDialect implements DatabaseDialect {
         conditions.add(filterStr);
       }
     }
-
     if (conditions.isEmpty()) {
       return "";
     }
-
-    String joinOperator = compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
-    whereClause.append(String.join(joinOperator, conditions))
-        .append(")");
-
+    String joinOperator =
+        compositeFilter.getOperator() == LogicalOperator.AND ? " AND " : " OR ";
+    whereClause.append(String.join(joinOperator, conditions)).append(")");
     return whereClause.toString();
   }
 
@@ -139,11 +136,12 @@ public class GenericDialect implements DatabaseDialect {
     ) + ")";
   }
 
-  private String getFilterAndStringRaw(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
+  private String getFilterAndStringRaw(CProfile cProfileFilter,
+                                       String[] filterData,
+                                       CompareFunction compareFunction) {
     if (cProfileFilter == null || filterData == null) {
       return "";
     }
-
     String columnName = cProfileFilter.getColName();
     StringBuilder filterClause = new StringBuilder();
     boolean isNumeric = isNumericType(cProfileFilter);
@@ -160,9 +158,11 @@ public class GenericDialect implements DatabaseDialect {
         String formattedValue = filterValue.trim();
         if (CompareFunction.CONTAIN.equals(compareFunction)) {
           formattedValue = "%" + formattedValue.toLowerCase() + "%";
-          condition = "LOWER(" + columnName + ") LIKE '" + formattedValue.replace("'", "''") + "'";
+          condition = "LOWER(" + columnName + ") LIKE '"
+              + formattedValue.replace("'", "''") + "'";
         } else {
-          condition = columnName + " = '" + formattedValue.replace("'", "''") + "'";
+          condition = columnName + " = '"
+              + formattedValue.replace("'", "''") + "'";
         }
       }
       if (filterClause.length() > 0) {
@@ -174,7 +174,9 @@ public class GenericDialect implements DatabaseDialect {
     return filterClause.toString();
   }
 
-  private String getFilterAndString(CProfile cProfileFilter, String[] filterData, CompareFunction compareFunction) {
+  private String getFilterAndString(CProfile cProfileFilter,
+                                    String[] filterData,
+                                    CompareFunction compareFunction) {
     String raw = getFilterAndStringRaw(cProfileFilter, filterData, compareFunction);
     return raw.isEmpty() ? "" : " AND (" + raw + ")";
   }

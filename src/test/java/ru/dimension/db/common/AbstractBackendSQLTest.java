@@ -154,10 +154,16 @@ public abstract class AbstractBackendSQLTest implements JdbcSource {
         basicDataSource.addConnectionProperty("compress", "0");
       } else if (BType.FIREBIRD.equals(bType)) {
         basicDataSource.setValidationQuery("SELECT 1 FROM RDB$DATABASE");
+      } else if (BType.SQLITE.equals(bType)) {
+        basicDataSource.setValidationQuery("SELECT 1");
+        basicDataSource.setInitialSize(1);
+        basicDataSource.setMaxTotal(3);
+        basicDataSource.addConnectionProperty("journal_mode", "WAL");
+      } else {
+        basicDataSource.setInitialSize(3);
+        basicDataSource.setMaxTotal(7);
       }
 
-      basicDataSource.setInitialSize(3);
-      basicDataSource.setMaxTotal(7);
       basicDataSource.setMaxWaitMillis(TimeUnit.SECONDS.toMillis(5));
 
     } catch (Exception e) {

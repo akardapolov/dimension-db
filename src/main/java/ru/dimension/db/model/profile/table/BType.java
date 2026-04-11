@@ -8,5 +8,6 @@ public enum BType {
   MSSQL,
   MYSQL,
   DUCKDB,
-  FIREBIRD
+  FIREBIRD,
+  SQLITE
 }

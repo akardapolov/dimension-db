@@ -9,7 +9,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -23,8 +28,13 @@ import ru.dimension.db.model.profile.cstype.CSType;
 
 public interface JdbcSource {
 
-  default void loadData(DStore dStore, Connection dbConnection, String sqlText,
-                        SProfile sProfile, Logger log, int fBaseBatchSize, int resultSetFetchSize) throws SQLException {
+  default void loadData(DStore dStore,
+                        Connection dbConnection,
+                        String sqlText,
+                        SProfile sProfile,
+                        Logger log,
+                        int fBaseBatchSize,
+                        int resultSetFetchSize) throws SQLException {
 
     TProfile tProfile;
     try {
@@ -48,7 +58,6 @@ public interface JdbcSource {
 
     while (r.next()) {
       cProfiles.forEach(v -> {
-
         try {
           addToList(listsColStore, v, r);
         } catch (SQLException e) {
@@ -115,36 +124,38 @@ public interface JdbcSource {
     ps.close();
   }
 
-  default void addToList(List<List<Object>> lists, CProfile v, ResultSet r) throws SQLException {
+  default void addToList(List<List<Object>> lists,
+                         CProfile v,
+                         ResultSet r) throws SQLException {
     lists.get(v.getColId()).add(r.getObject(v.getColIdSql()));
   }
 
-  default SProfile getSProfileForSelect(String select, Connection dbConnection) throws SQLException {
+  default SProfile getSProfileForSelect(String select,
+                                        Connection dbConnection) throws SQLException {
     Map<String, CSType> csTypeMap = new HashMap<>();
 
-    Statement s;
-    ResultSet rs;
-    ResultSetMetaData rsmd;
+    try (Statement s = dbConnection.createStatement();
+        ResultSet rs = s.executeQuery(select)) {
 
-    s = dbConnection.createStatement();
-    s.executeQuery(select);
-    rs = s.getResultSet();
-    rsmd = rs.getMetaData();
-
-    for (int i = 1; i <= rsmd.getColumnCount(); i++) {
-        csTypeMap.put(rsmd.getColumnName(i).toUpperCase(), new CSType().toBuilder().build());
+      ResultSetMetaData rsmd = rs.getMetaData();
+      for (int i = 1; i <= rsmd.getColumnCount(); i++) {
+        String colName = rsmd.getColumnName(i);
+        if (colName == null || colName.isBlank()) {
+          colName = rsmd.getColumnLabel(i);
+        }
+        csTypeMap.put(colName.toUpperCase(), new CSType().toBuilder().build());
+      }
     }
-
-    rs.close();
-    s.close();
 
     return new SProfile().setCsTypeMap(csTypeMap);
   }
 
-  default void loadDataTypes(ResultSet r, List<String> includeList, int initialValue) throws SQLException {
+  default void loadDataTypes(ResultSet r,
+                             List<String> includeList,
+                             int initialValue) throws SQLException {
 
-    Map<String, String> byteStringMap = new TreeMap<>(Comparator.comparingInt(String::length)
-                    .thenComparing(Function.identity())
+    Map<String, String> byteStringMap = new TreeMap<>(
+        Comparator.comparingInt(String::length).thenComparing(Function.identity())
     );
 
     while (r.next()) {
@@ -154,12 +165,11 @@ public interface JdbcSource {
 
     AtomicInteger byteKey = new AtomicInteger(initialValue);
 
-    // Load data types
     byteStringMap.forEach((key, val) -> {
       if (includeList.contains(val)) {
         System.out.println(val.toUpperCase()
-                + "(" + byteKey.getAndIncrement() + ", \""
-                + val.toUpperCase() + "\"),");
+                               + "(" + byteKey.getAndIncrement() + ", \""
+                               + val.toUpperCase() + "\"),");
       }
     });
   }

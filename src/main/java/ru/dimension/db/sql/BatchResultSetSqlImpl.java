@@ -29,10 +29,8 @@ import ru.dimension.db.storage.dialect.OracleDialect;
 public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResultSet {
 
   private final String tableName;
-
   private final long begin;
   private final long end;
-
   private final int fetchSize;
   private final List<CProfile> cProfiles;
 
@@ -40,15 +38,12 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
 
   private boolean isNext = true;
   private boolean isStarted = true;
+  private boolean isFirstBatch = true;
 
   private final long maxBlockId;
-
   private final BasicDataSource basicDataSource;
-
   private final DatabaseDialect databaseDialect;
-
   private final TType tableType;
-
   private int currentOffset;
 
   public BatchResultSetSqlImpl(String tableName,
@@ -59,7 +54,8 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
                                List<CProfile> cProfiles,
                                BasicDataSource basicDataSource,
                                DatabaseDialect databaseDialect) {
-    this(tableName, fetchSize, begin, end, maxBlockId, cProfiles, basicDataSource, databaseDialect, TType.TIME_SERIES);
+    this(tableName, fetchSize, begin, end, maxBlockId, cProfiles,
+         basicDataSource, databaseDialect, TType.TIME_SERIES);
   }
 
   public BatchResultSetSqlImpl(String tableName,
@@ -79,7 +75,6 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
     this.basicDataSource = basicDataSource;
     this.databaseDialect = databaseDialect;
     this.tableType = tableType;
-
     this.pointer = Map.entry(begin, 0);
     this.maxBlockId = maxBlockId;
     this.currentOffset = 0;
@@ -95,9 +90,7 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
 
   private List<List<Object>> getObjectRegular() {
     List<List<Object>> tableColFormatData = new ArrayList<>();
-
     String query = getSqlQueryRegular();
-
     AtomicInteger fetchCounter = new AtomicInteger(0);
 
     try (Connection connection = basicDataSource.getConnection();
@@ -113,7 +106,6 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
         for (int i = 0; i < cProfiles.size(); i++) {
           CProfile cProfile = cProfiles.get(i);
           Object cellValue = rs.getObject(cProfile.getColName());
-
           if (cProfile.getCsType().getCType().equals(CType.STRING)) {
             tableColFormatData.get(i).add(convertRawToString(cellValue, cProfile));
           } else {
@@ -145,7 +137,7 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
     List<List<Object>> tableColFormatData = new ArrayList<>();
 
     AtomicReference<Entry<Long, Integer>> pointerLocal =
-        new AtomicReference<>(Map.entry(isStarted ? 0L : pointer.getKey(), isStarted ? 0 : pointer.getValue()));
+        new AtomicReference<>(Map.entry(pointer.getKey(), pointer.getValue()));
 
     Optional<CProfile> tsCProfile = cProfiles.stream()
         .filter(k -> k.getCsType().isTimeStamp())
@@ -155,15 +147,14 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
       throw new RuntimeException("API working only for time-series tables");
     }
 
-    String query = getSqlQueryTimeSeries(tsCProfile);
+    String query = getSqlQueryTimeSeries(tsCProfile, isFirstBatch);
 
     AtomicInteger fetchCounter = new AtomicInteger(pointer.getValue());
 
     try (Connection connection = basicDataSource.getConnection();
         PreparedStatement ps = connection.prepareStatement(query)) {
 
-      long dateTime = isStarted ? pointer.getKey() : pointer.getKey() + 1;
-      databaseDialect.setDateTime(tsCProfile.get(), ps, 1, dateTime);
+      databaseDialect.setDateTime(tsCProfile.get(), ps, 1, pointer.getKey());
       databaseDialect.setDateTime(tsCProfile.get(), ps, 2, maxBlockId);
 
       ResultSet rs = ps.executeQuery();
@@ -204,7 +195,7 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
       pointer = pointerLocal.get();
     }
 
-    isStarted = false;
+    isFirstBatch = false;
 
     if (pointer.getKey() >= maxBlockId) {
       isNext = false;
@@ -213,9 +204,14 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
     return transpose(tableColFormatData);
   }
 
-  private String getSqlQueryTimeSeries(Optional<CProfile> tsCProfile) {
+  private String getSqlQueryTimeSeries(Optional<CProfile> tsCProfile,
+                                       boolean firstBatch) {
+    String whereClause = firstBatch
+        ? databaseDialect.getWhereClass(tsCProfile.get(), null, null, null)
+        : databaseDialect.getWhereClassExcludeBegin(tsCProfile.get());
+
     return "SELECT * FROM " + tableName + " "
-        + databaseDialect.getWhereClass(tsCProfile.get(), null, null, null)
+        + whereClause
         + databaseDialect.getOrderByClass(tsCProfile.get())
         + databaseDialect.getLimitClass(fetchSize);
   }
@@ -225,18 +221,16 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
       return "SELECT * FROM " + tableName
           + " OFFSET " + currentOffset + " ROWS FETCH NEXT " + fetchSize + " ROWS ONLY ";
     }
-
     if (databaseDialect instanceof MsSqlDialect) {
       return "SELECT * FROM " + tableName
-          + " ORDER BY (SELECT NULL) OFFSET " + currentOffset + " ROWS FETCH NEXT " + fetchSize + " ROWS ONLY ";
+          + " ORDER BY (SELECT NULL) OFFSET " + currentOffset
+          + " ROWS FETCH NEXT " + fetchSize + " ROWS ONLY ";
     }
-
     if (databaseDialect instanceof FirebirdDialect) {
       int start = currentOffset + 1;
       int end = currentOffset + fetchSize;
       return "SELECT * FROM " + tableName + " ROWS " + start + " TO " + end;
     }
-
     return "SELECT * FROM " + tableName
         + databaseDialect.getLimitClass(fetchSize)
         + databaseDialect.getOffsetClass(currentOffset);
@@ -254,28 +248,29 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
     if (!isNext) {
       return false;
     }
-
     if (currentOffset >= maxBlockId) {
       isNext = false;
       return false;
     }
-
     return true;
   }
 
   private boolean nextTimeSeries() {
-    Optional<CProfile> tsCProfile = cProfiles.stream()
-        .filter(k -> k.getCsType().isTimeStamp())
-        .findAny();
+    if (!isNext) {
+      return false;
+    }
 
     if (isStarted) {
-      String query = getSqlQueryTimeSeries(tsCProfile);
+      Optional<CProfile> tsCProfile = cProfiles.stream()
+          .filter(k -> k.getCsType().isTimeStamp())
+          .findAny();
+
+      String query = getSqlQueryTimeSeries(tsCProfile, true);
 
       try (Connection connection = basicDataSource.getConnection();
           PreparedStatement ps = connection.prepareStatement(query)) {
 
-        long dateTime = pointer.getKey();
-        databaseDialect.setDateTime(tsCProfile.orElseThrow(), ps, 1, dateTime);
+        databaseDialect.setDateTime(tsCProfile.orElseThrow(), ps, 1, pointer.getKey());
         databaseDialect.setDateTime(tsCProfile.orElseThrow(), ps, 2, maxBlockId);
 
         try (ResultSet rs = ps.executeQuery()) {
@@ -288,9 +283,10 @@ public class BatchResultSetSqlImpl extends CommonServiceApi implements BatchResu
         }
       } catch (SQLException e) {
         log.catching(e);
+        isNext = false;
       }
 
-      isStarted = true;
+      isStarted = false;
     }
 
     return isNext;

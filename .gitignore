@@ -51,3 +51,7 @@ build/
 *.db
 *.jdb
 *.lck
+release.log
+
+#AI
+.claude/settings.local.json
