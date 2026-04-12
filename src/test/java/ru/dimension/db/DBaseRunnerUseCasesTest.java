@@ -288,8 +288,8 @@ public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode {
     putDataJdbcBatch(cfg.getDStore(), tp, cfg.getH2DbConnection(), "SELECT * FROM person");
     List<BlockKeyTail> tails = cfg.getDStore().getBlockKeyTailList(table, 1, 3);
     Assertions.assertEquals(1, tails.size());
-    Assertions.assertEquals(1, tails.get(0).getKey());
-    Assertions.assertEquals(3, tails.get(0).getTail());
+    Assertions.assertEquals(1, tails.getFirst().getKey());
+    Assertions.assertEquals(3, tails.getFirst().getTail());
   }
 
   private void testGetStacked(DBaseTestConfig cfg) throws Exception {
@@ -334,7 +334,7 @@ public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode {
         List.of(new FilterCondition(getCProfileByName(tp, "CITY"), new String[]{"Moscow"}, CompareFunction.EQUAL)),
         LogicalOperator.AND);
     List<StackedColumn> res = cfg.getDStore().getStacked(table, getCProfileByName(tp, "HOUSE"), GroupFunction.SUM, f, 1, 3);
-    assertEquals(3.0, res.get(0).getKeySum().get("HOUSE"));
+    assertEquals(3.0, res.getFirst().getKeySum().get("HOUSE"));
   }
 
   private void testGetStackedAvgFilter(DBaseTestConfig cfg) throws Exception {
@@ -345,7 +345,7 @@ public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode {
         List.of(new FilterCondition(getCProfileByName(tp, "CITY"), new String[]{"Moscow"}, CompareFunction.EQUAL)),
         LogicalOperator.AND);
     List<StackedColumn> res = cfg.getDStore().getStacked(table, getCProfileByName(tp, "HOUSE"), GroupFunction.AVG, f, 1, 3);
-    assertEquals(1.5, res.get(0).getKeyAvg().get("HOUSE"));
+    assertEquals(1.5, res.getFirst().getKeyAvg().get("HOUSE"));
   }
 
   private void testGetGantt(DBaseTestConfig cfg) throws Exception {
@@ -424,7 +424,7 @@ public class DBaseRunnerUseCasesTest implements DirectMode, JDBCMode {
     putDataJdbcBatch(cfg.getDStore(), tp, cfg.getH2DbConnection(), "SELECT * FROM person");
     List<List<Object>> res = cfg.getDStore().getRawDataAll(table, getCProfileByName(tp, "FIRSTNAME"), "Alex", 1, 3);
     assertEquals(1, res.size());
-    assertEquals("Alex", String.valueOf(res.get(0).get(1)));
+    assertEquals("Alex", String.valueOf(res.getFirst().get(1)));
   }
 
   private void testGetRawDataByColumn(DBaseTestConfig cfg) throws Exception {

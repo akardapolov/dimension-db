@@ -253,7 +253,7 @@ public class DBaseMsSQLRSBackendTest extends AbstractBackendSQLTest {
     List<StackedColumn> stackedColumns =
         dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, 4394908640000L);
 
-    assertEquals(3, stackedColumns.get(0).getKeyCount().get(""));
-    assertEquals(1, stackedColumns.get(0).getKeyCount().get("Test"));
+    assertEquals(3, stackedColumns.getFirst().getKeyCount().get(""));
+    assertEquals(1, stackedColumns.getFirst().getKeyCount().get("Test"));
   }
 }

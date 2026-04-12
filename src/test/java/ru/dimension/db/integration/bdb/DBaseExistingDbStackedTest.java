@@ -67,7 +67,7 @@ public class DBaseExistingDbStackedTest {
         .collect(Collectors.toList());
 
     assertFalse(sessionTypeColumns.isEmpty(), "SESSION_TYPE column should exist");
-    CProfile groupProfile = sessionTypeColumns.get(0);
+    CProfile groupProfile = sessionTypeColumns.getFirst();
     System.out.println(groupProfile);
 
     // 3. Verify column properties match your parameters

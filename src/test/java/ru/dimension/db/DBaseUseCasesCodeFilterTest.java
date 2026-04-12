@@ -439,7 +439,7 @@ public class DBaseUseCasesCodeFilterTest implements JDBCMode {
             CompareFunction.EQUAL)),
         LogicalOperator.AND);
     List<StackedColumn> actualMsk = getStackedFilter(tProfile, "HOUSE", groupFunction, moscowFilter, begin, end);
-    assertEquals(3.0, actualMsk.get(0).getKeySum().get("HOUSE"));
+    assertEquals(3.0, actualMsk.getFirst().getKeySum().get("HOUSE"));
 
     CompositeFilter ekbFilter = new CompositeFilter(
         List.of(new FilterCondition(
@@ -448,7 +448,7 @@ public class DBaseUseCasesCodeFilterTest implements JDBCMode {
             CompareFunction.EQUAL)),
         LogicalOperator.AND);
     List<StackedColumn> actualEkb = getStackedFilter(tProfile, "HOUSE", groupFunction, ekbFilter, begin, end);
-    assertEquals(3.0, actualEkb.get(0).getKeySum().get("HOUSE"));
+    assertEquals(3.0, actualEkb.getFirst().getKeySum().get("HOUSE"));
 
     CompositeFilter ovFilter = new CompositeFilter(
         List.of(new FilterCondition(
@@ -457,7 +457,7 @@ public class DBaseUseCasesCodeFilterTest implements JDBCMode {
             CompareFunction.CONTAIN)),
         LogicalOperator.AND);
     List<StackedColumn> actualLastNameOv = getStackedFilter(tProfile, "HOUSE", groupFunction, ovFilter, begin, end);
-    assertEquals(6.0, actualLastNameOv.get(0).getKeySum().get("HOUSE"));
+    assertEquals(6.0, actualLastNameOv.getFirst().getKeySum().get("HOUSE"));
   }
 
   @Test
@@ -474,7 +474,7 @@ public class DBaseUseCasesCodeFilterTest implements JDBCMode {
             CompareFunction.EQUAL)),
         LogicalOperator.AND);
     List<StackedColumn> actualMsk = getStackedFilter(tProfile, "HOUSE", groupFunction, moscowFilter, begin, end);
-    assertEquals(1.5, actualMsk.get(0).getKeyAvg().get("HOUSE"));
+    assertEquals(1.5, actualMsk.getFirst().getKeyAvg().get("HOUSE"));
 
     CompositeFilter ekbFilter = new CompositeFilter(
         List.of(new FilterCondition(
@@ -483,7 +483,7 @@ public class DBaseUseCasesCodeFilterTest implements JDBCMode {
             CompareFunction.EQUAL)),
         LogicalOperator.AND);
     List<StackedColumn> actualEkb = getStackedFilter(tProfile, "HOUSE", groupFunction, ekbFilter, begin, end);
-    assertEquals(3.0, actualEkb.get(0).getKeyAvg().get("HOUSE"));
+    assertEquals(3.0, actualEkb.getFirst().getKeyAvg().get("HOUSE"));
 
     CompositeFilter ovFilter = new CompositeFilter(
         List.of(new FilterCondition(
@@ -492,7 +492,7 @@ public class DBaseUseCasesCodeFilterTest implements JDBCMode {
             CompareFunction.CONTAIN)),
         LogicalOperator.AND);
     List<StackedColumn> actualLastNameOv = getStackedFilter(tProfile, "HOUSE", groupFunction, ovFilter, begin, end);
-    assertEquals(2.0, actualLastNameOv.get(0).getKeyAvg().get("HOUSE"));
+    assertEquals(2.0, actualLastNameOv.getFirst().getKeyAvg().get("HOUSE"));
   }
 
   private List<StackedColumn> getStackedFilter(TProfile tProfile,

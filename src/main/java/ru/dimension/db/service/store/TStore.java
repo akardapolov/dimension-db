@@ -35,15 +35,15 @@ public class TStore extends CommonServiceApi {
   }
 
   public int size() {
-    return this.rawData.get(0).size();
+    return this.rawData.getFirst().size();
   }
 
   public long getBlockId() {
-    return this.rawData.get(0).get(0);
+    return this.rawData.getFirst().getFirst();
   }
 
   public long getTail() {
-    return this.rawData.get(0).get(this.rawData.get(0).size() - 1);
+    return this.rawData.getFirst().getLast();
   }
 
   public int[] mappingToArray() {

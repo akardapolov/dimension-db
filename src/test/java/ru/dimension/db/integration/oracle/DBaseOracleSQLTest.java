@@ -268,39 +268,39 @@ public class DBaseOracleSQLTest extends AbstractOracleSQLTest {
 
     /* Test GanttColumn API */
     List<GanttColumnCount> oracleDtRawChar = getGanttColumn(tableName, oracleDtRaw, oracleDtChar);
-    assertEquals(new String(raw, StandardCharsets.UTF_8), oracleDtRawChar.get(0).getKey());
+    assertEquals(new String(raw, StandardCharsets.UTF_8), oracleDtRawChar.getFirst().getKey());
     assertEquals(charVal, getGanttKey(oracleDtRawChar, charVal));
 
     List<GanttColumnCount> oracleDtCharClob = getGanttColumn(tableName, oracleDtChar, oracleDtClob);
-    assertEquals(charVal, oracleDtCharClob.get(0).getKey());
+    assertEquals(charVal, oracleDtCharClob.getFirst().getKey());
     assertEquals(clob, getGanttKey(oracleDtCharClob, clob));
 
     List<GanttColumnCount> oracleDtClobDate = getGanttColumn(tableName, oracleDtClob, oracleDtDate);
-    assertEquals(clob, oracleDtClobDate.get(0).getKey());
+    assertEquals(clob, oracleDtClobDate.getFirst().getKey());
     assertEquals(dateLong, Long.parseLong(getGanttKey(oracleDtClobDate, String.valueOf(dateLong))));
 
     List<GanttColumnCount> oracleDtDateFloat = getGanttColumn(tableName, oracleDtDate, oracleDtFloat);
-    assertEquals(dateLong, Long.parseLong(oracleDtDateFloat.get(0).getKey()));
+    assertEquals(dateLong, Long.parseLong(oracleDtDateFloat.getFirst().getKey()));
     assertEquals(floatVal, Float.valueOf(getGanttKey(oracleDtDateFloat, Float.toString(floatVal))));
 
     List<GanttColumnCount> oracleDtFloatNChar = getGanttColumn(tableName, oracleDtFloat, oracleDtNchar);
-    assertEquals(floatVal, Float.valueOf(oracleDtFloatNChar.get(0).getKey()));
+    assertEquals(floatVal, Float.valueOf(oracleDtFloatNChar.getFirst().getKey()));
     assertEquals(nchar, getGanttKey(oracleDtFloatNChar, nchar));
 
     List<GanttColumnCount> oracleDtNCharNClob = getGanttColumn(tableName, oracleDtNchar, oracleDtNclob);
-    assertEquals(nchar, oracleDtNCharNClob.get(0).getKey());
+    assertEquals(nchar, oracleDtNCharNClob.getFirst().getKey());
     assertEquals(nclob, getGanttKey(oracleDtNCharNClob, nclob));
 
     List<GanttColumnCount> oracleDtNClobNumber = getGanttColumn(tableName, oracleDtNclob, oracleDtNumber);
-    assertEquals(nclob, oracleDtNClobNumber.get(0).getKey());
+    assertEquals(nclob, oracleDtNClobNumber.getFirst().getKey());
     assertEquals(number, Integer.valueOf(getGanttKey(oracleDtNClobNumber, Integer.toString(number))));
 
     List<GanttColumnCount> oracleDtNumberVarchar2 = getGanttColumn(tableName, oracleDtNumber, oracleDtVarchar2);
-    assertEquals(number, Integer.valueOf(oracleDtNumberVarchar2.get(0).getKey()));
+    assertEquals(number, Integer.valueOf(oracleDtNumberVarchar2.getFirst().getKey()));
     assertEquals(varchar2, getGanttKey(oracleDtNumberVarchar2, varchar2));
 
     List<GanttColumnCount> oracleDtVarchar2NVarchar2 = getGanttColumn(tableName, oracleDtVarchar2, oracleDtNvarchar2);
-    assertEquals(varchar2, oracleDtVarchar2NVarchar2.get(0).getKey());
+    assertEquals(varchar2, oracleDtVarchar2NVarchar2.getFirst().getKey());
     assertEquals(nvarchar2, getGanttKey(oracleDtVarchar2NVarchar2, nvarchar2));
 
     /* Test Raw data API */
@@ -384,7 +384,7 @@ public class DBaseOracleSQLTest extends AbstractOracleSQLTest {
   }
 
   private String getGanttKey(List<GanttColumnCount> ganttColumnCountList, String filter) {
-    return ganttColumnCountList.get(0).getGantt()
+    return ganttColumnCountList.getFirst().getGantt()
         .entrySet()
         .stream()
         .filter(f -> f.getKey().equalsIgnoreCase(filter))

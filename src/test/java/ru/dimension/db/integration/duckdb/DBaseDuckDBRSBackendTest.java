@@ -189,8 +189,8 @@ public class DBaseDuckDBRSBackendTest extends AbstractBackendSQLTest {
   public void bugEmptyValueTest() throws BeginEndWrongOrderException, SqlColMetadataException {
     CProfile cProfile = getCProfileByName(tProfile, "duckdb_dt_char_empty");
     List<StackedColumn> stacked = dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, beginTs, endTs);
-    assertEquals(3, stacked.get(0).getKeyCount().get(""));
-    assertEquals(1, stacked.get(0).getKeyCount().get("Test"));
+    assertEquals(3, stacked.getFirst().getKeyCount().get(""));
+    assertEquals(1, stacked.getFirst().getKeyCount().get("Test"));
   }
 
   @AfterAll

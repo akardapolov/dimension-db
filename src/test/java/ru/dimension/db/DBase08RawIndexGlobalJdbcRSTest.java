@@ -52,16 +52,16 @@ public class DBase08RawIndexGlobalJdbcRSTest extends AbstractH2Test {
   public void computeTableRawDataBeginEnd77Test() {
     List<List<Object>> actual = getRawDataAll(7, 7);
 
-    assertEquals(expected.stream().filter(e -> e.get(0) == "7").count(), actual.size());
-    assertForRaw(expected.stream().filter(e -> e.get(0) == "7").collect(Collectors.toList()), actual);
-    assertForRaw(expected.stream().filter(e -> e.get(0) == "7").collect(Collectors.toList()),  RSTest(7, 7, 1));
+    assertEquals(expected.stream().filter(e -> e.getFirst() == "7").count(), actual.size());
+    assertForRaw(expected.stream().filter(e -> e.getFirst() == "7").collect(Collectors.toList()), actual);
+    assertForRaw(expected.stream().filter(e -> e.getFirst() == "7").collect(Collectors.toList()),  RSTest(7, 7, 1));
   }
 
   @Test
   public void computeTableRawDataBeginEnd57Test() {
     List<List<Object>> actual = getRawDataAll(5, 7);
 
-    Predicate<List<Object>> filter = e -> (e.get(0) == "5" | e.get(0) == "6" | e.get(0) == "7");
+    Predicate<List<Object>> filter = e -> (e.getFirst() == "5" | e.getFirst() == "6" | e.getFirst() == "7");
 
     assertEquals(expected.stream().filter(filter).count(), actual.size());
     assertForRaw(expected.stream().filter(filter).collect(Collectors.toList()), actual);
@@ -72,7 +72,7 @@ public class DBase08RawIndexGlobalJdbcRSTest extends AbstractH2Test {
   public void computeTableRawDataBeginEnd67Test() {
     List<List<Object>> actual = getRawDataAll(6, 7);
 
-    Predicate<List<Object>> filter = e -> (e.get(0) == "6" | e.get(0) == "7");
+    Predicate<List<Object>> filter = e -> (e.getFirst() == "6" | e.getFirst() == "7");
 
     assertEquals(expected.stream().filter(filter).count(), actual.size());
     assertForRaw(expected.stream().filter(filter).collect(Collectors.toList()), actual);
@@ -83,8 +83,8 @@ public class DBase08RawIndexGlobalJdbcRSTest extends AbstractH2Test {
   public void computeTableRawDataBeginEnd16Test() {
     List<List<Object>> actual = getRawDataAll(1, 6);
 
-    Predicate<List<Object>> filter = e -> (e.get(0) == "1" | e.get(0) == "2" | e.get(0) == "3"
-        | e.get(0) == "4" | e.get(0) == "5" | e.get(0) == "6");
+    Predicate<List<Object>> filter = e -> (e.getFirst() == "1" | e.getFirst() == "2" | e.getFirst() == "3"
+        | e.getFirst() == "4" | e.getFirst() == "5" | e.getFirst() == "6");
 
     assertEquals(expected.stream().filter(filter).count(), actual.size());
     assertForRaw(expected.stream().filter(filter).collect(Collectors.toList()), actual);
@@ -95,8 +95,8 @@ public class DBase08RawIndexGlobalJdbcRSTest extends AbstractH2Test {
   public void computeTableRawDataBeginEnd811Test() {
     List<List<Object>> actual = getRawDataAll(8, 11);
 
-    Predicate<List<Object>> filter = e -> (e.get(0) == "8" | e.get(0) == "9"
-        | e.get(0) == "10" | e.get(0) == "11");
+    Predicate<List<Object>> filter = e -> (e.getFirst() == "8" | e.getFirst() == "9"
+        | e.getFirst() == "10" | e.getFirst() == "11");
 
     assertEquals(expected.stream().filter(filter).count(), actual.size());
     assertForRaw(expected.stream().filter(filter).collect(Collectors.toList()), actual);
@@ -109,11 +109,11 @@ public class DBase08RawIndexGlobalJdbcRSTest extends AbstractH2Test {
 
     List<List<Object>> actual = getRawDataByColumn(cProfile, 8, 11);
 
-    Predicate<List<Object>> filter = e -> (e.get(0) == "8" | e.get(0) == "9"
-        | e.get(0) == "10" | e.get(0) == "11");
+    Predicate<List<Object>> filter = e -> (e.getFirst() == "8" | e.getFirst() == "9"
+        | e.getFirst() == "10" | e.getFirst() == "11");
 
     assertEquals(expected.stream().filter(filter).count(), actual.size());
-    assertForRaw(expected.stream().filter(filter).map(map -> List.of(map.get(0), map.get(0))).collect(Collectors.toList()), actual);
+    assertForRaw(expected.stream().filter(filter).map(map -> List.of(map.getFirst(), map.getFirst())).collect(Collectors.toList()), actual);
   }
 
   @Test
@@ -121,11 +121,11 @@ public class DBase08RawIndexGlobalJdbcRSTest extends AbstractH2Test {
     CProfile cProfile = getCProfileByColumnName("FIRSTNAME");
     List<List<Object>> actual = getRawDataByColumn(cProfile, 8, 11);
 
-    Predicate<List<Object>> filter = e -> (e.get(0) == "8" | e.get(0) == "9"
-        | e.get(0) == "10" | e.get(0) == "11");
+    Predicate<List<Object>> filter = e -> (e.getFirst() == "8" | e.getFirst() == "9"
+        | e.getFirst() == "10" | e.getFirst() == "11");
 
     assertEquals(expected.stream().filter(filter).count(), actual.size());
-    assertForRaw(expected.stream().filter(filter).map(map -> List.of(map.get(0), map.get(1))).collect(Collectors.toList()), actual);
+    assertForRaw(expected.stream().filter(filter).map(map -> List.of(map.getFirst(), map.get(1))).collect(Collectors.toList()), actual);
   }
 
   @Test
@@ -133,11 +133,11 @@ public class DBase08RawIndexGlobalJdbcRSTest extends AbstractH2Test {
     CProfile cProfile = getCProfileByColumnName("CITY");
     List<List<Object>> actual = getRawDataByColumn(cProfile, 8, 11);
 
-    Predicate<List<Object>> filter = e -> (e.get(0) == "8" | e.get(0) == "9"
-        | e.get(0) == "10" | e.get(0) == "11");
+    Predicate<List<Object>> filter = e -> (e.getFirst() == "8" | e.getFirst() == "9"
+        | e.getFirst() == "10" | e.getFirst() == "11");
 
     assertEquals(expected.stream().filter(filter).count(), actual.size());
-    assertForRaw(expected.stream().filter(filter).map(map -> List.of(map.get(0), map.get(4))).collect(Collectors.toList()), actual);
+    assertForRaw(expected.stream().filter(filter).map(map -> List.of(map.getFirst(), map.get(4))).collect(Collectors.toList()), actual);
   }
 
   private List<List<Object>> RSTest(int begin, int end, int fetchSize) {

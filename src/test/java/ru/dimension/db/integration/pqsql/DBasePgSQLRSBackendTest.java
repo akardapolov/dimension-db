@@ -254,6 +254,6 @@ public class DBasePgSQLRSBackendTest extends AbstractBackendSQLTest {
     List<StackedColumn> stackedColumns =
         dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, 4394908640000L);
 
-    assertEquals(4, stackedColumns.get(0).getKeyCount().get(""));
+    assertEquals(4, stackedColumns.getFirst().getKeyCount().get(""));
   }
 }

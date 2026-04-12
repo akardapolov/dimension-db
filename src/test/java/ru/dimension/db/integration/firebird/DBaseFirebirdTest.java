@@ -209,11 +209,11 @@ public class DBaseFirebirdTest implements JdbcSource {
 
     /* Test GanttColumn API */
     List<GanttColumnCount> clobCharGantt = getGanttColumn(tableName, clobProfile, charProfile);
-    assertEquals(clobData, clobCharGantt.get(0).getKey());
+    assertEquals(clobData, clobCharGantt.getFirst().getKey());
     assertEquals(charVal, getGanttKey(clobCharGantt, charVal));
 
     List<GanttColumnCount> floatEnumGantt = getGanttColumn(tableName, floatProfile, enumProfile);
-    assertEquals(floatVal, Float.parseFloat(floatEnumGantt.get(0).getKey()), 0.01);
+    assertEquals(floatVal, Float.parseFloat(floatEnumGantt.getFirst().getKey()), 0.01);
     assertEquals(enumVal, getGanttKey(floatEnumGantt, enumVal));
 
     /* Test Raw data API */
@@ -286,7 +286,7 @@ public class DBaseFirebirdTest implements JdbcSource {
   private String getStackedColumnKey(String tableName, CProfile cProfile)
       throws BeginEndWrongOrderException, SqlColMetadataException {
     return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, Long.MAX_VALUE)
-        .get(0)
+        .getFirst()
         .getKeyCount()
         .keySet()
         .iterator()
@@ -294,7 +294,7 @@ public class DBaseFirebirdTest implements JdbcSource {
   }
 
   private String getGanttKey(List<GanttColumnCount> ganttColumnCountList, String filter) {
-    return ganttColumnCountList.get(0).getGantt()
+    return ganttColumnCountList.getFirst().getGantt()
         .entrySet()
         .stream()
         .filter(f -> f.getKey().equalsIgnoreCase(filter))

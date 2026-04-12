@@ -112,7 +112,7 @@ public class DBaseSQLiteRSBackendTest extends AbstractBackendSQLTest {
     while (rs.next()) {
       List<List<Object>> batch = rs.getObject();
       for (List<Object> row : batch) {
-        actualTs.add(toMillis(row.get(0)));
+        actualTs.add(toMillis(row.getFirst()));
         actualCpu.add(((Number) row.get(1)).doubleValue());
       }
     }

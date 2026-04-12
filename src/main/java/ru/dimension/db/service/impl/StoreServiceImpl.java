@@ -84,7 +84,7 @@ public class StoreServiceImpl extends CommonServiceApi implements StoreService {
     boolean compression = metaModelApi.getTableCompression(tableName);
     List<CProfile> cProfiles = metaModelApi.getCProfiles(tableName);
     int colCount = cProfiles.size();
-    int rowCount = data.get(0).size();
+    int rowCount = data.getFirst().size();
 
     // Initialize storage type map
     Map<Integer, SType> colIdSTypeMap = new HashMap<>();

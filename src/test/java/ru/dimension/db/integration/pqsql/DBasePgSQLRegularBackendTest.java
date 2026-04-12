@@ -179,7 +179,7 @@ public class DBasePgSQLRegularBackendTest extends AbstractBackendSQLTest {
     assertNotNull(stackedColumns);
     assertFalse(stackedColumns.isEmpty());
 
-    StackedColumn column = stackedColumns.get(0);
+    StackedColumn column = stackedColumns.getFirst();
     assertEquals(4, column.getKeyCount().get("Electronics"));
     assertEquals(3, column.getKeyCount().get("Books"));
     assertEquals(3, column.getKeyCount().get("Clothing"));
@@ -201,7 +201,7 @@ public class DBasePgSQLRegularBackendTest extends AbstractBackendSQLTest {
     assertNotNull(stackedColumns);
     assertFalse(stackedColumns.isEmpty());
 
-    StackedColumn column = stackedColumns.get(0);
+    StackedColumn column = stackedColumns.getFirst();
     assertEquals(4, column.getKeyCount().get("Electronics"));
     assertEquals(2, column.getKeyCount().get("Books"));
     assertEquals(1, column.getKeyCount().get("Clothing"));

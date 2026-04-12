@@ -146,23 +146,23 @@ public class DBaseMySQLTest extends AbstractMySQLTest {
 
     /* Test GanttColumn API */
     List<GanttColumnCount> clobCharGantt = getGanttColumn(tableName, clobProfile, charProfile);
-    assertEquals(clobData, clobCharGantt.get(0).getKey());
+    assertEquals(clobData, clobCharGantt.getFirst().getKey());
     assertEquals(charVal, getGanttKey(clobCharGantt, charVal));
 
     List<GanttColumnCount> charTextGantt = getGanttColumn(tableName, charProfile, textProfile);
-    assertEquals(charVal, charTextGantt.get(0).getKey());
+    assertEquals(charVal, charTextGantt.getFirst().getKey());
     assertEquals(textVal, getGanttKey(charTextGantt, textVal));
 
     List<GanttColumnCount> floatEnumGantt = getGanttColumn(tableName, floatProfile, enumProfile);
-    assertEquals(floatVal, Float.valueOf(floatEnumGantt.get(0).getKey()));
+    assertEquals(floatVal, Float.valueOf(floatEnumGantt.getFirst().getKey()));
     assertEquals(enumVal, getGanttKey(floatEnumGantt, enumVal));
 
     List<GanttColumnCount> enumIntGantt = getGanttColumn(tableName, enumProfile, intProfile);
-    assertEquals(enumVal, enumIntGantt.get(0).getKey());
+    assertEquals(enumVal, enumIntGantt.getFirst().getKey());
     assertEquals(intVal, Integer.valueOf(getGanttKey(enumIntGantt, Integer.toString(intVal))));
 
     List<GanttColumnCount> intVarcharGantt = getGanttColumn(tableName, intProfile, varcharProfile);
-    assertEquals(intVal, Integer.valueOf(intVarcharGantt.get(0).getKey()));
+    assertEquals(intVal, Integer.valueOf(intVarcharGantt.getFirst().getKey()));
     assertEquals(varcharVal, getGanttKey(intVarcharGantt, varcharVal));
 
     /* Test Raw data API */
@@ -204,7 +204,7 @@ public class DBaseMySQLTest extends AbstractMySQLTest {
   private String getStackedColumnKey(String tableName, CProfile cProfile)
       throws BeginEndWrongOrderException, SqlColMetadataException {
     return dStore.getStacked(tableName, cProfile, GroupFunction.COUNT, null, 0, Long.MAX_VALUE)
-        .get(0)
+        .getFirst()
         .getKeyCount()
         .keySet()
         .iterator()
@@ -212,7 +212,7 @@ public class DBaseMySQLTest extends AbstractMySQLTest {
   }
 
   private String getGanttKey(List<GanttColumnCount> ganttColumnCountList, String filter) {
-    return ganttColumnCountList.get(0).getGantt()
+    return ganttColumnCountList.getFirst().getGantt()
         .entrySet()
         .stream()
         .filter(f -> f.getKey().equalsIgnoreCase(filter))

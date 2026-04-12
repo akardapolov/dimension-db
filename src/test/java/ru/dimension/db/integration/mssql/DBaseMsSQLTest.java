@@ -424,51 +424,51 @@ public class DBaseMsSQLTest extends AbstractMicrosoftSQLTest {
 
     /* Test GanttColumn API */
     List<GanttColumnCount> mssqlDtBitInt = getGanttColumn(tableName, mssqlDtBit, mssqlDtInt);
-    assertEquals(bitValue, mssqlDtBitInt.get(0).getKey());
+    assertEquals(bitValue, mssqlDtBitInt.getFirst().getKey());
     assertEquals(intValue, Integer.valueOf(getGanttKey(mssqlDtBitInt, String.valueOf(intValue))));
 
     List<GanttColumnCount> mssqlDtIntChar = getGanttColumn(tableName, mssqlDtInt, mssqlDtChar);
-    assertEquals(intValue, Integer.valueOf(mssqlDtIntChar.get(0).getKey()));
+    assertEquals(intValue, Integer.valueOf(mssqlDtIntChar.getFirst().getKey()));
     assertEquals(charValue, getGanttKey(mssqlDtIntChar, charValue));
 
     List<GanttColumnCount> mssqlDtCharDate = getGanttColumn(tableName, mssqlDtChar, mssqlDtDate);
-    assertEquals(charValue, mssqlDtCharDate.get(0).getKey());
+    assertEquals(charValue, mssqlDtCharDate.getFirst().getKey());
     assertEquals(dateValue.getTime(), Long.valueOf(getGanttKey(mssqlDtCharDate, String.valueOf(dateValue.getTime()))));
 
     List<GanttColumnCount> mssqlDtDateReal = getGanttColumn(tableName, mssqlDtDate, mssqlDtReal);
-    assertEquals(dateValue.getTime(), Long.valueOf(mssqlDtDateReal.get(0).getKey()));
+    assertEquals(dateValue.getTime(), Long.valueOf(mssqlDtDateReal.getFirst().getKey()));
     assertEquals(floatValue, Float.valueOf(getGanttKeyFloat(mssqlDtDateReal, String.format("%.2f", floatValue))));
 
     List<GanttColumnCount> mssqlDtRealText = getGanttColumn(tableName, mssqlDtReal, mssqlDtText);
-    assertEquals(floatValue, Float.valueOf(mssqlDtRealText.get(0).getKey()));
+    assertEquals(floatValue, Float.valueOf(mssqlDtRealText.getFirst().getKey()));
     assertEquals(textValue, getGanttKey(mssqlDtRealText, textValue));
 
     List<GanttColumnCount> mssqlDtTextTime = getGanttColumn(tableName, mssqlDtText, mssqlDtTime);
-    assertEquals(textValue, mssqlDtTextTime.get(0).getKey());
+    assertEquals(textValue, mssqlDtTextTime.getFirst().getKey());
     assertEquals(timeValueInt, Integer.parseInt(getGanttKey(mssqlDtTextTime, String.valueOf(timeValueInt))));
 
     List<GanttColumnCount> mssqlDtTimeFloat = getGanttColumn(tableName, mssqlDtTime, mssqlDtFloat);
-    assertEquals(timeValueInt, Integer.parseInt(mssqlDtTimeFloat.get(0).getKey()));
+    assertEquals(timeValueInt, Integer.parseInt(mssqlDtTimeFloat.getFirst().getKey()));
     assertEquals(doubleValue, Double.valueOf(getGanttKey(mssqlDtTimeFloat, String.valueOf(doubleValue))));
 
     List<GanttColumnCount> mssqlDtFloatDec = getGanttColumn(tableName, mssqlDtFloat, mssqlDtDecimal);
-    assertEquals(doubleValue, Double.valueOf(mssqlDtFloatDec.get(0).getKey()));
+    assertEquals(doubleValue, Double.valueOf(mssqlDtFloatDec.getFirst().getKey()));
     assertEquals(decimalValue1, new BigDecimal(getGanttKey(mssqlDtFloatDec, decimalValue1.toPlainString())).setScale(2, RoundingMode.HALF_UP));
 
     List<GanttColumnCount> mssqlDtDecimalNChar = getGanttColumn(tableName, mssqlDtDecimal, mssqlDtNchar);
-    assertEquals(decimalValue1, new BigDecimal(mssqlDtDecimalNChar.get(0).getKey()).setScale(2, RoundingMode.HALF_UP));
+    assertEquals(decimalValue1, new BigDecimal(mssqlDtDecimalNChar.getFirst().getKey()).setScale(2, RoundingMode.HALF_UP));
     assertEquals(ncharValue, getGanttKey(mssqlDtDecimalNChar, ncharValue));
 
     List<GanttColumnCount> mssqlDtNcharNText = getGanttColumn(tableName, mssqlDtNchar, mssqlDtNtext);
-    assertEquals(ncharValue, mssqlDtNcharNText.get(0).getKey());
+    assertEquals(ncharValue, mssqlDtNcharNText.getFirst().getKey());
     assertEquals(ntextValue, getGanttKey(mssqlDtNcharNText, ntextValue));
 
     List<GanttColumnCount> mssqlDtNtextBigInt = getGanttColumn(tableName, mssqlDtNtext, mssqlDtBigint);
-    assertEquals(ntextValue, mssqlDtNtextBigInt.get(0).getKey());
+    assertEquals(ntextValue, mssqlDtNtextBigInt.getFirst().getKey());
     assertEquals(bigintValue, Long.valueOf(getGanttKey(mssqlDtNtextBigInt, String.valueOf(bigintValue))));
 
     List<GanttColumnCount> mssqlDtBigintBinary = getGanttColumn(tableName, mssqlDtBigint, mssqlDtBinary);
-    assertEquals(bigintValue, Long.valueOf(mssqlDtBigintBinary.get(0).getKey()));
+    assertEquals(bigintValue, Long.valueOf(mssqlDtBigintBinary.getFirst().getKey()));
     assertEquals(new String(binaryValue, StandardCharsets.UTF_8).trim(), getGanttKey(mssqlDtBigintBinary, new String(binaryValue, StandardCharsets.UTF_8).trim()).trim());
 
     /* Test Raw data API */
@@ -542,7 +542,7 @@ public class DBaseMsSQLTest extends AbstractMicrosoftSQLTest {
   }
 
   private String getGanttKey(List<GanttColumnCount> ganttColumnCountList, String filter) {
-    return ganttColumnCountList.get(0).getGantt()
+    return ganttColumnCountList.getFirst().getGantt()
         .entrySet()
         .stream()
         .filter(f -> f.getKey().trim().equalsIgnoreCase(filter))
@@ -552,7 +552,7 @@ public class DBaseMsSQLTest extends AbstractMicrosoftSQLTest {
   }
 
   private String getGanttKeyFloat(List<GanttColumnCount> ganttColumnCountList, String filter) {
-    return ganttColumnCountList.get(0).getGantt()
+    return ganttColumnCountList.getFirst().getGantt()
         .entrySet()
         .stream()
         .filter(f -> {

@@ -105,7 +105,7 @@ public class DBase11MapArrayTest extends AbstractDirectTest {
                                                         GroupFunction.COUNT, filter, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     assertEquals(1, listMessage.size());
-    Map<String, Integer> counts = listMessage.get(0).getKeyCount();
+    Map<String, Integer> counts = listMessage.getFirst().getKeyCount();
     assertEquals(2, counts.get(testMessage2));
     assertFalse(counts.containsKey(testMessage1));
     assertFalse(counts.containsKey(testMessage3));
@@ -261,7 +261,7 @@ public class DBase11MapArrayTest extends AbstractDirectTest {
                                                     Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     assertEquals(1, listSum.size());
-    StackedColumn sumColumn = listSum.get(0);
+    StackedColumn sumColumn = listSum.getFirst();
     assertNotNull(sumColumn.getKeySum());
 
     double expectedSum = (testLongValue1 * 2) + (testLongValue2 * 2) + (testLongValue3 * 2);
@@ -271,7 +271,7 @@ public class DBase11MapArrayTest extends AbstractDirectTest {
                                                     Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     assertEquals(1, listAvg.size());
-    StackedColumn avgColumn = listAvg.get(0);
+    StackedColumn avgColumn = listAvg.getFirst();
     assertNotNull(avgColumn.getKeyAvg());
 
     double expectedAvg = (testLongValue1 + testLongValue2 + testLongValue3) / 3.0;
@@ -359,7 +359,7 @@ public class DBase11MapArrayTest extends AbstractDirectTest {
 
     assertEquals(3, distinctLongs.size());
 
-    assertEquals(String.valueOf(testLongValue1), distinctLongs.get(0));
+    assertEquals(String.valueOf(testLongValue1), distinctLongs.getFirst());
     assertEquals(String.valueOf(testLongValue2), distinctLongs.get(1));
     assertEquals(String.valueOf(testLongValue3), distinctLongs.get(2));
 
@@ -367,7 +367,7 @@ public class DBase11MapArrayTest extends AbstractDirectTest {
                                                         10, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     assertEquals(3, distinctLongsDesc.size());
-    assertEquals(String.valueOf(testLongValue3), distinctLongsDesc.get(0));
+    assertEquals(String.valueOf(testLongValue3), distinctLongsDesc.getFirst());
     assertEquals(String.valueOf(testLongValue2), distinctLongsDesc.get(1));
     assertEquals(String.valueOf(testLongValue1), distinctLongsDesc.get(2));
   }
@@ -384,7 +384,7 @@ public class DBase11MapArrayTest extends AbstractDirectTest {
                                                         filter, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     assertEquals(1, listMessage.size());
-    Map<String, Integer> counts = listMessage.get(0).getKeyCount();
+    Map<String, Integer> counts = listMessage.getFirst().getKeyCount();
 
     assertEquals(1, counts.size());
     assertEquals(2, counts.get(testMessage1).intValue());
@@ -432,7 +432,7 @@ public class DBase11MapArrayTest extends AbstractDirectTest {
                                                        OrderBy.ASC, filter, 10, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     assertEquals(1, distinctMessages.size());
-    assertEquals(testMessage2, distinctMessages.get(0));
+    assertEquals(testMessage2, distinctMessages.getFirst());
   }
 
   @Test
