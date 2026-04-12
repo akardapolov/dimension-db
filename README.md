@@ -508,16 +508,17 @@ The APIs for writing data only work with the local Berkley DB key-value data sto
 
 Table 5. Supported databases for working with API in Dimension DB
 
-| № | Dimension DB API support | Database             | Database type |
-|---|--------------------------|----------------------|---------------|
-| 1 | Read/Write               | Berkley DB           | key-value     |
-| 2 | Read                     | ClickHouse           | analytical    |
-| 3 | Read                     | Oracle               | relational    |
-| 4 | Read                     | PostgreSQL           | relational    |
-| 5 | Read                     | Microsoft SQL Server | relational    |
-| 6 | Read                     | MySQL                | relational    |
-| 7 | Read                     | DuckDB               | analytical    |
-| 8 | Read                     | Firebird             | relational    |
+| No. | Dimension DB API support | Database             | Database type |
+|-----|--------------------------|----------------------|---------------|
+| 1   | Read/Write               | Berkeley DB          | key-value     |
+| 2   | Read                     | ClickHouse           | analytical    |
+| 3   | Read                     | Oracle               | relational    |
+| 4   | Read                     | PostgreSQL           | relational    |
+| 5   | Read                     | Microsoft SQL Server | relational    |
+| 6   | Read                     | MySQL                | relational    |
+| 7   | Read                     | DuckDB               | analytical    |
+| 8   | Read                     | Firebird             | relational    |
+| 9   | Read                     | SQLite               | relational    |
 
 Before you start writing data, you need to set storage parameters and metadata for tables and columns in the **SProfile** object.
 
