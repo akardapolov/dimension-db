@@ -9,8 +9,10 @@ import ru.dimension.db.exception.EnumByteExceedException;
 import ru.dimension.db.exception.GanttColumnNotSupportedException;
 import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.exception.TableNameEmptyException;
+import ru.dimension.db.model.GranularityFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.BlockKeyTail;
 import ru.dimension.db.model.output.GanttColumnCount;
@@ -145,6 +147,31 @@ public interface DStore {
   List<StackedColumn> getStacked(String tableName,
                                  CProfile cProfile,
                                  GroupFunction groupFunction,
+                                 CompositeFilter compositeFilter,
+                                 long begin,
+                                 long end)
+      throws SqlColMetadataException, BeginEndWrongOrderException;
+
+  /**
+   * Get list stacked data by column with percentile support
+   *
+   * @param tableName            - Table name
+   * @param cProfile             - Column profile
+   * @param groupFunction        - COUNT, SUM or AVG
+   * @param percentileFunction   - NONE, P50, P90, P95, P99
+   * @param granularityFunction  - AUTO, MINUTE, HOUR, DAY, WEEK, MONTH (used only for COUNT, ignored for SUM/AVG)
+   * @param compositeFilter      - Composite filter with multiple conditions (AND/OR logic)
+   * @param begin                - start of range
+   * @param end                  - end of range
+   * @return {@literal List<StackedColumn>}
+   * @throws SqlColMetadataException
+   * @throws BeginEndWrongOrderException
+   */
+  List<StackedColumn> getStacked(String tableName,
+                                 CProfile cProfile,
+                                 GroupFunction groupFunction,
+                                 PercentileFunction percentileFunction,
+                                 GranularityFunction granularityFunction,
                                  CompositeFilter compositeFilter,
                                  long begin,
                                  long end)

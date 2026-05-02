@@ -22,10 +22,12 @@ import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.exception.TableNameEmptyException;
 import ru.dimension.db.handler.MetaModelHandler;
 import ru.dimension.db.handler.MetadataHandler;
+import ru.dimension.db.model.GranularityFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.MetaModel;
 import ru.dimension.db.model.MetaModel.TableMetadata;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.BlockKeyTail;
 import ru.dimension.db.model.output.GanttColumnCount;
@@ -542,6 +544,25 @@ public abstract class CommonStore implements DStore {
     }
 
     return this.groupByService.getStacked(tableName, cProfile, groupFunction, compositeFilter, begin, end);
+  }
+
+  @Override
+  public List<StackedColumn> getStacked(String tableName,
+                                        CProfile cProfile,
+                                        GroupFunction groupFunction,
+                                        PercentileFunction percentileFunction,
+                                        GranularityFunction granularityFunction,
+                                        CompositeFilter compositeFilter,
+                                        long begin,
+                                        long end)
+      throws SqlColMetadataException, BeginEndWrongOrderException {
+    if (begin > end) {
+      throw new BeginEndWrongOrderException("Begin value must be less the end one..");
+    }
+
+    return this.groupByService.getStacked(tableName, cProfile, groupFunction,
+                                          percentileFunction, granularityFunction,
+                                          compositeFilter, begin, end);
   }
 
   @Override

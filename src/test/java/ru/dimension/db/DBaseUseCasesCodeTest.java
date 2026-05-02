@@ -203,13 +203,25 @@ public class DBaseUseCasesCodeTest implements DirectMode, JDBCMode {
     testBlockKeyTail(tProfile.getTableName(), 2, 3);
 
     List<StackedColumn> expectedBlock = List.of(
-        new StackedColumn(1, 3, Map.of("Ivanov", 2, "Petrov", 1), null, null)
+        StackedColumn.builder()
+            .key(1)
+            .tail(3)
+            .keyCount(Map.of("Ivanov", 2, "Petrov", 1))
+            .build()
     );
     List<StackedColumn> expectedEdgeCaseTail = List.of(
-        new StackedColumn(1, 3, Map.of("Ivanov", 2), null, null)
+        StackedColumn.builder()
+            .key(1)
+            .tail(3)
+            .keyCount(Map.of("Ivanov", 2))
+            .build()
     );
     List<StackedColumn> expectedEdgeCaseBegin = List.of(
-        new StackedColumn(1, 3, Map.of("Ivanov", 1, "Petrov", 1), null, null)
+        StackedColumn.builder()
+            .key(1)
+            .tail(3)
+            .keyCount(Map.of("Ivanov", 1, "Petrov", 1))
+            .build()
     );
 
     String lastName = "LASTNAME";

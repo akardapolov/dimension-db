@@ -20,7 +20,12 @@ public class StackedColumn {
 
   private long tail;
 
+  @Builder.Default
   private Map<String, Integer> keyCount = new HashMap<>();
+  @Builder.Default
   private Map<String, Double> keySum = new HashMap<>();
+  @Builder.Default
   private Map<String, Double> keyAvg = new HashMap<>();
+  @Builder.Default
+  private Map<String, Double> keyPercentile = new HashMap<>();
 }

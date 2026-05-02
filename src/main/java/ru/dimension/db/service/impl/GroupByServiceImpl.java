@@ -25,8 +25,10 @@ import ru.dimension.db.core.metamodel.MetaModelApi;
 import ru.dimension.db.exception.BeginEndWrongOrderException;
 import ru.dimension.db.exception.SqlColMetadataException;
 import ru.dimension.db.metadata.DataType;
+import ru.dimension.db.model.GranularityFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.filter.FilterCondition;
 import ru.dimension.db.model.output.GanttColumnCount;
@@ -230,6 +232,271 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     } catch (Exception e) {
       log.error("Failed to process stacked count for column '{}': {}", cProfile.getColName(), e.toString(), e);
     }
+  }
+
+  private static final int MIN_BUCKETS_FOR_PERCENTILE = 5;
+
+  @Override
+  public List<StackedColumn> getStacked(String tableName,
+                                        CProfile cProfile,
+                                        GroupFunction groupFunction,
+                                        PercentileFunction percentileFunction,
+                                        GranularityFunction granularityFunction,
+                                        CompositeFilter compositeFilter,
+                                        long begin,
+                                        long end) throws SqlColMetadataException {
+
+    if (percentileFunction == null || percentileFunction == PercentileFunction.NONE) {
+      return getStacked(tableName, cProfile, groupFunction, compositeFilter, begin, end);
+    }
+
+    if (cProfile.getCsType().isTimeStamp()) {
+      throw new SqlColMetadataException("Not supported for timestamp column..");
+    }
+
+    if (groupFunction == GroupFunction.SUM || groupFunction == GroupFunction.AVG) {
+      CType cType = cProfile.getCsType().getCType();
+      if (!(cType == CType.INT || cType == CType.LONG || cType == CType.FLOAT || cType == CType.DOUBLE)) {
+        throw new RuntimeException("Group function " + groupFunction + " not supported for non-numeric column: " + cProfile.getColName());
+      }
+    }
+
+    BType bType = metaModelApi.getBackendType(tableName);
+    if (!BType.BERKLEYDB.equals(bType)) {
+      log.warn("Percentile not supported for non-BerkeleyDB backend '{}', falling back to regular getStacked", bType);
+      return getStacked(tableName, cProfile, groupFunction, compositeFilter, begin, end);
+    }
+
+    CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
+    if (!tsProfile.getCsType().isTimeStamp()) {
+      throw new SqlColMetadataException("Timestamp column not defined..");
+    }
+
+    byte tableId = metaModelApi.getTableId(tableName);
+
+    if (groupFunction == GroupFunction.COUNT) {
+      return computeCountPercentile(tableName, tableId, tsProfile, cProfile,
+                                    percentileFunction, granularityFunction,
+                                    compositeFilter, begin, end);
+    }
+    return computeNumericPercentile(tableId, tsProfile, cProfile,
+                                    percentileFunction, compositeFilter, begin, end);
+  }
+
+  private List<StackedColumn> computeNumericPercentile(byte tableId,
+                                                       CProfile tsProfile,
+                                                       CProfile cProfile,
+                                                       PercentileFunction percentileFunction,
+                                                       CompositeFilter compositeFilter,
+                                                       long begin,
+                                                       long end) {
+    List<Double> allValues = new ArrayList<>();
+
+    long previousBlockId = rawDAO.getPreviousBlockId(tableId, begin);
+    Map.Entry<MetadataKey, MetadataKey> keyEntry = getMetadataKeyPair(tableId, begin, end, previousBlockId);
+
+    try (EntityCursor<Metadata> cursor = rawDAO.getMetadataEntityCursor(keyEntry.getKey(), keyEntry.getValue())) {
+      Metadata columnKey;
+      while ((columnKey = cursor.next()) != null) {
+        long blockId = columnKey.getMetadataKey().getBlockId();
+        long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsProfile.getColId());
+
+        StorageContext context = StorageContext.builder()
+            .tableId(tableId)
+            .blockId(blockId)
+            .timestamps(timestamps)
+            .rawDAO(rawDAO)
+            .enumDAO(enumDAO)
+            .histogramDAO(histogramDAO)
+            .converter(converter)
+            .build();
+
+        SType sType = getSType(cProfile.getColId(), columnKey);
+
+        Map<FilterCondition, String[]> filterCache = buildFilterCacheWithFormats(compositeFilter, context, columnKey);
+        BitSet accepted = acceptedRows(timestamps, begin, end, compositeFilter, filterCache);
+
+        if (accepted.isEmpty()) {
+          continue;
+        }
+
+        try {
+          double[] values = storageManager.readDoubleValues(context, cProfile, sType);
+          for (int i = accepted.nextSetBit(0); i >= 0 && i < values.length; i = accepted.nextSetBit(i + 1)) {
+            allValues.add(values[i]);
+          }
+        } catch (Exception e) {
+          log.error("Failed to read double values for column '{}': {}", cProfile.getColName(), e.toString(), e);
+        }
+      }
+    } catch (RuntimeException re) {
+      throw re;
+    } catch (Exception e) {
+      log.error("Error in computeNumericPercentile: ", e);
+    }
+
+    if (allValues.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    double result = computePercentile(allValues, percentileFunction.getValue());
+
+    Map<String, Double> keyPercentile = new HashMap<>();
+    keyPercentile.put(cProfile.getColName(), result);
+
+    StackedColumn column = StackedColumn.builder()
+        .key(begin)
+        .tail(end)
+        .keyPercentile(keyPercentile)
+        .build();
+
+    return List.of(column);
+  }
+
+  private List<StackedColumn> computeCountPercentile(String tableName,
+                                                     byte tableId,
+                                                     CProfile tsProfile,
+                                                     CProfile cProfile,
+                                                     PercentileFunction percentileFunction,
+                                                     GranularityFunction granularityFunction,
+                                                     CompositeFilter compositeFilter,
+                                                     long begin,
+                                                     long end) {
+    GranularityFunction resolved = GranularityFunction.resolve(granularityFunction, begin, end);
+    long bucketSize = resolved.getMillis();
+
+    List<long[]> buckets = buildBuckets(begin, end, bucketSize);
+
+    Map<String, List<Double>> groupValues = new LinkedHashMap<>();
+    int nonEmptyBuckets = 0;
+
+    for (int b = 0; b < buckets.size(); b++) {
+      long[] bucket = buckets.get(b);
+      boolean isLast = (b == buckets.size() - 1);
+      long effectiveBucketEnd = isLast ? bucket[1] : bucket[1] - 1;
+
+      Map<String, Integer> bucketCounts = countInRange(tableId, tsProfile, cProfile,
+                                                       compositeFilter, bucket[0], effectiveBucketEnd);
+
+      if (bucketCounts.isEmpty()) {
+        continue;
+      }
+
+      nonEmptyBuckets++;
+      for (Map.Entry<String, Integer> entry : bucketCounts.entrySet()) {
+        groupValues
+            .computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
+            .add(entry.getValue().doubleValue());
+      }
+    }
+
+    if (nonEmptyBuckets < MIN_BUCKETS_FOR_PERCENTILE) {
+      log.warn("Not enough data buckets ({}) for percentile calculation on column '{}', falling back to regular COUNT",
+               nonEmptyBuckets, cProfile.getColName());
+      try {
+        return getStacked(tableName, cProfile, GroupFunction.COUNT, compositeFilter, begin, end);
+      } catch (SqlColMetadataException e) {
+        log.error("Fallback COUNT failed: ", e);
+        return Collections.emptyList();
+      }
+    }
+
+    Map<String, Double> keyPercentile = new LinkedHashMap<>();
+    for (Map.Entry<String, List<Double>> entry : groupValues.entrySet()) {
+      double p = computePercentile(entry.getValue(), percentileFunction.getValue());
+      keyPercentile.put(entry.getKey(), p);
+    }
+
+    StackedColumn column = StackedColumn.builder()
+        .key(begin)
+        .tail(end)
+        .keyPercentile(keyPercentile)
+        .build();
+
+    return List.of(column);
+  }
+
+  private Map<String, Integer> countInRange(byte tableId,
+                                            CProfile tsProfile,
+                                            CProfile cProfile,
+                                            CompositeFilter compositeFilter,
+                                            long bucketBegin,
+                                            long bucketEnd) {
+    Map<String, Integer> counts = new LinkedHashMap<>();
+
+    long previousBlockId = rawDAO.getPreviousBlockId(tableId, bucketBegin);
+    Map.Entry<MetadataKey, MetadataKey> keyEntry = getMetadataKeyPair(tableId, bucketBegin, bucketEnd, previousBlockId);
+
+    try (EntityCursor<Metadata> cursor = rawDAO.getMetadataEntityCursor(keyEntry.getKey(), keyEntry.getValue())) {
+      Metadata columnKey;
+      while ((columnKey = cursor.next()) != null) {
+        long blockId = columnKey.getMetadataKey().getBlockId();
+        long[] timestamps = rawDAO.getRawLong(tableId, blockId, tsProfile.getColId());
+
+        StorageContext context = StorageContext.builder()
+            .tableId(tableId)
+            .blockId(blockId)
+            .timestamps(timestamps)
+            .rawDAO(rawDAO)
+            .enumDAO(enumDAO)
+            .histogramDAO(histogramDAO)
+            .converter(converter)
+            .build();
+
+        SType sType = getSType(cProfile.getColId(), columnKey);
+
+        Map<FilterCondition, String[]> filterCache = buildFilterCacheWithFormats(compositeFilter, context, columnKey);
+        BitSet accepted = acceptedRows(timestamps, bucketBegin, bucketEnd, compositeFilter, filterCache);
+
+        if (accepted.isEmpty()) {
+          continue;
+        }
+
+        try {
+          String[] values = storageManager.readStringValues(context, cProfile, sType);
+          for (int i = accepted.nextSetBit(0); i >= 0 && i < values.length; i = accepted.nextSetBit(i + 1)) {
+            String v = values[i] != null ? values[i] : "";
+            processValueByDataType(v, counts, cProfile, compositeFilter);
+          }
+        } catch (Exception e) {
+          log.error("Failed to read string values for column '{}' in bucket [{}, {}]: {}",
+                    cProfile.getColName(), bucketBegin, bucketEnd, e.toString(), e);
+        }
+      }
+    } catch (Exception e) {
+      log.error("Error in countInRange [{}, {}]: ", bucketBegin, bucketEnd, e);
+    }
+
+    return counts;
+  }
+
+  private double computePercentile(List<Double> values, double p) {
+    if (values.isEmpty()) {
+      return 0.0;
+    }
+
+    List<Double> sorted = new ArrayList<>(values);
+    Collections.sort(sorted);
+
+    int index = (int) Math.ceil(p * sorted.size()) - 1;
+    return sorted.get(Math.max(0, index));
+  }
+
+  private List<long[]> buildBuckets(long begin, long end, long bucketSize) {
+    List<long[]> buckets = new ArrayList<>();
+    if (bucketSize <= 0) {
+      buckets.add(new long[]{begin, end});
+      return buckets;
+    }
+
+    long cursor = begin;
+    while (cursor < end) {
+      long bucketEnd = Math.min(cursor + bucketSize, end);
+      buckets.add(new long[]{cursor, bucketEnd});
+      cursor = bucketEnd;
+    }
+
+    return buckets;
   }
 
   @Override
