@@ -13,8 +13,10 @@ import java.util.stream.IntStream;
 import lombok.extern.log4j.Log4j2;
 import org.xerial.snappy.Snappy;
 import ru.dimension.db.metadata.CompressType;
+import ru.dimension.db.model.GranularityFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
@@ -667,6 +669,19 @@ public class RawBdbImpl extends QueryBdbApi implements RawDAO {
                                                CompositeFilter compositeFilter,
                                                int limit) {
     throw new RuntimeException("Not supported");
+  }
+
+  @Override
+  public List<StackedColumn> getStackedPercentile(String tableName,
+                                                  CProfile tsCProfile,
+                                                  CProfile cProfile,
+                                                  GroupFunction groupFunction,
+                                                  PercentileFunction percentileFunction,
+                                                  GranularityFunction granularityFunction,
+                                                  CompositeFilter compositeFilter,
+                                                  long begin,
+                                                  long end) {
+    throw new RuntimeException("Not supported — Berkeley DB percentile is handled at the service layer");
   }
 
   @Override

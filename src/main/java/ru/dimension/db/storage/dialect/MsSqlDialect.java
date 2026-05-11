@@ -9,6 +9,7 @@ import ru.dimension.db.metadata.DataType;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.filter.FilterCondition;
 import ru.dimension.db.model.filter.LogicalOperator;
@@ -40,6 +41,19 @@ public class MsSqlDialect implements DatabaseDialect {
     } else {
       throw new RuntimeException("Not supported");
     }
+  }
+
+  @Override
+  public boolean supportsNativeNumericPercentile() {
+    return true;
+  }
+
+  @Override
+  public String getSelectClassStackedPercentile(PercentileFunction percentileFunction,
+                                                CProfile cProfile) {
+    String colName = cProfile.getColName().toLowerCase();
+    return "SELECT DISTINCT PERCENTILE_DISC(" + percentileFunction.getValue()
+        + ") WITHIN GROUP (ORDER BY " + colName + ") OVER () AS value ";
   }
 
   @Override

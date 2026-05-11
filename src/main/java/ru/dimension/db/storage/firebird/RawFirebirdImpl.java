@@ -14,8 +14,10 @@ import java.util.Objects;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.dbcp2.BasicDataSource;
 import ru.dimension.db.core.metamodel.MetaModelApi;
+import ru.dimension.db.model.GranularityFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
@@ -221,6 +223,25 @@ public class RawFirebirdImpl extends QueryJdbcApi implements RawDAO {
                                                CompositeFilter compositeFilter,
                                                int limit) {
     return getStackedCommonRegular(tableName, cProfile, groupFunction, compositeFilter, limit, databaseDialect);
+  }
+
+  @Override
+  public List<StackedColumn> getStackedPercentile(String tableName,
+                                                  CProfile tsCProfile,
+                                                  CProfile cProfile,
+                                                  GroupFunction groupFunction,
+                                                  PercentileFunction percentileFunction,
+                                                  GranularityFunction granularityFunction,
+                                                  CompositeFilter compositeFilter,
+                                                  long begin,
+                                                  long end) {
+    if (GroupFunction.COUNT.equals(groupFunction)) {
+      return getStackedPercentileCountCommon(tableName, tsCProfile, cProfile, percentileFunction,
+                                             granularityFunction, compositeFilter, begin, end,
+                                             databaseDialect);
+    }
+    return getStackedPercentileNumericCommon(tableName, tsCProfile, cProfile, percentileFunction,
+                                             compositeFilter, begin, end, databaseDialect);
   }
 
   @Override

@@ -4,8 +4,10 @@ import com.sleepycat.persist.EntityCursor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import ru.dimension.db.model.GranularityFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
@@ -162,6 +164,16 @@ public interface RawDAO {
                                         GroupFunction groupFunction,
                                         CompositeFilter compositeFilter,
                                         int limit);
+
+  List<StackedColumn> getStackedPercentile(String tableName,
+                                           CProfile tsCProfile,
+                                           CProfile cProfile,
+                                           GroupFunction groupFunction,
+                                           PercentileFunction percentileFunction,
+                                           GranularityFunction granularityFunction,
+                                           CompositeFilter compositeFilter,
+                                           long begin,
+                                           long end);
 
   List<GanttColumnCount> getGanttCount(String tableName,
                                        CProfile tsCProfile,

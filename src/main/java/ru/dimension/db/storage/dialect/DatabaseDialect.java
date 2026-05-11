@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import ru.dimension.db.model.CompareFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.profile.CProfile;
 
@@ -13,6 +14,26 @@ public interface DatabaseDialect {
   String getSelectClassGantt(CProfile firstCProfile, CProfile secondCProfile);
 
   String getSelectClassStacked(GroupFunction groupFunction, CProfile cProfile);
+
+  /**
+   * Whether the underlying database has a native percentile function suitable for
+   * the SUM/AVG numeric-percentile path. When false, the SQL composer falls back to
+   * fetching column values and computing the percentile in-memory.
+   */
+  default boolean supportsNativeNumericPercentile() {
+    return false;
+  }
+
+  /**
+   * SELECT clause producing a single percentile aggregate (no GROUP BY).
+   * Implementations MUST emit a single numeric expression that can be read via
+   * {@code rs.getDouble(1)}. Only called when {@link #supportsNativeNumericPercentile()} returns true.
+   */
+  default String getSelectClassStackedPercentile(PercentileFunction percentileFunction,
+                                                 CProfile cProfile) {
+    throw new UnsupportedOperationException(
+        "Native numeric percentile not supported by this dialect");
+  }
 
   String getWhereClass(CProfile tsCProfile,
                        CProfile cProfileFilter,

@@ -15,8 +15,10 @@ import java.util.Objects;
 import java.util.Optional;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.dbcp2.BasicDataSource;
+import ru.dimension.db.model.GranularityFunction;
 import ru.dimension.db.model.GroupFunction;
 import ru.dimension.db.model.OrderBy;
+import ru.dimension.db.model.PercentileFunction;
 import ru.dimension.db.model.filter.CompositeFilter;
 import ru.dimension.db.model.output.GanttColumnCount;
 import ru.dimension.db.model.output.GanttColumnSum;
@@ -26,6 +28,7 @@ import ru.dimension.db.model.profile.table.TType;
 import ru.dimension.db.sql.BatchResultSet;
 import ru.dimension.db.sql.BatchResultSetSqlImpl;
 import ru.dimension.db.storage.dialect.DatabaseDialect;
+import ru.dimension.db.util.PercentileUtil;
 
 @Log4j2
 public abstract class QueryJdbcApi {
@@ -189,6 +192,145 @@ public abstract class QueryJdbcApi {
     } else {
       throw new RuntimeException("Not supported group function: " + groupFunction);
     }
+  }
+
+  protected List<StackedColumn> getStackedPercentileNumericCommon(String tableName,
+                                                                  CProfile tsCProfile,
+                                                                  CProfile cProfile,
+                                                                  PercentileFunction percentileFunction,
+                                                                  CompositeFilter compositeFilter,
+                                                                  long begin,
+                                                                  long end,
+                                                                  DatabaseDialect databaseDialect) {
+    String whereClass = databaseDialect.getWhereClassWithCompositeFilter(tsCProfile, compositeFilter);
+    String colNameOriginal = cProfile.getColName();
+    double percentileValue;
+
+    if (databaseDialect.supportsNativeNumericPercentile()) {
+      String selectClass = databaseDialect.getSelectClassStackedPercentile(percentileFunction, cProfile);
+      String query = selectClass + "FROM " + tableName + " " + whereClass;
+      log.info("Query: {}", query);
+
+      try (Connection conn = basicDataSource.getConnection();
+          PreparedStatement ps = conn.prepareStatement(query)) {
+        int paramIndex = 1;
+        databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, begin);
+        databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, end);
+
+        try (ResultSet rs = ps.executeQuery()) {
+          if (!rs.next()) {
+            return List.of();
+          }
+          percentileValue = rs.getDouble(1);
+          if (rs.wasNull()) {
+            return List.of();
+          }
+        }
+      } catch (SQLException e) {
+        throw new RuntimeException("Error executing native percentile query: " + e.getMessage(), e);
+      }
+    } else {
+      List<Double> values = new ArrayList<>();
+      String colName = cProfile.getColName().toLowerCase();
+      String query = "SELECT " + colName + " FROM " + tableName + " " + whereClass;
+      log.info("Query: {}", query);
+
+      try (Connection conn = basicDataSource.getConnection();
+          PreparedStatement ps = conn.prepareStatement(query)) {
+        int paramIndex = 1;
+        databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, begin);
+        databaseDialect.setDateTime(tsCProfile, ps, paramIndex++, end);
+
+        try (ResultSet rs = ps.executeQuery()) {
+          while (rs.next()) {
+            double v = rs.getDouble(1);
+            if (!rs.wasNull()) {
+              values.add(v);
+            }
+          }
+        }
+      } catch (SQLException e) {
+        throw new RuntimeException("Error executing in-memory percentile fetch: " + e.getMessage(), e);
+      }
+
+      if (values.isEmpty()) {
+        return List.of();
+      }
+      percentileValue = PercentileUtil.compute(values, percentileFunction.getValue());
+    }
+
+    Map<String, Double> keyPercentile = new HashMap<>();
+    keyPercentile.put(colNameOriginal, percentileValue);
+
+    StackedColumn column = StackedColumn.builder()
+        .key(begin)
+        .tail(end)
+        .keyPercentile(keyPercentile)
+        .build();
+    return List.of(column);
+  }
+
+  protected List<StackedColumn> getStackedPercentileCountCommon(String tableName,
+                                                                CProfile tsCProfile,
+                                                                CProfile cProfile,
+                                                                PercentileFunction percentileFunction,
+                                                                GranularityFunction granularityFunction,
+                                                                CompositeFilter compositeFilter,
+                                                                long begin,
+                                                                long end,
+                                                                DatabaseDialect databaseDialect) {
+    GranularityFunction resolved = GranularityFunction.resolve(granularityFunction, begin, end);
+    long bucketSize = resolved.getMillis();
+    List<long[]> buckets = PercentileUtil.buildBuckets(begin, end, bucketSize);
+
+    Map<String, List<Double>> groupValues = new LinkedHashMap<>();
+    int nonEmptyBuckets = 0;
+
+    for (int b = 0; b < buckets.size(); b++) {
+      long[] bucket = buckets.get(b);
+      boolean isLast = (b == buckets.size() - 1);
+      long effectiveBucketEnd = isLast ? bucket[1] : bucket[1] - 1;
+
+      List<StackedColumn> bucketResult = getStackedCommon(tableName, tsCProfile, cProfile,
+                                                          GroupFunction.COUNT, compositeFilter,
+                                                          bucket[0], effectiveBucketEnd,
+                                                          databaseDialect);
+
+      Map<String, Integer> bucketCounts = bucketResult.isEmpty()
+          ? Map.of()
+          : bucketResult.get(0).getKeyCount();
+
+      if (bucketCounts == null || bucketCounts.isEmpty()) {
+        continue;
+      }
+
+      nonEmptyBuckets++;
+      for (Map.Entry<String, Integer> entry : bucketCounts.entrySet()) {
+        groupValues
+            .computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
+            .add(entry.getValue().doubleValue());
+      }
+    }
+
+    if (nonEmptyBuckets < PercentileUtil.MIN_BUCKETS_FOR_PERCENTILE) {
+      log.warn("Not enough data buckets ({}) for percentile calculation on column '{}', falling back to regular COUNT",
+               nonEmptyBuckets, cProfile.getColName());
+      return getStackedCommon(tableName, tsCProfile, cProfile,
+                              GroupFunction.COUNT, compositeFilter, begin, end, databaseDialect);
+    }
+
+    Map<String, Double> keyPercentile = new LinkedHashMap<>();
+    for (Map.Entry<String, List<Double>> entry : groupValues.entrySet()) {
+      double p = PercentileUtil.compute(entry.getValue(), percentileFunction.getValue());
+      keyPercentile.put(entry.getKey(), p);
+    }
+
+    StackedColumn column = StackedColumn.builder()
+        .key(begin)
+        .tail(end)
+        .keyPercentile(keyPercentile)
+        .build();
+    return List.of(column);
   }
 
   protected List<GanttColumnCount> getGanttCountCommon(String tableName,

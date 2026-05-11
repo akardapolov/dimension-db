@@ -50,6 +50,7 @@ import ru.dimension.db.storage.bdb.entity.Metadata;
 import ru.dimension.db.storage.bdb.entity.MetadataKey;
 import ru.dimension.db.storage.format.StorageContext;
 import ru.dimension.db.storage.format.StorageManager;
+import ru.dimension.db.util.PercentileUtil;
 
 @Log4j2
 public class GroupByServiceImpl extends CommonServiceApi implements GroupByService {
@@ -234,7 +235,7 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     }
   }
 
-  private static final int MIN_BUCKETS_FOR_PERCENTILE = 5;
+  private static final int MIN_BUCKETS_FOR_PERCENTILE = PercentileUtil.MIN_BUCKETS_FOR_PERCENTILE;
 
   @Override
   public List<StackedColumn> getStacked(String tableName,
@@ -262,14 +263,15 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     }
 
     BType bType = metaModelApi.getBackendType(tableName);
-    if (!BType.BERKLEYDB.equals(bType)) {
-      log.warn("Percentile not supported for non-BerkeleyDB backend '{}', falling back to regular getStacked", bType);
-      return getStacked(tableName, cProfile, groupFunction, compositeFilter, begin, end);
-    }
-
     CProfile tsProfile = metaModelApi.getTimestampCProfile(tableName);
     if (!tsProfile.getCsType().isTimeStamp()) {
       throw new SqlColMetadataException("Timestamp column not defined..");
+    }
+
+    if (!BType.BERKLEYDB.equals(bType)) {
+      return rawDAO.getStackedPercentile(tableName, tsProfile, cProfile,
+                                         groupFunction, percentileFunction, granularityFunction,
+                                         compositeFilter, begin, end);
     }
 
     byte tableId = metaModelApi.getTableId(tableName);
@@ -339,7 +341,7 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
       return Collections.emptyList();
     }
 
-    double result = computePercentile(allValues, percentileFunction.getValue());
+    double result = PercentileUtil.compute(allValues, percentileFunction.getValue());
 
     Map<String, Double> keyPercentile = new HashMap<>();
     keyPercentile.put(cProfile.getColName(), result);
@@ -365,7 +367,7 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     GranularityFunction resolved = GranularityFunction.resolve(granularityFunction, begin, end);
     long bucketSize = resolved.getMillis();
 
-    List<long[]> buckets = buildBuckets(begin, end, bucketSize);
+    List<long[]> buckets = PercentileUtil.buildBuckets(begin, end, bucketSize);
 
     Map<String, List<Double>> groupValues = new LinkedHashMap<>();
     int nonEmptyBuckets = 0;
@@ -403,7 +405,7 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
 
     Map<String, Double> keyPercentile = new LinkedHashMap<>();
     for (Map.Entry<String, List<Double>> entry : groupValues.entrySet()) {
-      double p = computePercentile(entry.getValue(), percentileFunction.getValue());
+      double p = PercentileUtil.compute(entry.getValue(), percentileFunction.getValue());
       keyPercentile.put(entry.getKey(), p);
     }
 
@@ -468,35 +470,6 @@ public class GroupByServiceImpl extends CommonServiceApi implements GroupByServi
     }
 
     return counts;
-  }
-
-  private double computePercentile(List<Double> values, double p) {
-    if (values.isEmpty()) {
-      return 0.0;
-    }
-
-    List<Double> sorted = new ArrayList<>(values);
-    Collections.sort(sorted);
-
-    int index = (int) Math.ceil(p * sorted.size()) - 1;
-    return sorted.get(Math.max(0, index));
-  }
-
-  private List<long[]> buildBuckets(long begin, long end, long bucketSize) {
-    List<long[]> buckets = new ArrayList<>();
-    if (bucketSize <= 0) {
-      buckets.add(new long[]{begin, end});
-      return buckets;
-    }
-
-    long cursor = begin;
-    while (cursor < end) {
-      long bucketEnd = Math.min(cursor + bucketSize, end);
-      buckets.add(new long[]{cursor, bucketEnd});
-      cursor = bucketEnd;
-    }
-
-    return buckets;
   }
 
   @Override
